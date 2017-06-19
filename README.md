@@ -1,4 +1,4 @@
-# Elzar
+# ccfepyutils
 Central repository for general purpose python classes and functions used at CCFE.
 
 This repository will be updated soon.
@@ -9,4 +9,4 @@ attending [Coding Discussion Group](https://git.ccfe.ac.uk/tfarley/Coding_Discus
 ### Files contained in repositry
 **_MODULE_**  | **_DESCRIPTION_**  
 ---|---
-**data**		|	*Collections of functions for data analysis* 
+**data**		|	*Collections of feneral purpose functions for data analysis* 
