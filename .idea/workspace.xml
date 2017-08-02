@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="7d0c14cf-f146-4f20-b923-e9e0e56b4b61" name="Default" comment="">
-      <change type="DELETED" beforePath="$PROJECT_DIR$/data.py" afterPath="" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-    </list>
+    <list default="true" id="7d0c14cf-f146-4f20-b923-e9e0e56b4b61" name="Default" comment="" />
     <ignored path="$PROJECT_DIR$/.idea/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -77,9 +74,11 @@
       <file leaf-file-name="ccfe_plotly.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ccfe_plotly.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="54">
-              <caret line="3" column="18" lean-forward="false" selection-start-line="3" selection-start-column="18" selection-end-line="3" selection-end-column="18" />
-              <folding />
+            <state relative-caret-position="612">
+              <caret line="34" column="54" lean-forward="false" selection-start-line="34" selection-start-column="54" selection-end-line="34" selection-end-column="54" />
+              <folding>
+                <element signature="e#58#93#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -381,7 +380,14 @@
       <option name="project" value="LOCAL" />
       <updated>1500641396309</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Updated ccfe_plotly functionality">
+      <created>1501259320507</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1501259320507</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -416,7 +422,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Added ccfe_plotly file" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added ccfe_plotly file" />
+    <MESSAGE value="Updated ccfe_plotly functionality" />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated ccfe_plotly functionality" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -481,7 +488,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
+          <folding>
+            <element signature="e#58#93#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -534,7 +543,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
+          <folding>
+            <element signature="e#58#93#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -587,7 +598,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
+          <folding>
+            <element signature="e#58#93#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -782,9 +795,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/ccfe_plotly.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="54">
-          <caret line="3" column="18" lean-forward="false" selection-start-line="3" selection-start-column="18" selection-end-line="3" selection-end-column="18" />
-          <folding />
+        <state relative-caret-position="612">
+          <caret line="34" column="54" lean-forward="false" selection-start-line="34" selection-start-column="54" selection-end-line="34" selection-end-column="54" />
+          <folding>
+            <element signature="e#58#93#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
