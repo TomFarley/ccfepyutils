@@ -97,10 +97,10 @@ def input_output_scatter3d(inp, output, extra_points={}, axis_labels=None, onlin
         url = py.plot(data, layout=layout, filename=online_name, auto_open=auto_open)
         logger.info('Plotly input_output_scatter3d plot "{n}" saved online at url: {u}'.format(n=online_name, u=url))
         return  url
-    else:
+    else:  # offline
         import plotly
         fig = go.Figure(data=data, layout=layout)
-        plotly.offline.plot(fig, filename=offline_name)
+        plotly.offline.plot(fig, filename=offline_name, auto_open=auto_open)
         logger.info('Plotly input_output_scatter3d plot saved to local file: {n}'.format(n=offline_name))
 
 
