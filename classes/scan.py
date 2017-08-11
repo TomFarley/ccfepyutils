@@ -1,4 +1,13 @@
-from __future__ import division
+#!/usr/bin/env python
+"""Iterator class for selecting x so as to best capture detail in y(x)
+Tom Farley, 08-2017
+
+TODO:
+- replace parametric spline interpolation
+
+"""
+from __future__ import (absolute_import, division, print_function, unicode_literals)
+
 import numpy as np
 import matplotlib.pyplot as plt
 from time import sleep
@@ -8,19 +17,29 @@ from scipy.optimize import curve_fit
 from scipy.signal import argrelmax, argrelmin
 
 class ParameterScan(object):
-    """Itterator for selecting x so as to best capture detail in y(x)
+    """Iterator class for selecting x so as to best capture detail in y(x)
+    Usage example:
+       ps =  ParameterScan([0,100], n_linear=4, n_refine=6, n_spread=2, n_extreema=2)
+       for x in ps:
+          y = # your code goes here and returns y(x)
+          ps.add_data(x, y)
+       ps.plot_data()  # plot results of the scan y(x)
+       x, y = ps.data  # return results of the scan y(x)
     """
-    def __init__(self, lims, n_linear=0, n_refine=0, n_spread=0, n_extreema=0, extrema_weight=10, func='linear', n_model=1000,
-                 extrema_frac=0.25, pinpoint_extrema_weight=2, order=2):
+    def __init__(self, lims, n_linear=4, n_refine=6, n_spread=2, n_extreema=2, extrema_weight=10, func='linear',
+                 n_model=1000, extrema_frac=0.25, pinpoint_extrema_weight=2, order=1):
         """
         n_refine                 - Number of points to intelligently evaluate over interval (not including interval limits)
-        extrema_weight           -
-        n_spread                 -
-        n_extreema               -
-        func                     -
-        n_model                  -
+        extrema_weight           - Importance of refining extrema relative to evaluating evenly along the curve
+        n_linear                 - Number of points to linearly evaluate across interval (excluding limits)
+        n_refine                 - Number of points to assign automatically based on extrema_frac (
+        n_spread                 - Number of points to assign to filling gaps at end of refinement
+        n_extreema               - Number of points to assign to further refining extrema at end of refinement
+        func                     - Not implemented - anticipated distribution of data
+        n_model                  - Number of high resolution points to evalute along fitted spline curve
         extrema_frac             - Proportion of range over which feature must be global maxima to be refined
-        pinpoint_extrema_weight  -
+        pinpoint_extrema_weight  - Relative importance of pinpointing extrema location over filling gaps around extrema
+        order                    - Order of spline fit
         """
         assert len(lims) == 2, 'lims must contain two elements: [min, max]'
         self.lims = lims  # Limits over which parameter scan will be performed
@@ -67,6 +86,10 @@ class ParameterScan(object):
         return 2 + self.n_linear + self.n_refine + self.n_spread + self.n_extreema
 
     @property
+    def data(self):
+        return (self.x, self.y)
+
+    @property
     def func(self):
         return self._func
 
@@ -108,14 +131,14 @@ class ParameterScan(object):
 
                 if l_gap > self._extrema_weight * l_extr:
                     self._current_type = 'gap'
-                    print('Filling gap')
+                    print('Filling largest gap in data')
                     yield x_gap
                 else:
                     self._current_type = 'extrema'
-                    print('Refining extrema')
+                    print('Refining extrema position')
                     yield x_extr
             else:
-                print('Filling gap')
+                print('Filling largest gap in data')
                 self._current_type = 'gap'
                 yield x_gap
 
@@ -127,12 +150,15 @@ class ParameterScan(object):
             assert len(self._x) == 2+self.n_linear+self.n_refine+n, 'New data must be added each loop using .add_data()  to update the model'
             assert len(self._y) == len(self._x) == 2+self.n_linear+self.n_refine+n, 'New x and y data must be added of equal length'
             x_new = self.get_gap_point()
+            print('Filling largest gap in data')
             yield x_new
         # Finally refine extrema with requested number of points
         for n in np.arange(self.n_extreema):
             x_new = self.get_extreema_point()
             if x_new is None:
+                print('No extrema detected to refine - skipping')
                 break
+            print('Refining extrema position')
             yield x_new
 
     def add_data(self, x, y):
@@ -197,7 +223,7 @@ class ParameterScan(object):
         l_fine = np.sqrt(np.sum(np.diff(spline.T, axis=0) ** 2, axis=1))  # distance between adjacent fine points
         cum_len = np.append([0], np.cumsum(l_fine))  # distance along fine spline
         full_length = cum_len[-1]
-        print('length of curve: {}'.format(full_length))
+        # print('length of curve: {}'.format(full_length))
         l = [cum_len[np.argmin(np.abs(self._u_model - ui))] for ui in self._u]  # distance along spline line at data points
 
         imodel_new = [self.closest_model_index(x_newi) for x_newi in x_new]  # indices of extrema in model (ie fine)
@@ -267,159 +293,16 @@ class ParameterScan(object):
         return np.sum(lengths)
 
     def predict(self):
+        raise NotImplementedError
         f = curve_fit(self.func, np.arange(self.n_spread))
-    
-    @staticmethod
-    def demo(func, lims, noise=0.05, time=30, **kwargs):
-        """Demo class on known function to demonstrate capabilties"""
-        plt.ion()  # interactive mode
-        # Fine points describing true function we trying to sample and best represent
-        ps = ParameterScan(lims, **kwargs)
-        dt = (time-2.) / (ps.n_scan)
 
-        # Generate noisy data
+    def plot_data(self, xlabel='x', ylabel='y'):
+        fig, ax = plt.subplots()
+        ax.plot(self.x, self.y, label='Scan results')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        plt.show()
 
-
-        # Find points that would be returned used simple linear scan
-        linear_scan = np.linspace(lims[0], lims[1], ps.n_scan)
-        linear_scan = [linear_scan, func(linear_scan)]
-        # Add random guassian 'experiemntal' noise to measurement
-        linear_scan[1] = linear_scan[1] + np.random.randn(len(linear_scan[1]))*noise*np.mean(linear_scan[1])
-        noisy_interp = scipy.interpolate.interp1d(linear_scan[0], linear_scan[1])
-
-        fine = np.linspace(lims[0], lims[1], 1000)
-        fine = [fine, func(fine)]
-
-        art_true, = plt.plot(fine[0], fine[1], label='True distribution')
-        # plt.plot(fine[0][(0, -1)], fine[1][(0, -1)], label='Interval limits')
-        # plt.show(block=False)
-        # plt.draw()
-        # sleep(3)
-        plt.legend(loc='best')
-        plt.pause(1)
-        art_linear, = plt.plot(linear_scan[0], linear_scan[1], 'o-', label='Linear scan results')
-        plt.legend(loc='best')
-        # plt.draw()
-        plt.pause(1)
-        # sleep(3)
-        # plt.show()
-        # plt.clear()
-        art_true.set_visible(False)
-        art_linear.set_visible(False)
-
-        model = ps.model_data  # fitted spline data
-        art_model, = plt.plot(model[0], model[1], '--r', label='model')  # spline curve
-        art_results, = plt.plot(ps._x[:-1], ps._y[:-1], '.k', label='results')  # black dots for points evaluated
-        art_next = plt.axvline(np.mean(ps.lims), color='k', ls='--')  # vertical line marking where next point will be
-        art_text = plt.annotate('', xy=(0.05, 0.95), xycoords=("axes fraction"))
-        art_next.set_visible(False)
-        for x in ps:
-            art_next.set_xdata(x)
-            art_next.set_visible(True)
-            art_text.set_text(ps._current_type)  # Update label for type of point being added
-            plt.pause(dt)
-            art_next.set_visible(False)
-            # y = func(x) + np.random.randn()*noise*np.mean(linear_scan[1])  # update with experimental/sim data + noise
-            y = noisy_interp(x)  # update with experimental/sim data + noise
-            ps.add_data(x, y)
-            model = ps.model_data
-            art_model.set_data(model)  # update spline fit data
-            art_results.set_data(ps._x[:], ps._y[:])  # mark previous points (excluding new point)
-            # plt.plot(ps._x[-1], ps._y[-1], 'og', ms=10, label='results')
-            plt.legend(loc='best')
-            # plt.show()
-            # plt.draw()
-            # sleep(2)
-
-        art_results.set_visible(False)
-        art_model.set_visible(False)
-        art_final, = plt.plot(ps.x, ps.y, 'o-g', label='model')  # final set of fitted points
-        art_linear.set_visible(True)
-        art_true.set_visible(True)
-        plt.legend(loc='best')
-        plt.pause(15)
-        # input()
-
-        print('Demo finished!')
-
-def spike(x):
-    x = x -0.9
-    return 100*np.exp(-(((x/0.7)**2+5*x+1))) + 3*x - np.exp(x/3.) #+ 4*np.sin(x)
-
-def dec_exp(x):
-    y = np.exp(-2*x)
-    return y
-
-def wavy(x):
-    y = np.cos(x) - x**2 / 40
-    return y
 
 if __name__ == '__main__':
-    lims = [-10, 10]
-    func = spike
-    # func = dec_exp
-    func = wavy
-    # x = np.linspace(lims[0], lims[1], 1000)
-    # plt.plot(x, func(x))
-    # plt.show()
-    # ParameterScan.demo(func, lims, time=10, n_linear=0, n_refine=12, n_spread=2, n_extreema=2,
-    #                    noise=0.2, order=1, extrema_frac=0.05)
-    ParameterScan.demo(wavy, lims, time=10, n_linear=5, n_refine=10, n_spread=2, n_extreema=2,
-                       noise=0.2, order=1, extrema_frac=0.05)
-
-    # x = np.array([ 2.,  1.,  1.,  2.,  2.,  4.,  4.,  3.])
-    # y = np.array([ 1.,  2.,  3.,  4.,  2.,  3.,  2.,  1.])
-    x = np.array([0.1, 0.18, 0.3, 0.99, 2, 2.1, 3, 4, 7, 10])
-    y = np.sin(x)
-    x_fine = np.linspace(np.min(x), np.max(x), 1000)
-    y_fine = np.sin(x_fine)
-    plt.plot(x, y, 'x', label='raw')
-    plt.plot(x_fine, y_fine, '-', label='True')
-
-    # t = np.arange(x.shape[0], dtype=float)
-    # t /= t[-1]
-    # nt = np.linspace(0, 1, 100)
-    # x1 = scipy.interpolate.spline(t, x, nt)
-    # y1 = scipy.interpolate.spline(t, y, nt)
-    # plt.plot(x1, y1, label='range_spline')
-    #
-    # t = np.zeros(x.shape)
-    # t[1:] = np.sqrt((x[1:] - x[:-1])**2 + (y[1:] - y[:-1])**2)
-    # t = np.cumsum(t)
-    # t /= t[-1]
-    # x2 = scipy.interpolate.spline(t, x, nt)
-    # y2 = scipy.interpolate.spline(t, y, nt)
-    # plt.plot(x2, y2, label='dist_spline')
-
-    # Return the distance from u to v along the spline
-    def dist_along_spline(tck, u = 0, v = 1, N = 1000):
-        spline = np.array(interpolate.splev(np.linspace(u, v, N), tck))
-        lengths = np.sqrt(np.sum(np.diff(spline.T, axis=0)**2, axis=1))
-        return np.sum(lengths)
-
-    n = 10
-
-    tck, u = interpolate.splprep([x, y], s=0)
-    print('u original: {}'.format(u))
-
-    u_fine = np.linspace(0, 1, 1000)
-    spline = np.array(interpolate.splev(u_fine, tck))
-    l_fine = np.sqrt(np.sum(np.diff(spline.T, axis=0) ** 2, axis=1))
-    cum_len = np.cumsum(l_fine)
-    full_length = cum_len[-1]
-    # full_length = dist_along_spline(tck)
-
-    l_new = np.linspace(0, full_length, n)
-    u_new = [u_fine[np.argmin(np.abs(cum_len-l))] for l in l_new]
-
-    print('length of curve: {}'.format(full_length))
-    # unew = np.arange(0, 1.01, 0.01)
-    out = interpolate.splev(u_new, tck)
-
-    # plt.plot(out[0], np.sin(out[0]), label='True')
-    plt.plot(out[0], out[1], '*', label='para spline')
-    plt.legend(loc='best')
-
-    plt.show()
-
-    print('finished!')
+    pass
