@@ -3,7 +3,6 @@
   <component name="ChangeListManager">
     <list default="true" id="7d0c14cf-f146-4f20-b923-e9e0e56b4b61" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/classes/demos/scan_demo.py" afterPath="$PROJECT_DIR$/classes/demos/scan_demo.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -47,7 +46,7 @@
       <file leaf-file-name="tf_debug.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/../tf_libs/tf_debug.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="505">
+            <state relative-caret-position="540">
               <caret line="30" column="33" lean-forward="false" selection-start-line="30" selection-start-column="33" selection-end-line="30" selection-end-column="33" />
               <folding />
             </state>
@@ -58,8 +57,8 @@
         <entry file="file://$PROJECT_DIR$/docs/Requirements_and_plans/plotting_class_specificaton.md">
           <provider selected="true" editor-type-id="split-provider[text-editor;MarkdownPreviewEditor]">
             <state split_layout="SPLIT">
-              <first_editor relative-caret-position="342">
-                <caret line="19" column="15" lean-forward="true" selection-start-line="19" selection-start-column="15" selection-end-line="19" selection-end-column="15" />
+              <first_editor relative-caret-position="234">
+                <caret line="22" column="36" lean-forward="false" selection-start-line="22" selection-start-column="36" selection-end-line="22" selection-end-column="36" />
                 <folding />
               </first_editor>
               <second_editor>
@@ -97,6 +96,7 @@
         <option value="$PROJECT_DIR$/array.py" />
         <option value="$PROJECT_DIR$/ccfe_array.py" />
         <option value="$PROJECT_DIR$/ccfe_plotly.py" />
+        <option value="$PROJECT_DIR$/docs/Requirements_and_plans/plotting_class_specificaton.md" />
       </list>
     </option>
   </component>
@@ -405,14 +405,21 @@
       <option name="project" value="LOCAL" />
       <updated>1502456163502</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Added plotting_class_specification.md">
+      <created>1503663460644</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1503663460644</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="24" width="1920" height="1005" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.251981" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.15266772" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Debug Logs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
@@ -443,7 +450,8 @@
     <MESSAGE value="Updated ccfe_plotly functionality" />
     <MESSAGE value="Cleaned up master branch and moved new code to dev branch" />
     <MESSAGE value="Quick update" />
-    <option name="LAST_COMMIT_MESSAGE" value="Quick update" />
+    <MESSAGE value="Added plotting_class_specification.md" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added plotting_class_specification.md" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -816,7 +824,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/../tf_libs/tf_debug.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="505">
+        <state relative-caret-position="540">
           <caret line="30" column="33" lean-forward="false" selection-start-line="30" selection-start-column="33" selection-end-line="30" selection-end-column="33" />
           <folding />
         </state>
@@ -825,8 +833,8 @@
     <entry file="file://$PROJECT_DIR$/docs/Requirements_and_plans/plotting_class_specificaton.md">
       <provider selected="true" editor-type-id="split-provider[text-editor;MarkdownPreviewEditor]">
         <state split_layout="SPLIT">
-          <first_editor relative-caret-position="342">
-            <caret line="19" column="15" lean-forward="true" selection-start-line="19" selection-start-column="15" selection-end-line="19" selection-end-column="15" />
+          <first_editor relative-caret-position="234">
+            <caret line="22" column="36" lean-forward="false" selection-start-line="22" selection-start-column="36" selection-end-line="22" selection-end-column="36" />
             <folding />
           </first_editor>
           <second_editor>
