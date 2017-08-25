@@ -119,9 +119,9 @@ if __name__ == '__main__':
                              (dec_exp, dict(n_linear=5, n_refine=5, n_spread=4, n_extreema=2, order=1)),
                              (wavy, dict(n_linear=5, n_refine=5, n_spread=4, n_extreema=2, order=1))])
 
-    noise = 0.0
+    noise = 0.2
     lims = [-10, 10]
-    time = 15
+    time = 10
     end_pause = 5  # 'input'
     extrema_frac = 0.05
 
