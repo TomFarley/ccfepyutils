@@ -16,12 +16,17 @@ Info:
     @since: 18/09/2015
 """
 
+from collections import defaultdict
 import numpy as np
+from numpy import exp as exp0
+from numpy import log as log0
+from numpy import sqrt as sqrt0
+from numpy import pi as pi0
 ## CAN import:    Debug, simple
 ## CANNOT import:
-import tf_libs.tf_simple as tf_simple
-import tf_libs.tf_debug as tf_debug
-import tf_libs.tf_string as tf_string
+# import tf_libs.tf_simple as tf_simple
+# import tf_libs.tf_debug as tf_debug
+# import tf_libs.tf_string as tf_string
 
 __version__ = "1.0.1"
 __author__ = 'Tom Farley'
@@ -31,7 +36,7 @@ __email__ = "farleytpm@gmail.com"
 __status__ = "Development"
 # __all__ = []
 
-db = tf_debug.Debug(1,1,0)
+# db = tf_debug.Debug(1,1,0)
 
 """ Physical constants: 
 ## Physical constants
@@ -64,6 +69,55 @@ eV2K   = 11604.505         # eV to K conversion factor = e/k_B [K/eV]
 ## Specific constants
 M_Ar = 39.948           # Atomic mass of atomic/molecular Argon [amu]
 
+class FitFunction(object):
+    """Class for fit functions
+
+    Wrapper for standard functions with additional meta data"""
+    instances = defaultdict(None)  # Dict of FitFunction instances
+    fitter = None
+    def __init__(self, func, key, name=None, name_short=None, description=None, equation=None, eqn_latex=None,
+                 params=None, symbol=None, constraints=None):
+        assert callable(func)
+        self.func = func  # Callable to evaluate
+        self.key = key  # Key to look up this FitFunction instance with
+        self._name = name  # Name for labels etc
+        self._name_short = name_short  # Abreviated/less verbose name for labels
+        self._description = description  # Verbose description of the function
+        self._equation = equation  # String showing implementation of equation
+        self._eqn_latex = eqn_latex # Latex string showing implementation of equation
+        self._params = params  # Dict of param strings and arg numbers
+        self._symbol = symbol  # Symbol representing function
+        self._constraints = constraints  # Constraints on possible parameter values eg strictly sigma > 0 for fitting
+
+        self.instances[key] = self
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    @property
+    def name(self):
+        if self._name is None:
+            return ''
+        else:
+            return self._name
+
+    @property
+    def description(self):
+        if self._description is None:
+            return ''
+        else:
+            return self._description
+
+    @classmethod
+    def avail(self):
+        """Print out list of available FitFunction instances"""
+        for key, f in self.instances.items():
+            print('{}: {}, {}'.format(key, f.name, f.description))
+
+    @classmethod
+    def get(cls, key):
+        """Get an existing FitFunction instance"""
+        return self.instances[key]
 
 ## Functions
 def poly(x, coefs, str_eqn = False):
@@ -97,7 +151,23 @@ def poly(x, coefs, str_eqn = False):
     else:
         return sum, str_eqn
 
-def exp(x, a, m, c, str_eqn=False):
+def linear(x, m, c):
+    """y = m*x + c"""
+    return m*x +c
+
+def exp(x, lamda, k):
+    """y = e^( -(x-k)/lamda )"""
+    return np.exp(-(x-k)/lamda)
+
+def exp_c(x, lamda, k, c):
+    """y = e^( -(x-k)/lamda ) + c"""
+    return np.exp(-(x-k)/lamda) + c
+
+def exp_a_c(x, A, lamda, k, c):
+    """y = e^( -(x-k)/lamda ) + c"""
+    return A * np.exp(-(x-k)/lamda) + c
+
+def exp_polly(x, a, m, c, str_eqn=False):
     """ y = a * e^( m ) + c where exp, a and c can all be polynomials in x """
 
     val_a, str_a = poly(x, a, str_eqn=True)
@@ -116,10 +186,70 @@ def exp(x, a, m, c, str_eqn=False):
 
         return val, str_eqn
 
-def gauss(x, A, mu, sigma, str_eqn=False):
+def gaussian(x, A, mu, sigma, c):
     """ Gaussian distribution with centre mu and width sigma """
-    ## @todo: update gaussian formula
-    return exp(x, A, (1/(2*sigma),0,-mu/(2*sigma)), 0, str_eqn=str_eqn)
+
+    return A * (1/sqrt0(2*pi0*sigma**2)) * exp0(-(x-mu)**2/(2*sigma**2)) + c
+    # return exp(x, A, (1/(2*sigma),0,-mu/(2*sigma)), 0)
+
+def gaussian_upright(x, A, mu, sigma, c):
+    """ Gaussian distribution with centre mu and width sigma """
+    if A <= 0:  # for purpose of curve fitting return inf if have negative amplitude
+        return 1e50
+    return A * 1/sqrt0(2*pi0*sigma**2) * exp0(-(x-mu)**2/(2*sigma**2)) + c
+
+def lognormal(x, A, mu, sigma, c):
+    """y = A / (sigma*sqrt(2*pi)*(x)) * exp(-(ln(x)-mu)**2/(sigma*sqrt(2)))"""
+    return (A / (sigma*sqrt0(2*pi0)*x)) * exp0(-(log0(x)-mu)**2/(2*sigma**2)) + c
+
+def distributions():
+    def delta(value, size=1):
+        if size > 1:
+            value = np.repeat(value, size)
+        return value
+
+    def lognormal(mean=0.0, sigma=1.0, scale=1.0, offset=0.0, size=None):
+        return scale * np.random.lognormal(mean=mean, sigma=sigma, size=size) + offset
+
+    def normal(mean=0.0, sigma=1.0, scale=1.0, size=None):
+        return scale * random.normal(loc=mean, scale=sigma, size=size)
+
+    def decaying_exponential(lamda=1.0, scale=1.0, offset=0.0, size=None):
+        """decaying_exponential with max value, scale, at position offset"""
+        return (scale * lamda) * random.exponential(scale=lamda, size=size) + offset
+
+    def trunc_exponential(size=None):
+        f = np.random.uniform(size=size) * 1e9
+        return np.log(f + 1.0) / np.max(np.log(f + 1.0))
+
+    def gaussian_2d(x_range, y_range, x, y, sigma_x, sigma_y, amp, angle=0, deg=True):
+        if angle != 0:
+            return elliptic_gaussian(x_range, y_range, x, y, sigma_x, sigma_y, amp, angle)
+        else:
+            xx, yy = np.meshgrid(x_range, y_range)  # 2D gaussian
+            return amp * (np.exp(-((xx.T - x) ** 2.0) / (2 * sigma_x * sigma_x)) *
+                          np.exp(-((yy.T - y) ** 2.0) / (2 * sigma_y * sigma_y)))
+
+    def elliptic_gaussian(x_range, y_range, x, y, sigma_x, sigma_y, amp, angle, deg=True):
+        """Generate tilted 2D ellipse on R tor grid"""
+        if deg:
+            angle = np.deg2rad(angle)
+        RR, TT = np.meshgrid(x_range, y_range)
+
+        a = (np.cos(angle) * np.cos(angle) / (2.0 * sigma_x * sigma_x)) + (
+            np.sin(angle) * np.sin(angle) / (2.0 * sigma_y * sigma_y))
+
+        b = (-np.sin(2.0 * angle) / (4.0 * sigma_x * sigma_x)) + (np.sin(2.0 * angle) / (4.0 * sigma_y * sigma_y))
+
+        c = (np.sin(angle) * np.sin(angle) / (2.0 * sigma_x * sigma_x)) + (
+            np.cos(angle) * np.cos(angle) / (2.0 * sigma_y * sigma_y))
+
+        exponent = - (a * (RR.T - x) * (RR.T - x) + 2.0 * b * (RR.T - x) * (TT.T - y) + c * (TT.T - y) * (TT.T - y))
+
+        return amp * np.exp(exponent)
+
+functions = {'poly': poly, 'linear': linear, 'exp': exp, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 'normal':
+    gaussian, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 'lognormal': lognormal}
 
 if __name__ == "__main__":
     print("e = ", e)
