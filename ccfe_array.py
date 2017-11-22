@@ -41,11 +41,13 @@ import tf_libs.tf_numeric as tf_numeric
 
 db = Debug(1,1,0)
 
+
 def make_itterable(obj):
     """If object is a scalar nest it in a list so it can be iterated over"""
     if not hasattr(obj, '__iter__') or isinstance(obj, basestring):
         obj = [obj]
     return obj
+
 
 def argsort(seq, reverse=False):
     """ Return indices of sorted (assernding) list """
@@ -53,19 +55,19 @@ def argsort(seq, reverse=False):
     return sorted(range(len(seq)), key=seq.__getitem__, reverse=reverse)
 
 
-def check_array(arr, ndarray=True, nest_depth=0, verbatim = False):
+def check_array(arr, ndarray=True, nest_depth=0, verbatim=False):
     """Check that the supplied array is as expected"""
     if verbatim: print('In: ', type(arr), arr)
 
     ## Remove nesting lists
-    if nest_depth==0:
-        while (type(arr) == list) and (len(arr)==1):
+    if nest_depth == 0:
+        while (type(arr) == list) and (len(arr) == 1):
             arr = arr[0]
 
     assert (type(arr) == list or np.ndarray), arr
     assert type(arr[0]) != list, arr
 
-    if ndarray: # Make sure arr is an ndarray
+    if ndarray:  # Make sure arr is an ndarray
         # if type(arr) == list:
         #     arr = list(itertools.chain(*arr))
         arr = np.array(arr)
@@ -76,7 +78,7 @@ def check_array(arr, ndarray=True, nest_depth=0, verbatim = False):
     return arr
 
 
-def sub_arr(array, lim, con_array = None, min=None, max=None, boundaries=True):
+def sub_arr(array, lim, con_array=None, min=None, max=None, boundaries=True):
     """Purpose: Extract sub array of values between min and max limits
     arguements:
      array          var     array to take subset of
@@ -91,25 +93,27 @@ def sub_arr(array, lim, con_array = None, min=None, max=None, boundaries=True):
 
     TODO: implement only using max or min
     """
-    array = check_array(array) # check array is a numpy array
+    array = check_array(array)  # check array is a numpy array
 
     assert lim[1] >= lim[0], 'min > max'
 
-    if con_array == None: # If no separate array supplied use same array for min/max
+    if con_array == None:  # If no separate array supplied use same array for min/max
         con_array = array
-    else: 
+    else:
         assert np.size(con_array) != np.size(array), 'WARNING: size(con_array) != size(array)'
 
     if boundaries == True:
-        sub = np.extract( (con_array>=lim[0]) * (con_array<=lim[1]), array)
+        sub = np.extract((con_array >= lim[0]) * (con_array <= lim[1]), array)
     else:
-        sub = np.extract( (con_array>lim[0]) * (con_array<lim[1]), array)
+        sub = np.extract((con_array > lim[0]) * (con_array < lim[1]), array)
     return sub
+
 
 def extract_2D(arr1, arr2, condition):
     """ Return elements of two arrays where indices match condition """
     inds = np.nonzero(condition)
     return arr1[inds], arr2[inds]
+
 
 def arr_range(array, var_name=False):
     """ Return numeric range of array as two element array """
@@ -118,18 +122,19 @@ def arr_range(array, var_name=False):
         print(var_name, 'range:', range)
     return range
 
-def arr_nearest(array, value, output = 'value', side = 'both', next=0):
+
+def arr_nearest(array, value, output='value', side='both', next=0):
     """Element in nd array closest to the scalar value
     Use 'next' to return next nearest values
     @Todo: add nest functionality """
     if side == 'both':
         idx = np.abs(array - value).argmin()
-    elif side =='above':
+    elif side == 'above':
         idx = (array - value)
-        idx = np.abs(np.extract(idx>0, idx)).argmin()
+        idx = np.abs(np.extract(idx > 0, idx)).argmin()
     elif side == 'below':
         idx = (array - value)
-        idx = np.abs(np.extract(idx<0, idx)).argmin()
+        idx = np.abs(np.extract(idx < 0, idx)).argmin()
     else:
         print('arr_nearest: Invalid side argument')
 
@@ -141,15 +146,16 @@ def arr_nearest(array, value, output = 'value', side = 'both', next=0):
         print('arr_nearest: Invalid output argument:', output)
         print("\t Accepted arguments: 'value', 'v', 'index', 'i'")
 
-def closest_max(x, y, x0, order = 3, output = 'value'):
+
+def closest_max(x, y, x0, order=3, output='value'):
     """ x value/index of max y value closest to x0 
     Requires arr_nearest 
     """
-    imax = argrelmax(y, order = order)[0] # Extract maximum in dI
+    imax = argrelmax(y, order=order)[0]  # Extract maximum in dI
     i0 = arr_nearest(x, x0, output='index')
-    iclose =  arr_nearest(imax, i0, output='value')
+    iclose = arr_nearest(imax, i0, output='value')
     x1 = imax
-    
+
     if (output == 'value') or (output == 'v'):
         return x[iclose]
     elif (output == 'index') or (output == 'i'):
@@ -157,9 +163,6 @@ def closest_max(x, y, x0, order = 3, output = 'value'):
     else:
         print('arr_nearest: Invalid output arguement:', output)
         print("\t Accepted arguments: 'value', 'v', 'index', 'i'")
-
-
-
 
 
 def tup0(obj):
