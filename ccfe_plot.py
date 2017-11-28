@@ -2,6 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 # from mpl_toolkits.basemap import Basemap
 from matplotlib.collections import LineCollection
 import logging
@@ -324,11 +325,16 @@ def set_yaxis_percent(ax, dp=0):
     ax.yaxis.set_major_formatter(formatter)
     return ax
 
-def save_fig(fn, fig=None, directory=None, transparent=True, bbox_inches='tight', dpi=90):
+def save_fig(fn, fig=None, directory=None, transparent=True, bbox_inches='tight', dpi=90, image_resolution=None):
     if fig is None:
         fig = plt.gcf()
     if directory is not None:
         fn = os.path.join(directory, fn)
+    if image_resolution is not None:
+        # Set savefig dpi resolution to be multiple of that of image on first axes
+        scale_factor = 1
+        vsize = fig.axes[0].get_position().size[1]  # fraction of figure occupied by axes
+        dpi = (scale_factor*image_resolution[1]/(fig.get_size_inches()[1] * vsize))
     fig.savefig(fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
 
 if __name__ == '__main__':

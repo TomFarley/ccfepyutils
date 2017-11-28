@@ -36,7 +36,7 @@ from tf_libs.tf_debug import Debug
 import tf_libs.tf_numeric as tf_numeric
 # from . import tf_debug.debug_print as dprint
 # from . import tf_debug
-# from . import tf_string
+# from . import tf_stringcd
 # import tf_string
 
 db = Debug(1,1,0)

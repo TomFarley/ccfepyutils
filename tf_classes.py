@@ -405,7 +405,7 @@ class PlotLines(Plot):
 
         self._internal = True # Prevent functions performing blocking actions and saving files after internal chain calls
 
-        self.plot2D(self.x, self.y) # Plot the data
+        self.plot2d(self.x, self.y) # Plot the data
         self.update_colours(cm=cm) # Set line colours acording to colour map for clarity
         self.update_ranges(padx = padx, pady = pady, pass_zero=pass_zero) # Extend the axes ranges
         self.add_legend(force_legend=force_legend) # Add legend with good default settings
@@ -414,7 +414,7 @@ class PlotLines(Plot):
 
         self.show() # Show the plotting window and save file
 
-    def plot2D(self, x, y, block=True):
+    def plot2d(self, x, y, block=True):
         """ Plot the y parameters (stored in a tuple) vs the x parameter """
         db(_internal=self._internal)
         if not self._internal: # If called individually, redraw the plot as was
@@ -457,7 +457,7 @@ class PlotLines(Plot):
     def set_plot(self):
         """ Plot lines, tweek display and show legend etc based on previously stored values"""
         self.lines = [] # Empty list of all lines plotted so they are not duplicated when replotted
-        self.plot2D(self.x, self.y) # Plot the data
+        self.plot2d(self.x, self.y) # Plot the data
         self.update_colours(cm=self.cm) # Set line colours acording to colour map for clarity
         self.update_ranges(padx = self.padx, pady = self.pady, pass_zero = self.pass_zero) # Extend the axes ranges
         self.add_legend(force_legend=self.force_legend) # Add legend with good default settings
