@@ -2,13 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7d0c14cf-f146-4f20-b923-e9e0e56b4b61" name="Default" comment="">
-      <change beforePath="" afterPath="$PROJECT_DIR$/classes/data_stack.py" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/logging_config.ini" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/tests/test_stack.py" />
-      <change beforePath="$PROJECT_DIR$/.idea/ccfepyutils.iml" afterPath="$PROJECT_DIR$/.idea/ccfepyutils.iml" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change beforePath="$PROJECT_DIR$/__init__.py" afterPath="$PROJECT_DIR$/__init__.py" />
+      <change beforePath="$PROJECT_DIR$/classes/data_stack.py" afterPath="$PROJECT_DIR$/classes/data_stack.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -20,7 +15,7 @@
   </component>
   <component name="CoverageDataManager">
     <SUITE FILE_PATH="coverage/ccfepyutils$Unittests_in_test_stack_py.coverage" NAME="Unittests in test_stack.py Coverage Results" MODIFIED="1514060002006" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
-    <SUITE FILE_PATH="coverage/ccfepyutils$data_stack.coverage" NAME="data_stack Coverage Results" MODIFIED="1514068040557" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/classes" />
+    <SUITE FILE_PATH="coverage/ccfepyutils$data_stack.coverage" NAME="data_stack Coverage Results" MODIFIED="1514132709682" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/classes" />
   </component>
   <component name="CreatePatchCommitExecutor">
     <option name="PATCH_PATH" value="" />
@@ -57,11 +52,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="ccfe_plot.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="ccfe_plot.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ccfe_plot.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="6282">
-              <caret line="354" column="0" lean-forward="false" selection-start-line="354" selection-start-column="0" selection-end-line="354" selection-end-column="0" />
+            <state relative-caret-position="168">
+              <caret line="345" column="23" lean-forward="true" selection-start-line="345" selection-start-column="23" selection-end-line="345" selection-end-column="23" />
               <folding>
                 <element signature="e#116#134#0" expanded="true" />
               </folding>
@@ -69,14 +64,24 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="data_stack.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="data_stack.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/classes/data_stack.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="540">
-              <caret line="33" column="33" lean-forward="false" selection-start-line="33" selection-start-column="33" selection-end-line="33" selection-end-column="33" />
+            <state relative-caret-position="158">
+              <caret line="42" column="12" lean-forward="false" selection-start-line="42" selection-start-column="12" selection-end-line="42" selection-end-column="12" />
               <folding>
                 <element signature="e#23#42#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="pickle_settings.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/../elzar/elzar_settings_default/pickle_settings.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="198">
+              <caret line="11" column="36" lean-forward="false" selection-start-line="11" selection-start-column="36" selection-end-line="11" selection-end-column="36" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -157,6 +162,7 @@
         <option value="$PROJECT_DIR$/logging_config.ini" />
         <option value="$PROJECT_DIR$/tests/test_stack.py" />
         <option value="$PROJECT_DIR$/classes/data_stack.py" />
+        <option value="$PROJECT_DIR$/../elzar/elzar_settings_default/pickle_settings.py" />
       </list>
     </option>
   </component>
@@ -570,7 +576,14 @@
       <option name="project" value="LOCAL" />
       <updated>1511878733782</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Created Stack and Slice classes">
+      <created>1514132450892</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1514132450892</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -590,7 +603,7 @@
     <layout>
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32842106" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32842106" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32947367" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Unicode Browser" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
@@ -630,7 +643,8 @@
     <MESSAGE value="Added plotting_class_specification.md" />
     <MESSAGE value="Added ccfe_mast.py" />
     <MESSAGE value="Added save_fig image resolution preserving option" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added save_fig image resolution preserving option" />
+    <MESSAGE value="Created Stack and Slice classes" />
+    <option name="LAST_COMMIT_MESSAGE" value="Created Stack and Slice classes" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -656,13 +670,6 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/ccfe_plotly.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/README.md" />
     <entry file="file://$PROJECT_DIR$/.gitignore">
       <provider selected="true" editor-type-id="text-editor">
@@ -860,16 +867,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/ccfe_plot.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="6282">
-          <caret line="354" column="0" lean-forward="false" selection-start-line="354" selection-start-column="0" selection-end-line="354" selection-end-column="0" />
-          <folding>
-            <element signature="e#116#134#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/ccfe_mast.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -939,10 +936,28 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/classes/data_stack.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="540">
-          <caret line="33" column="33" lean-forward="false" selection-start-line="33" selection-start-column="33" selection-end-line="33" selection-end-column="33" />
+        <state relative-caret-position="158">
+          <caret line="42" column="12" lean-forward="false" selection-start-line="42" selection-start-column="12" selection-end-line="42" selection-end-column="12" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../elzar/elzar_settings_default/pickle_settings.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="198">
+          <caret line="11" column="36" lean-forward="false" selection-start-line="11" selection-start-column="36" selection-end-line="11" selection-end-column="36" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ccfe_plot.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="168">
+          <caret line="345" column="23" lean-forward="true" selection-start-line="345" selection-start-column="23" selection-end-line="345" selection-end-column="23" />
+          <folding>
+            <element signature="e#116#134#0" expanded="true" />
           </folding>
         </state>
       </provider>

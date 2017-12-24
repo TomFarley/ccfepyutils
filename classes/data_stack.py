@@ -26,21 +26,21 @@ class Slice(object):
         self.stack = stack
         self.dim = stack.dim2xyz(dim)
         self.value = stack.closest_coord(dim, value)
-    
+
     def __str__(self):
         raise NotImplementedError
-    
+
     def __repr__(self):
         raise NotImplementedError
-    
+
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
-    
+
     def __getitem__(self, item):
         raise NotImplementedError
-    
+
     def plot(self):
-        
+        pass
 
 class Stack(object):
     """Class for 3d data composed of a set of 2d data frames"""
@@ -85,7 +85,7 @@ class Stack(object):
             values = np.empty(self.shape) * np.nan
         logger.info('coords: {}'.format(coords))
         self.data = xr.DataArray(values, coords=self.coords, dims=self.dims)
-        
+
     def set_data(self, values=None, reset=False):
         """Ready xarray for data access"""
         self._values = none_filter(self._values, values)
@@ -123,14 +123,14 @@ class Stack(object):
             for key in input:
                 out.append(self.dim2xyz(key))
         return out
-    
+
     def closest_coord(self, dim, value, tol=None):
         """Return value in coordinates closest to value"""
         #TODO: implement tol
         dim = self.dim2xyz(dim)
         value = find_nearest(value, self.coords[dim])
         return value
-        
+
 
     def mask(self, **kwargs):
         """Return mask corresponding to supplied coordiante values"""
@@ -142,14 +142,14 @@ class Stack(object):
             if value == 'average':
                 input[key] = None
         coords = self.coords
-        
-        masks = {c: ~np.isnan(coords[c]) if input[c] is None else isclose_within(coords[c], input[c]) 
+
+        masks = {c: ~np.isnan(coords[c]) if input[c] is None else isclose_within(coords[c], input[c])
                  for c in ['x', 'y', 'z']}
         return masks
 
 
     def extract(self, ):
-        
+
         raise NotImplementedError
 
     def slice(self, **kwargs):
