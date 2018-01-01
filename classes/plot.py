@@ -23,6 +23,7 @@ class Plot(object):
                       ((1, 1 , None), ('line', 'scatter')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
                       ((1, 1 , 2), ('contourf', 'contour', 'image')),
+                      ((2, None, None), ('contourf', 'contour', 'image')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
 
@@ -48,14 +49,17 @@ class Plot(object):
         self.axes = make_itterable(self.axes)
 
 
-    def _get_modes(self, x, y, z):
+    def _get_modes(self, x, y, z, data_requried=False):
         """Inspect supplied data to see whether further actions should be taken with it"""
         data = {k: np.array(v) for k, v in zip(['x', 'y', 'z'], [x, y, z]) if v is not None}  # data that is not None
         shapes = {k: v.shape for k, v in data.items()}
         dims = {k: v.ndim for k, v in data.items()}
         dim = tuple((np.array(v).ndim if v is not None else None for v in (x, y, z)))
         if len(data) == 0:
-            return None
+            if data_requried:
+                raise ValueError('No data supplied to Plot object')
+            else:
+                return None
         if dim in self.dim_modes:
             return self.dim_modes[dim]
         else:
@@ -97,8 +101,12 @@ class Plot(object):
         ax = self.ax(ax)
         if mode == 'line':
             plot_1d(x, y, ax, **kwargs)
+        if mode == 'scatter':
+            scatter_1d(x, y, ax, **kwargs)
         elif mode == 'contourf':
             contourf(x, y, z, ax, **kwargs)
+        else:
+            raise NotImplementedError('Mode={}'.format(mode))
         # raise NotImplementedError
 
     def set_axis_labels(self, xlabel, ylabel, ax=None):
@@ -119,8 +127,10 @@ class Plot(object):
         if self._legend == 'each axis':
             for ax in self.axes:
                 # TODO: check if more than one legend handels exist
-                leg = ax.legend()
-                leg.draggable()
+                handles, labels = ax.get_legend_handles_labels()
+                if len(handles) > 1:  # Only produce legend if more than one artist has a label
+                    leg = ax.legend()
+                    leg.draggable()
 
     def save_image(self, z, fn, bit_depth=12):
         """Save image to file preserving resolution"""
@@ -141,13 +151,25 @@ class Plot(object):
 def plot_1d(x, y, ax, **kwargs):
     ax.plot(x, y, **kwargs)
 
+def scatter_1d(x, y, ax, **kwargs):
+    ax.scatter(x, y, **kwargs)
+
 def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viridis', transpose=False, **kwargs):
     """ """
+    assert not np.all([i is None for i in (x, y, z)])
+
+    if (z is None) and (y is None) and (np.array(x).ndim == 2):  # if x supplied as z coord, swap them around
+        x, z = z, x
+
     if transpose:
         z = z.T
 
-    im = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
-    im = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
+    if not None in (x, y, z):
+        im = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
+        im = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
+    else:
+        im = ax.contour(z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
+        im = ax.contourf(z, levels, cmap=cmap, **kwargs)
 
     if colorbar:
         from mpl_toolkits.axes_grid1 import make_axes_locatable

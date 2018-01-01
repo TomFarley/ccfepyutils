@@ -57,6 +57,14 @@ class TestStack(unittest.TestCase):
         logger.info(repr(stack))
         pass
 
+    def test_loc(self):
+        logger.info('** Running test_loc')
+        coords = self.coords2
+        stack = Stack(coords['x'], coords['y'], coords['z'])
+        slice = stack.loc(R=1.36)
+        logger.debug('slice = {}'.format(slice))
+
+
 
 def suite():
     print('Setting test suit')
@@ -64,6 +72,7 @@ def suite():
 
     suite.addTest(TestStack('test_init_empty'))
     suite.addTest(TestStack('test_init_empty2'))
+    suite.addTest(TestStack('test_loc'))
 
 
     return suite
