@@ -26,6 +26,7 @@ class Plot(object):
                       ((2, None, None), ('contourf', 'contour', 'image')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
+    instances = []  # List of all Plot instances
 
     def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), current_ax=0, mode=None, legend='each axis',
                  save=False, show=False, fig_args={}, **kwargs):
@@ -38,6 +39,7 @@ class Plot(object):
 
         self.fig = None
         self.axes = None
+        self.instances.append(self)
         self.make_figure(num, axes, **fig_args)
         self.plot(x, y, z, mode=mode, **kwargs)
         self.show(show)

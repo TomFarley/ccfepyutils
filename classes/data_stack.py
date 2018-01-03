@@ -92,6 +92,9 @@ class Stack(object):
         if values is not None:
             self.set_data()
 
+        self.window = None
+        self._slices = {}
+
         self._check_types()
 
     def _check_types(self):
@@ -255,18 +258,38 @@ class Stack(object):
         if self.data is not None:
             return self.data.loc[args]
 
+    def get_slice(self, item):
+        """Get slice object at given stack coord index"""
+        # Check item is valid stack coord index
+        values = make_itterable(self.coord_obj(self._stack_axis)['values'])
+        if not item in values:
+            raise ValueError('Item {} not in stack coordinate values: {}'.format(item, values))
+
+        # Return existing instance or create new
+        if item in self._slices.keys():
+            return self._slices[item]
+        else:
+            return self.create_slice()
+
+    def create_slice(self, item):
+        if item in make_itterable(self.coord_obj(self._stack_axis)['values']):
+            slice = Slice(self, self._stack_axis, item)
+            self._slices[item] = slice
+            return slice
+        else:
+            raise NotImplementedError
+
+    def remove_slice(self, item):
+        if item in self._slices.keys():
+            self._slices.pop(item)
+
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
     def __getitem__(self, item):
         """Return data slices from the stack of data"""
         self._init_xarray()
-        if item in make_itterable(self.coord_obj(self._stack_axis)['values']):
-            return Slice(self, self._stack_axis, item)
-        else:
-            raise NotImplementedError
-        if self.data is not None:
-            return self.data
+        return self.get_slice(item)
 
     def __repr__(self):
         if self.data is None:
@@ -337,6 +360,9 @@ class Stack(object):
         dim, value = kwargs.keys()[0], kwargs.values()[0]
         return self.slice_class(self, dim, value)
 
+    def window(self):
+        """Wibndow the data so return letterboxed subset of data perp to stack axis"""
+        raise NotImplementedError
 
 class Movie(Stack):
     # TODO: Load compatibilities from config file
@@ -385,6 +411,9 @@ class Movie(Stack):
         self._camera = value
 
     def load_movie(self, pulse=None, machine=None, camera=None):
+        raise NotImplementedError
+
+    def to_hdf5(self, fn=None):
         raise NotImplementedError
 
 if __name__ == '__main__':
