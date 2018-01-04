@@ -4,7 +4,8 @@ import logging
 from logging.config import fileConfig
 import os
 import sys
-print(os.getcwd())
+
+print('__init__: {}'.format(os.getcwd()))
 fn_log = '../logging_config.ini'
 try:
     fileConfig(fn_log)
