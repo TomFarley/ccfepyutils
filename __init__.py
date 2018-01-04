@@ -2,11 +2,17 @@
 
 import logging
 from logging.config import fileConfig
-import os
-import sys
+import os, inspect
 
-print('__init__: {}'.format(os.getcwd()))
-fn_log = 'logging_config.ini'
+def script_directory(level=0):
+    fn = os.path.abspath(inspect.getfile(inspect.currentframe()))  # Path to this file
+    path = os.path.dirname(fn)
+    return path
+this_dir = script_directory()
+
+print('__init__: {}'.format(this_dir)
+fn_log = os.path.join(this_dir, 'logging_config.ini')
+
 try:
     assert os.path.isfile(fn_log)
     fileConfig(fn_log)
