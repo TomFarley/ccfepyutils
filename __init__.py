@@ -10,7 +10,7 @@ def script_directory(level=0):
     return path
 this_dir = script_directory()
 
-print('__init__: {}'.format(this_dir)
+print('__init__: {}'.format(this_dir))
 fn_log = os.path.join(this_dir, 'logging_config.ini')
 
 try:
@@ -20,4 +20,7 @@ except KeyError as e:
     print('Failed to load logger settings from {}\nKeyError: {}'.format(fn_log, e))
 except AssertionError as e:
     print('Failed to load logger settings from {}\nFile does not exist {}'.format(fn_log, e))
-logging.getLogger(__name__).addHandler(logging.NullHandler())
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+logger.info('Created logger: {}'.format(logger))
