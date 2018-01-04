@@ -64,6 +64,10 @@ class Slice(object):
         raise NotImplementedError
 
     def __getitem__(self, item):
+        # if isinstance(item, slice):
+        #     # Expand the slice object using range()
+        #     # to a maximum of eight items.
+        # return [self[x] for x in range(*n.indices(8))]
         return self.data.values[item]
 
     def plot(self, **kwargs):
