@@ -417,7 +417,55 @@ class Movie(Stack):
     def load_movie(self, pulse=None, machine=None, camera=None):
         raise NotImplementedError
 
+    def lookup(self, **kwargs):
+        """Return t value corresponding to supplied meta data
+        :param kwargs:
+        :return: t value
+        """
+        raise NotImplementedError
+
+    def enahnace_frame(self, **kwargs):
+        # TODO: Make Enhancements class
+        raise NotImplementedError
+
+    def enhance(self, enhancements, frames='all'):
+        raise NotImplementedError
+
     def to_hdf5(self, fn=None):
+        raise NotImplementedError
+
+class Enhancer(object):
+    """Class to apply image enhancements to stack data"""
+    def __init__(self, stack):
+        assert issubclass(type(stack), Stack)
+        self.stack = stack
+
+    def apply(self, enhancements, x):
+        raise NotImplementedError
+
+    def chain_enhancements(self):
+        raise NotImplementedError
+
+    @classmethod
+    def to_8bit(cls, data):
+        raise NotImplementedError
+
+    @classmethod
+    def to_orig_format(cls, data):
+        raise NotImplementedError
+
+    @classmethod
+    def threshold(cls, data, level):
+        raise NotImplementedError
+
+    @classmethod
+    def gamma_enhance(cls, data, gamma):
+        raise NotImplementedError
+
+    def get_background(cls):
+        raise NotImplementedError
+
+    def get_foreground(cls):
         raise NotImplementedError
 
 if __name__ == '__main__':
