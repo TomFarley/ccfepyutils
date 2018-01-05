@@ -96,7 +96,12 @@ class Plot(object):
         raise NotImplementedError
 
 
-    def plot(self, x=None, y=None, z=None, ax=None, mode=None, **kwargs):
+    def plot(self, x=None, y=None, z=None, ax=None, mode=None, fit=None, smooth=None, **kwargs):
+        if fit is not None:
+            raise NotImplementedError
+        if smooth is not None:
+            raise NotImplementedError
+
         if mode is None:
             mode = self._get_modes(x, y, z)[0]  # take first compatible mode as default
         self._check_mode(x, y, z, mode)
