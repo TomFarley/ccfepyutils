@@ -588,34 +588,37 @@ def file_filter(path, extension='.p', contain=None, not_contain=None):
     return filenames
 
 
-def printProgress (iteration, total, prefix = '', suffix = '', frac=False, t0=None,
-                   decimals = 2, nth_loop=1, barLength = 50):
+def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
+                  decimals=2, nth_loop=2, barLength=50):
     """
     from http://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
-    
+
     Call in a loop to create terminal progress bar
     @params:
-        iteration   - Required  : current iteration (Int)
+        iteration   - Required  : current iteration starting at 0 (Int)
         total       - Required  : total iterations (Int)
         prefix      - Optional  : prefix string (Str)
         suffix      - Optional  : suffix string (Str)
         decimals    - Optional  : number of decimals in percent complete (Int)
         barLength   - Optional  : character length of bar (Int)
     """
-    if iteration % nth_loop != 0:  # Only print every nth loop to reduce slowdown from printing
+    # TODO: convert to class with __call__ (print 0% on __init__)
+    # TODO: Add compatibility for logger handlers
+    if (iteration % nth_loop != 0) and (
+            iteration != total - 1):  # Only print every nth loop to reduce slowdown from printing
         return
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
-    filledLength    = int(round(barLength * iteration / float(total)))
-    percents        = round(100.00 * (iteration / float(total)), decimals)
-    bar             = '|' * filledLength + '-' * (barLength - filledLength)
+    filledLength = int(round(barLength * iteration / float(total)))
+    percents = round(100.00 * (iteration / float(total)), decimals)
+    bar = '|' * filledLength + '-' * (barLength - filledLength)
     frac = '{}/{} '.format(iteration, total) if frac else ''
     if t0 is None:
         time = ''
     else:
         t1 = datetime.now()
         t_diff_past = relativedelta(t1, t0)  # time past in loop
-        mul = float(total-iteration)/iteration if iteration > 0 else 0
+        mul = float(total - iteration) / iteration if iteration > 0 else 0
         t_diff_rem = t_diff_past * mul  # estimate of remaining time
         t_diff_past = '({h}h {m}m {s}s)'.format(h=t_diff_past.hours, m=t_diff_past.minutes, s=t_diff_past.seconds)
         if t_diff_rem.hours > 0:  # If expected to take over an hour display date and time of completion
