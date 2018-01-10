@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import itertools
 import numpy as np
 from numpy import sin, cos, arctan, tan, sqrt
 import matplotlib.pyplot as plt
@@ -24,16 +25,30 @@ class Ellipses(object):
     Extreema extent - Bounding box dimensions (axis aligned)
     Focii           -
     """
+    conventions = {'ellipse_axes': ['major', 'minor', 'angle'],
+                   'bounding_box': ['x_boundbox', 'y_boudbox', 'angle'],
+                   'axes_extent': ['x_axis', 'y_axis', 'angle']}
     def __init__(self, arg1, arg2, arg3, convention='ellipse_axes', x=None, y=None, degrees=False):
         self.convention = convention
-        self.params = {}
-        
+        self.params = {key: None for key in itertools.chain.from_iterable(self.conventions.values())}  # initialise
+        self.x = x
+        self.y = y
+        params = self.params
+
+        if convention.lower() not in self.conventions:
+            raise NotImplementedError
+
+        for key, arg in zip(self.conventions[convention], (arg1, arg2, arg3)):
+            params[key] = arg
+
+        if (params['angle'] is not None) and degrees:
+            params['angle'] = np.deg2rad(params['angle'])
+
+    def convert(self):
+        """Calcualte parameters for other conventions"""
+        convention = self.convention
         params = self.params
         if convention.lower() == 'ellipse_axes':
-            params['major'] = arg1
-            params['minor'] = arg2
-            params['angle'] = arg3 if not degrees else np.deg2rad(arg3)
-
             params['x_axis'], params['y_axis'], angle = self.ellipse_axes_to_axis_extent(
                     params['major'], params['minor'], params['angle'])
             params['x_boundbox'], params['y_boundbox'], angle = self.ellipse_axes_to_bounding_box(
@@ -63,12 +78,31 @@ class Ellipses(object):
 
     @property
     def ellipse_axes(self):
-        return self.params['major'], self.params['minor'], self.params['angle']
+        convention = 'ellipse_axes'
+        values = [self.params[k] for k in self.conventions[convention]]
+        if np.any(values == None):
+            self.convert()
+            values = [self.params[k] for k in self.conventions[convention]]
+        return values
 
     @property
-    def boundingbox(self):
-        return self.params['x_boundbox'], self.params['y_boundbox'], self.params['angle']
+    def bounding_box(self):
+        convention = 'bounding_box'
+        values = [self.params[k] for k in self.conventions[convention]]
+        if np.any(values == None):
+            self.convert()
+            values = [self.params[k] for k in self.conventions[convention]]
+        return values
 
     @property
     def axes_extent(self):
-        return self.params['x_extent'], self.params['y_extent'], self.params['angle']
+        convention = 'axes_extent'
+        values = [self.params[k] for k in self.conventions[convention]]
+        if np.any(values == None):
+            self.convert()
+            values = [self.params[k] for k in self.conventions[convention]]
+        return values
+
+    def plot(self):
+        # TODO: Add plot method for ellipses
+        raise NotImplementedError
