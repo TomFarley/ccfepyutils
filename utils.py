@@ -602,8 +602,10 @@ def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
         decimals    - Optional  : number of decimals in percent complete (Int)
         barLength   - Optional  : character length of bar (Int)
     """
-    # TODO: convert to class with __call__ (print 0% on __init__)
+    # TODO: convert to class with __call__ (print 0% on __init__) - add to timeline class
+    # TODO: Change/add nth_loop to min time between updates
     # TODO: Add compatibility for logger handlers
+    # TODO: Make bar optional
     if (iteration % nth_loop != 0) and (
             iteration != total - 1):  # Only print every nth loop to reduce slowdown from printing
         return

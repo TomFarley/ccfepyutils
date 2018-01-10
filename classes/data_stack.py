@@ -3,6 +3,7 @@
 import xarray as xr
 import numpy as np
 import pandas as pd
+import multiprocessing as mp
 from collections import defaultdict, OrderedDict
 import numbers
 
@@ -22,7 +23,7 @@ from logging.config import fileConfig
 fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-
+pool = mp.Pool(processes=16)
 
 class Slice(object):
 
@@ -426,6 +427,7 @@ class Movie(Stack):
 
     def enahnace_frame(self, **kwargs):
         # TODO: Make Enhancements class
+        # TODO: Enable storing of multiple enhancements at once? bg, fg, raw?
         raise NotImplementedError
 
     def enhance(self, enhancements, frames='all'):
@@ -442,6 +444,8 @@ class Enhancer(object):
 
     def apply(self, enhancements, x):
         raise NotImplementedError
+        results = pool.map(func, inputs)
+        intensity, phase, contrast = zip(*results)
 
     def chain_enhancements(self):
         raise NotImplementedError
@@ -455,11 +459,19 @@ class Enhancer(object):
         raise NotImplementedError
 
     @classmethod
-    def threshold(cls, data, level):
+    def set_brightness(cls, data, gamma):
         raise NotImplementedError
 
     @classmethod
-    def gamma_enhance(cls, data, gamma):
+    def set_contrast(cls, data, gamma):
+        raise NotImplementedError
+
+    @classmethod
+    def set_gamma(cls, data, gamma):
+        raise NotImplementedError
+
+    @classmethod
+    def threshold(cls, data, level):
         raise NotImplementedError
 
     def get_background(cls):

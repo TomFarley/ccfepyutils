@@ -156,6 +156,8 @@ class Plot(object):
 
 
 def plot_1d(x, y, ax, **kwargs):
+    # TODO: Add error bar plot functionality
+    #
     ax.plot(x, y, **kwargs)
 
 def scatter_1d(x, y, ax, **kwargs):
