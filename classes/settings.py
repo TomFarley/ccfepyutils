@@ -6,8 +6,9 @@ from collections import defaultdict, OrderedDict
 import numbers
 from nested_dict import nested_dict
 from datetime import datetime
-from time import time
+import time
 from copy import deepcopy
+import os
 
 from ccfepyutils.classes.state import State
 
@@ -26,9 +27,10 @@ class Settings(object):
     """Object to store, save, load and interact with collections of settings for other classes"""
     instances = nested_dict()
     time_format = "%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S".format(dl='')
-    state_table = {'init': ['modified'],
+    state_table = {'init': ['modified', 'saved'],
                    'modified': ['saved'],
-                   'saved': ['modified']
+                   'saved': ['modified'],
+                   'accessed': ['modified']
                    }
 
     def __init__(self, application, name=None):
@@ -37,21 +39,52 @@ class Settings(object):
         assert isinstance(name, str)
         assert (application, name) not in self.instances.keys_flat(), 'Setting object {}:{} already exists'.format(
                 application, name)
-        self._application = application
-        self._name = name
+        self.application = application
+        self.name = name
         self.state = State(self, self.state_table, 'init')
         self.t_created = None
         self.t_modified = None
 
         self.instances[application][name] = self
+        call_table = {'modified': {'exit': [self.save]}}
         self.set_t_created()
         self.modified()
-
-        self.df = pd.DataFrame({'value': []})  # Initialise empty dataframe
+        if self.file_exists():
+            self.load()
+            self.state('saved')
+        else:
+            self.df = pd.DataFrame({'value': []})  # Initialise empty dataframe
+            self.state('modified')
 
     def __str__(self):
         # TODO: set ordering
         return str(self.df)
+
+    def __repr__(self):
+        return '<Settings: {app};{name}, {state}>'.format(app=self._application, name=self.name, state=self.state)
+
+    @property
+    def application(self):
+        return self._application
+
+    @application.setter
+    def application(self, value):
+        assert isinstance(value, str)
+        self._application = value
+
+    @property
+    def name(self):
+        if self._name is not None:
+            return self._name
+        elif self.state == 'init':
+            return None
+        else:
+            return self.t_modified
+
+    @name.setter
+    def name(self, value):
+        assert isinstance(value, str)
+        self._name = value
 
     @property
     def items(self):
@@ -61,14 +94,33 @@ class Settings(object):
     def columns(self):
         return self.df.columns.values
 
-    @@property
-    def name(self):
-        if self._name is not None:
-            return self._name
-        elif self.state == 'init':
-            return None
-        else:
-            return self.t_modified
+    @property
+    def path(self):
+        """Path to settings files"""
+        ## TODO: Load from config file
+        return os.path.expand_user('~/.ccfetools/setting/{}/'.format(self.application))
+
+    @property
+    def fn(self):
+        """Filename of current settings file"""
+        assert self.name is not None
+        return 'settings-{app}-{name}'.format(app=self.application, name=self.name)
+
+    @property
+    def fn_path(self):
+        return os.path.join(self.path, self.name)
+
+    def file_exists(self):
+        """Return True if a settings file with the current application and name already exists else False"""
+        return os.path.isfile(self.fn_path)
+
+    def load(self):
+        assert os.path.isfile(self.fn_path)
+        raise NotImplementedError
+        self.state('saved')
+
+    def save(self):
+        raise NotImplementedError
 
     def new_time(self):
         # TODO: update with config file
@@ -78,15 +130,16 @@ class Settings(object):
             fn = '{app}_log.hdf'.format(app=self._application)
             log = pd.DataFrame({'name': []})
             log.index.name = 'creation_time'
+
             while self.datetime2str(datetime.now()) in log.index:
-                time.wait(1.0)
+                time.sleep(1.0)
         return self.datetime2str(datetime.now())
 
     def set_t_created(self):
         self.t_created = self.new_time()
 
     def modified(self):
-
+        """Set modified time string"""
 
     def datetime2str(self, time):
         string = time.strftime(self.time_format)
@@ -130,3 +183,4 @@ if __name__ == '__main__':
     # print(s.columns)
     # print(s.items)
     print(s)
+    pass
