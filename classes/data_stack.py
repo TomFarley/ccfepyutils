@@ -11,7 +11,7 @@ from copy import deepcopy
 
 from ccfepyutils.utils import isclose_within, find_nearest, make_itterable
 from ccfepyutils.classes.plot import Plot
-from classes.utils import return_none, none_filter
+from ccfepyutils.utils import return_none, none_filter
 
 try:
     import cpickle as pickle

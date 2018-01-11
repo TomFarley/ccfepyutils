@@ -10,7 +10,7 @@ from time import time
 
 from copy import deepcopy
 
-from utils import args_for
+from ccfepyutils.utils import args_for
 
 try:
     import cpickle as pickle
@@ -21,7 +21,7 @@ from logging.config import fileConfig
 
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.DEBUG)
 
 class State(object):
     call_patterns = ('enter', 'exit')  # Patterns for calls in state transitions
@@ -38,7 +38,7 @@ class State(object):
         """Check formatting and consistency of tables"""
 
         # Check all transition states are valid starting states
-        for key, values in self._table:
+        for key, values in self._table.items():
             assert all([v in self.possible_states for v in values])
 
         # Check structure of call table
@@ -60,7 +60,7 @@ class State(object):
 
     @property
     def possible_states(self):
-        return self._table.key()
+        return self._table.keys()
 
     @property
     def accessible_states(self):
@@ -70,6 +70,11 @@ class State(object):
     def current_state(self):
         return self._current
 
+    @current_state.setter
+    def current_state(self, value):
+        assert value in self.possible_states
+        self._current = value
+
     @property
     def history(self):
         return ' -> '.join(self._history)
@@ -77,7 +82,9 @@ class State(object):
     def call_transition(self, old, new, *args, **kwargs):
         if self._call_table is None:
             return
-        kwargs.update(dict((('exit_state', old), ('entry_state', new))))  # Add information out state change
+        kwargs.update(dict(
+                ('state_transition', dict( (('old', old), ('new', new)),),)
+                ))  # Add information out state change
         for func in self._call_table[old]['exit']:
             # TODO: Use args
             kws = args_for(func, kwargs)
@@ -89,16 +96,18 @@ class State(object):
 
     def __call__(self, new_state, *args, **kwargs):
         assert new_state in self.possible_states
-        if (new_state != self.current_state):  # No change
+        if (new_state == self.current_state):  # No change
             pass
         elif (new_state in self.accessible_states):  # Update state
             old_state = self.current_state
-            self._current = new_state
+            self.current_state = new_state
             self._history.append(new_state)
             self.call_transition(old_state, new_state, *args, **kwargs)
         else:
             raise RuntimeError('{owner} cannot perform state switch {old} -> {new}. Accessible states: {avail}'.format(
                     owner=repr(self._owner), old=self._current, new=new_state, avail=self.accessible_states))
+        logger.debug('{owner} state changed {old} -> {new}'.format(
+                    owner=repr(self._owner), old=self._current, new=new_state))
         return self
 
     def __getitem__(self, item):

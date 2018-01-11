@@ -44,12 +44,13 @@ class Settings(object):
         self.state = State(self, self.state_table, 'init')
         self.t_created = None
         self.t_modified = None
+        self.log_file = None
 
         self.instances[application][name] = self
-        call_table = {'modified': {'exit': [self.save]}}
+        self.call_table = {'modified': {'exit': [self.save]}}
         self.set_t_created()
         self.modified()
-        if self.file_exists():
+        if self.file_exists:
             self.load()
             self.state('saved')
         else:
@@ -71,6 +72,7 @@ class Settings(object):
     def application(self, value):
         assert isinstance(value, str)
         self._application = value
+        self.log_file = SettingsLogFile(self.application)
 
     @property
     def name(self):
@@ -98,38 +100,45 @@ class Settings(object):
     def path(self):
         """Path to settings files"""
         ## TODO: Load from config file
-        return os.path.expand_user('~/.ccfetools/setting/{}/'.format(self.application))
+        return os.path.expanduser('~/.ccfetools/setting/{}/'.format(self.application))
+
 
     @property
     def fn(self):
         """Filename of current settings file"""
         assert self.name is not None
-        return 'settings-{app}-{name}'.format(app=self.application, name=self.name)
+        return 'settings-{app}-{name}.hdf'.format(app=self.application, name=self.name)
+
 
     @property
     def fn_path(self):
-        return os.path.join(self.path, self.name)
+        return os.path.join(self.path, self.fn)
 
+
+    @property
     def file_exists(self):
         """Return True if a settings file with the current application and name already exists else False"""
         return os.path.isfile(self.fn_path)
+
+
+    def read_file(self):
+        raise NotImplementedError
+        return df
 
     def load(self):
         assert os.path.isfile(self.fn_path)
         raise NotImplementedError
         self.state('saved')
 
-    def save(self):
+    def save(self, state_transition=None):
+
         raise NotImplementedError
 
     def new_time(self):
         # TODO: update with config file
         # Find times of exisiting settings for application
-        if self.name is not None:
-            path = '~/.ccfetools/settings/'
-            fn = '{app}_log.hdf'.format(app=self._application)
-            log = pd.DataFrame({'name': []})
-            log.index.name = 'creation_time'
+        if self.file_exists:
+
 
             while self.datetime2str(datetime.now()) in log.index:
                 time.sleep(1.0)
@@ -137,6 +146,9 @@ class Settings(object):
 
     def set_t_created(self):
         self.t_created = self.new_time()
+
+    def set_t_modified(self):
+        self.t_modified = self.new_time()
 
     def modified(self):
         """Set modified time string"""
@@ -172,6 +184,33 @@ class Settings(object):
     def add_items(self, items):
         raise NotImplementedError
 
+
+class SettingsLogFile(object):
+    def __init__(self, application):
+        """ """
+        assert isinstance(application, str)
+        self.application = application
+
+    @property
+    def path(self):
+        """Path to settings log files"""
+        ## TODO: Load from config file
+        return os.path.expanduser('~/.ccfetools/setting/')
+
+    @property
+    def fn(self):
+        """Filename of current settings file"""
+        return 'settings-{app}.hdf'.format(app=self.application)
+
+    @property
+    def fn_path(self):
+        return os.path.join(self.path, self.fn)
+
+    def read(self):
+        raise NotImplementedError
+
+    def update(self):
+        raise NotImplementedError
 
 if __name__ == '__main__':
     s = Settings('test', 'default')
