@@ -1286,6 +1286,14 @@ def none_filter(old, new):
         old = old[0]
     return old
 
+def fwhm2sigma(values):
+    fwhm = 2*np.sqrt(2*np.log(2))
+    return values / fwhm
+
+def sigma2fwhm(values):
+    fwhm = 2*np.sqrt(2*np.log(2))
+    return values * fwhm
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 

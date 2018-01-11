@@ -6,6 +6,7 @@ from numpy import sin, cos, arctan, tan, sqrt
 import matplotlib.pyplot as plt
 import matplotlib
 from collections import OrderedDict
+from copy import copy, deepcopy
 try:
     import cpickle as pickle
 except ImportError:
@@ -16,11 +17,13 @@ from logging.config import fileConfig, dictConfig
 logger = logging.getLogger(__name__)
 
 from ccfepyutils.utils import make_itterable
+from ccfepyutils.classes.plot import Plot
+from ccfepyutils.classes.plot import plot_ellipses
 
 class Ellipses(object):
     """Class for converting between different geometric descriptions of an ellipse.
     Need 3 parameters to define ellipse shape and orrientation + 2 for position
-    Ellipse axes    - Major axis/diameter, minor axis/diameter, angle between major radius and x direction
+    Ellipse axes    - Major axis/diameter, minor axis/diameter, angle between major radius and x direction anticlockwise
     Axis extent     - Lengths along x & y axes through ellipse centre (Method used in Zweeben 2016)
     Extreema extent - Bounding box dimensions (axis aligned)
     Focii           -
@@ -28,18 +31,19 @@ class Ellipses(object):
     conventions = {'ellipse_axes': ['major', 'minor', 'angle'],
                    'bounding_box': ['x_boundbox', 'y_boudbox', 'angle'],
                    'axes_extent': ['x_axis', 'y_axis', 'angle']}
-    def __init__(self, arg1, arg2, arg3, convention='ellipse_axes', x=None, y=None, degrees=False):
+    def __init__(self, arg1, arg2, arg3, convention='ellipse_axes', x=None, y=None, degrees=False, half_widths=False):
         self.convention = convention
         self.params = {key: None for key in itertools.chain.from_iterable(self.conventions.values())}  # initialise
         self.x = x
         self.y = y
+        self.half_widths = half_widths
         params = self.params
 
         if convention.lower() not in self.conventions:
             raise NotImplementedError
 
         for key, arg in zip(self.conventions[convention], (arg1, arg2, arg3)):
-            params[key] = arg
+            params[key] = np.array(arg)
 
         if (params['angle'] is not None) and degrees:
             params['angle'] = np.deg2rad(params['angle'])
@@ -75,6 +79,21 @@ class Ellipses(object):
         ty = arctan(-minor / (tan(angle)*major))
         dy = 2 * (major*cos(ty)*sin(angle) + minor*sin(tx)*cos(angle))
         return dx, dy, angle
+    
+    @property
+    def position(self):
+        return self.x, self.y
+
+    def get(self, convention, nested=True):
+        """Get values for any convension"""
+        assert convention in self.conventions
+        values = [self.params[k] for k in self.conventions[convention]]
+        if np.any(values == None):
+            self.convert()
+            values = [self.params[k] for k in self.conventions[convention]]
+        if nested:
+            values = [np.array([v]) if not hasattr(v, '__iter__') else v for v in values]
+        return values
 
     @property
     def ellipse_axes(self):
@@ -103,6 +122,12 @@ class Ellipses(object):
             values = [self.params[k] for k in self.conventions[convention]]
         return values
 
-    def plot(self):
-        # TODO: Add plot method for ellipses
-        raise NotImplementedError
+    def plot(self, ax=None, show=False, **kwargs):
+        major, minor, angle = self.get('ellipse_axes', nested=True)
+        x, y = self.position
+        if ax is None:
+            plot = Plot()
+            ax = plot.ax
+        plot_ellipses(ax, major, minor, angle, x=x, y=y, **kwargs)
+        if show:
+            plt.show()

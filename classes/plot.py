@@ -4,16 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 from collections import OrderedDict
+from copy import copy, deepcopy
 try:
     import cpickle as pickle
 except ImportError:
     import pickle
 import logging
 from logging.config import fileConfig, dictConfig
-fileConfig('../logging_config.ini')
+# fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable
+from ccfepyutils.utils import make_itterable, args_for
 
 
 class Plot(object):
@@ -95,6 +96,11 @@ class Plot(object):
         """Inspect supplied data to see whether further actions should be taken with it"""
         raise NotImplementedError
 
+    def call_if_args(self, **kwargs):
+        for func in (self.set_axis_labels, self.show):
+            kws = args_for(func, kwargs)
+            if len(kws) > 0:
+                func(**kws)
 
     def plot(self, x=None, y=None, z=None, ax=None, mode=None, fit=None, smooth=None, **kwargs):
         if fit is not None:
@@ -114,7 +120,7 @@ class Plot(object):
             contourf(x, y, z, ax, **kwargs)
         else:
             raise NotImplementedError('Mode={}'.format(mode))
-        # raise NotImplementedError
+        self.call_if_args(**kwargs)
 
     def set_axis_labels(self, xlabel, ylabel, ax=None):
         assert isinstance(xlabel, str)
@@ -139,6 +145,17 @@ class Plot(object):
                     leg = ax.legend()
                     leg.draggable()
 
+    def plot_ellipses(self, ax=None, obj=None, **kwargs):
+        from ccfepyutils.geometry import Ellipses
+        ax = self.ax(ax)
+        if isinstance(obj, Ellipses):
+            args = {}
+            args['major'], args['minor'], args['angle'] = obj.get('ellipse_axes', nested=True)
+            args['x'], args['y'] = obj.position
+            kwargs.update(args)
+        kws = args_for(plot_ellipses, kwargs)
+        plot_ellipses(ax, **kws)
+
     def save_image(self, z, fn, bit_depth=12):
         """Save image to file preserving resolution"""
         import scipy.misc
@@ -155,6 +172,7 @@ class Plot(object):
             plt.show()
 
 
+# TODO: Move functions to separate file
 def plot_1d(x, y, ax, **kwargs):
     # TODO: Add error bar plot functionality
     #
@@ -281,6 +299,37 @@ def plot_2d(self, z, x, y, ax, raw=False, show=True, save=False, annotate=True,
     if show:
         plt.show()
     return ax
+
+def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, color='k', lw=1, ls='-', alpha=0.7,
+                  label=False, half_widths=False, **kwargs):
+    from matplotlib.patches import Ellipse
+
+    if x is None:
+        x = np.zeros_like(major)
+    if y is None:
+        y = np.zeros_like(major)
+
+    # If half widths passed to function multiply by two for full widths wanted by matplotlib
+    if half_widths:
+        major = 2 * copy(major)
+        minor = 2 * copy(minor)
+
+    for i, (x0, y0, major0, minor0, angle0) in enumerate(list(zip(x, y, major, minor, angle))):
+        # Add ellipses marking filament width
+        ax.add_patch(Ellipse((x0, y0), major0, minor0, angle=angle0,
+                              facecolor='none', edgecolor=color, lw=lw, alpha=alpha, ls=ls, zorder=2, **kwargs))
+        if label:
+            plt.text(x0, y0, '{}'.format(i + 1), ha="center", family='sans-serif', size=10, color=color)
+        # Mark centres of ellipses with dots
+        if a is None:
+            ax.plot(x0, y0, '.', color=color, ms=3, lw=0.3, alpha=0.6)
+        else:  # Scale point size by intensity
+            a_lims = [np.min(a), np.max(a)] if a_lims is None else a_lims
+            a -= a_lims[0]
+            a /= (a_lims[1] - a_lims[0])  # Normalise amplitudes
+            min_size = 4
+            max_size = 25
+            ax.scatter(x, y, s=np.array(min_size + a * (max_size - min_size)), c=color, lw=0, alpha=0.6)
 
 if __name__ == '__main__':
     x = np.linspace(-10, 10, 41)
