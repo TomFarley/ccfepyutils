@@ -23,6 +23,16 @@ from logging.config import fileConfig
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+def in_state(state):
+    """Decorator to change state of object method belongs to for duration of method call"""
+    def in_state_wrapper(func):
+        def func_wrapper(self, *args, **kwargs):
+            self.state(state)
+            func(*args, **kwargs)
+            self.state.reverse()
+        return func_wrapper
+    return in_state_wrapper
+
 class State(object):
     call_patterns = ('enter', 'exit')  # Patterns for calls in state transitions
     def __init__(self, owner, table, initial_state, call_table=None):
@@ -30,6 +40,7 @@ class State(object):
         self._table = table
         self._current = initial_state
         self._history = [initial_state]
+        self._history_all = [initial_state]
         self._call_table = call_table
         assert initial_state in self.possible_states
         self.check_tables()
@@ -94,12 +105,14 @@ class State(object):
             kws = args_for(func, kwargs)
             func(*args, **kws)
 
-    def __call__(self, new_state, *args, **kwargs):
+    def __call__(self, new_state, ignore=False, *args, **kwargs):
+        """Change state to new_state. Return True if call lead to a state change, False if already in new_state.
+        :param new_state: name of state to change to"""
+        old_state = self.current_state
         assert new_state in self.possible_states
         if (new_state == self.current_state):  # No change
             pass
         elif (new_state in self.accessible_states):  # Update state
-            old_state = self.current_state
             self.current_state = new_state
             self._history.append(new_state)
             self.call_transition(old_state, new_state, *args, **kwargs)
@@ -108,7 +121,8 @@ class State(object):
                     owner=repr(self._owner), old=self._current, new=new_state, avail=self.accessible_states))
         logger.debug('{owner} state changed {old} -> {new}'.format(
                     owner=repr(self._owner), old=self._current, new=new_state))
-        return self
+        self._history_all.append(new_state)  # Update irrespective of change
+        return new_state != old_state
 
     def __getitem__(self, item):
         """Get state name from history
@@ -133,6 +147,14 @@ class State(object):
             return True
         else:
             return False
+
+    def reverse(self, steps=1):
+        """Reverse to past state if past state is different to current state
+        :param steps: number of steps in history_all to reverse"""
+        assert steps > 0
+        new_state = self._history_all[-steps]
+        if new_state != self:
+            self(self._history_all[-steps])
 
     def undo(self, n):
         """Undo n state changes"""

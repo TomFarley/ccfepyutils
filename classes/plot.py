@@ -15,7 +15,11 @@ from logging.config import fileConfig, dictConfig
 logger = logging.getLogger(__name__)
 
 from ccfepyutils.utils import make_itterable, args_for
-
+from ccfepyutils.classes.state import State, in_state
+try:
+    string_types = (basestring,)  # python2
+except Exception as e:
+    string_types = (str,)  # python3
 
 class Plot(object):
     """Convenience plotting class"""
@@ -28,6 +32,10 @@ class Plot(object):
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
     instances = []  # List of all Plot instances
+    state_table = {'init': ['ready', 'plotting'],
+                   'ready': ['plotting'],
+                   'plotting': ['ready'],
+                   }
 
     def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), current_ax=1, mode=None, legend='each axis',
                  save=False, show=False, fig_args={}, **kwargs):
@@ -53,6 +61,7 @@ class Plot(object):
         self._log = []  # Log of method calls for provenance
         self._legend = legend
 
+        self.state = State(self, self.state_table, 'init')
         self.fig = None
         self.axes = None
         self.instances.append(self)
@@ -112,13 +121,18 @@ class Plot(object):
         """Inspect supplied data to see whether further actions should be taken with it"""
         raise NotImplementedError
 
-    def call_if_args(self, kwargs):
+    def call_if_args(self, kwargs, raise_on_excess=True):
         for func in (self.set_axis_labels, self.show):
-            kws = args_for(func, kwargs)
+            kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
                 func(**kws)
-
+        if len(kwargs) > 0:
+            raise TypeError('Invalid keyword argument(s): {}'.format(kwargs))
+        self.state('ready')
+                
+    # @in_state('plotting')
     def plot(self, x=None, y=None, z=None, ax=None, mode=None, fit=None, smooth=None, **kwargs):
+        # self.state('plotting')
         if fit is not None:
             raise NotImplementedError
         if smooth is not None:
@@ -139,8 +153,8 @@ class Plot(object):
         self.call_if_args(kwargs)
 
     def set_axis_labels(self, xlabel, ylabel, ax=None):
-        assert isinstance(xlabel, str)
-        assert isinstance(ylabel, str)
+        assert isinstance(xlabel, string_types)
+        assert isinstance(ylabel, string_types)
         if ax == 'all':
             for ax in self.axes:
                 ax.set_xlabel(xlabel)
@@ -162,6 +176,7 @@ class Plot(object):
                     leg.draggable()
 
     def plot_ellipses(self, ax=None, obj=None, **kwargs):
+        self.state('plotting')
         from ccfepyutils.geometry import Ellipses
         ax = self.ax(ax)
         if isinstance(obj, Ellipses):
@@ -172,6 +187,7 @@ class Plot(object):
         kws = args_for(plot_ellipses, kwargs)
         plot_ellipses(ax, **kws)
         self.call_if_args(kwargs)
+        self.state('ready')
 
     def save(self, save=False):
         if save:
