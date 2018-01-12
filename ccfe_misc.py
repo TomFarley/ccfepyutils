@@ -907,7 +907,7 @@ def exists_equal(value, obj, indices):
     return obj == value
 
 def args_for(func, kwargs, exclude=[], match_signature=True, named_dict=True):
-    """Return dict of args that match input for func.
+    """Return filtered dict of args from kwargs that match input for func.
     Effectively filters kwargs to return those arguments
     func            - function to provide compatible arguments for
     kwargs          - list of kwargs to filter for supplied function
@@ -916,14 +916,28 @@ def args_for(func, kwargs, exclude=[], match_signature=True, named_dict=True):
     named_dict      - if kwargs contains a dict under key '<func_name>_args' return its contents (+ filtered kwargs)
     """
     kws = {}
+    signature = inspect.getargspec(func)[0]
     if match_signature:
-        matches = {k: v for k, v in kwargs.iteritems() if (k in inspect.getargspec(func)[0]) and (k not in exclude)}
+        matches = {k: v for k, v in kwargs.iteritems() if (k in signature) and (k not in exclude)}
         kws.update(matches)
     if named_dict:
         name = '{name}_args'.format(name=func.__name__)
         if name in kwargs:
             kws.update(kwargs[name])
     return kws
+
+def call_with_kwargs(func, kwargs, exclude=[], match_signature=True, named_dict=True, *args):
+    """Return output of func called with dict of args from kwargs that match input for func.
+    Effectively filters kwargs to return those arguments
+    func            - function to provide compatible arguments for
+    kwargs          - list of kwargs to filter for supplied function
+    exclude         - list of kwargs to exclude from filtering
+    match_signature - apply filtering to kwargs based on func call signature
+    named_dict      - if kwargs contains a dict under key '<func_name>_args' return its contents (+ filtered kwargs)
+    """
+    kws = args_for(func, kwargs, exclude=exclude, match_signature=match_signature, named_dict=named_dict)
+    output = func(*args, **kws)
+    return output
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
