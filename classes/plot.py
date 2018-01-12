@@ -315,7 +315,10 @@ def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, 
         minor = 2 * copy(minor)
 
     for i, (x0, y0, major0, minor0, angle0) in enumerate(list(zip(x, y, major, minor, angle))):
-        # Add ellipses marking filament width
+        # Matplotlib ellipse takes:
+        #  width:  total length (diameter) of horizontal axis
+        #  height: total length (diameter) of vertical axis
+        #  angle:  rotation in degrees (anti-clockwise)
         ax.add_patch(Ellipse((x0, y0), major0, minor0, angle=angle0,
                               facecolor='none', edgecolor=color, lw=lw, alpha=alpha, ls=ls, zorder=2, **kwargs))
         if label:
