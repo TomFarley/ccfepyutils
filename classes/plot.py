@@ -29,8 +29,23 @@ class Plot(object):
                       ))
     instances = []  # List of all Plot instances
 
-    def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), current_ax=0, mode=None, legend='each axis',
+    def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), current_ax=1, mode=None, legend='each axis',
                  save=False, show=False, fig_args={}, **kwargs):
+        """
+
+        :param x:
+        :param y:
+        :param z:
+        :param num:
+        :param axes:
+        :param current_ax: default axis for future calls if ax argument not supplied (starts at 1)
+        :param mode:
+        :param legend:
+        :param save:
+        :param show:
+        :param fig_args:
+        :param kwargs:
+        """
         self._num = num  # Name of figure window
         self._ax_shape = axes  # Shape of axes grid
         self._current_ax = current_ax  # Default axis for actions when no axis is specified
@@ -44,9 +59,10 @@ class Plot(object):
         self.make_figure(num, axes, **fig_args)
         self.plot(x, y, z, mode=mode, **kwargs)
         self.show(show)
+        self.save(save)
 
     def make_figure(self, num, axes, **kwargs):
-        assert isinstance(num, (str, int, type(None)))
+        assert isinstance(num, (basestring, str, int, type(None)))
         assert isinstance(axes, (tuple, list))
         self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
         self.axes = make_itterable(self.axes)
@@ -70,7 +86,7 @@ class Plot(object):
 
     def _name2ax(self, ax):
         if isinstance(ax, int):
-            return self.axes[ax]
+            return self.axes[ax-1]  # TODO: Make compatible with 2d grid of axes
         elif isinstance(ax, str):
             raise NotImplementedError
 
@@ -96,7 +112,7 @@ class Plot(object):
         """Inspect supplied data to see whether further actions should be taken with it"""
         raise NotImplementedError
 
-    def call_if_args(self, **kwargs):
+    def call_if_args(self, kwargs):
         for func in (self.set_axis_labels, self.show):
             kws = args_for(func, kwargs)
             if len(kws) > 0:
@@ -120,7 +136,7 @@ class Plot(object):
             contourf(x, y, z, ax, **kwargs)
         else:
             raise NotImplementedError('Mode={}'.format(mode))
-        self.call_if_args(**kwargs)
+        self.call_if_args(kwargs)
 
     def set_axis_labels(self, xlabel, ylabel, ax=None):
         assert isinstance(xlabel, str)
@@ -155,6 +171,11 @@ class Plot(object):
             kwargs.update(args)
         kws = args_for(plot_ellipses, kwargs)
         plot_ellipses(ax, **kws)
+        self.call_if_args(kwargs)
+
+    def save(self, save=False):
+        if save:
+            raise NotImplementedError
 
     def save_image(self, z, fn, bit_depth=12):
         """Save image to file preserving resolution"""
