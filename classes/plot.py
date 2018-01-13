@@ -37,8 +37,8 @@ class Plot(object):
                    'plotting': ['ready'],
                    }
 
-    def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), current_ax=1, mode=None, legend='each axis',
-                 save=False, show=False, fig_args={}, **kwargs):
+    def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), default_ax=1, ax=None, mode=None,
+                 legend='each axis', save=False, show=False, fig_args={}, **kwargs):
         """
 
         :param x:
@@ -46,7 +46,7 @@ class Plot(object):
         :param z:
         :param num:
         :param axes:
-        :param current_ax: default axis for future calls if ax argument not supplied (starts at 1)
+        :param default_ax: default axis for future calls if ax argument not supplied (starts at 1)
         :param mode:
         :param legend:
         :param save:
@@ -54,14 +54,18 @@ class Plot(object):
         :param fig_args:
         :param kwargs:
         """
+        self.call_table = {'ready': {'enter': self.set_ready}
+                      }
+        self.state = State(self, self.state_table, 'init', call_table=self.call_table)
+
         self._num = num  # Name of figure window
         self._ax_shape = axes  # Shape of axes grid
-        self._current_ax = current_ax  # Default axis for actions when no axis is specified
+        self._default_ax = default_ax  # Default axis for actions when no axis is specified
+        self._current_ax = ax
         self._data = OrderedDict()  # Data used in plots stored for provenance
         self._log = []  # Log of method calls for provenance
         self._legend = legend
 
-        self.state = State(self, self.state_table, 'init')
         self.fig = None
         self.axes = None
         self.instances.append(self)
@@ -76,6 +80,9 @@ class Plot(object):
         self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
         self.axes = make_itterable(self.axes)
 
+    def set_ready(self):
+        """Set plot object in 'ready' state by finalising/tidying up plot actions"""
+        self._current_ax = None
 
     def _get_modes(self, x, y, z, data_requried=False):
         """Inspect supplied data to see whether further actions should be taken with it"""
@@ -95,9 +102,16 @@ class Plot(object):
 
     def _name2ax(self, ax):
         if isinstance(ax, int):
-            return self.axes[ax-1]  # TODO: Make compatible with 2d grid of axes
-        elif isinstance(ax, str):
+            ax = self.axes[ax-1]  # TODO: Make compatible with 2d grid of axes
+        elif isinstance(ax, string_types):
             raise NotImplementedError
+        elif isinstance(ax, (tuple, list)):
+            raise NotImplementedError
+        elif isinstance(ax, type(self.axes[0])):  # TODO: improve this!
+            ax = ax  # already an axis instance
+        else:
+            raise TypeError
+        return ax
 
     def _check_mode(self, x, y, z, mode):
         assert isinstance(mode, str)
@@ -112,10 +126,17 @@ class Plot(object):
     def ax(self, ax=None):
         """Return axis instance."""
         if ax is None:
-            ax = self._current_ax
-        elif isinstance(ax, type(self.axes[0])):  # tmp TODO: fix this!
-            return ax
-        return self._name2ax(ax)
+            if self._current_ax is not None:
+                ax = self._current_ax
+            else:
+                ax = self._default_ax
+        elif isinstance(ax, type(self.axes[0])):  # TODO: improve this!
+            ax = ax
+        elif isinstance(ax, string_types+(int, tuple, list)):
+            ax = ax
+        ax = self._name2ax(ax)  # Convert axis name to axis instance
+        self._current_ax = ax
+        return ax
 
     def _use_data(self, x, y, z, mode):
         """Inspect supplied data to see whether further actions should be taken with it"""
@@ -130,7 +151,7 @@ class Plot(object):
             raise TypeError('Invalid keyword argument(s): {}'.format(kwargs))
         self.state('ready')
                 
-    # @in_state('plotting')
+    @in_state('plotting')
     def plot(self, x=None, y=None, z=None, ax=None, mode=None, fit=None, smooth=None, **kwargs):
         # self.state('plotting')
         if fit is not None:
@@ -143,11 +164,14 @@ class Plot(object):
         self._check_mode(x, y, z, mode)
         ax = self.ax(ax)
         if mode == 'line':
-            plot_1d(x, y, ax, **kwargs)
+            kws = args_for(plot_1d, kwargs, remove=True)
+            plot_1d(x, y, ax, **kws)
         if mode == 'scatter':
-            scatter_1d(x, y, ax, **kwargs)
+            kws = args_for(scatter_1d, kwargs, remove=True)
+            scatter_1d(x, y, ax, **kws)
         elif mode == 'contourf':
-            contourf(x, y, z, ax, **kwargs)
+            kws = args_for(contourf, kwargs, remove=True)
+            contourf(x, y, z, ax, **kws)
         else:
             raise NotImplementedError('Mode={}'.format(mode))
         self.call_if_args(kwargs)
@@ -175,13 +199,15 @@ class Plot(object):
                     leg = ax.legend()
                     leg.draggable()
 
-    def plot_ellipses(self, ax=None, obj=None, **kwargs):
+    def plot_ellipses(self, ax=None, obj=None, convention='ellipse_axes', **kwargs):
+        """Plot ellipses either by providing keyword arguments 'major, minor and angle' or by providing an Ellipses
+        onject"""
         self.state('plotting')
         from ccfepyutils.geometry import Ellipses
         ax = self.ax(ax)
         if isinstance(obj, Ellipses):
             args = {}
-            args['major'], args['minor'], args['angle'] = obj.get('ellipse_axes', nested=True)
+            args['major'], args['minor'], args['angle'] = obj.get(convention, nested=True)
             args['x'], args['y'] = obj.position
             kwargs.update(args)
         kws = args_for(plot_ellipses, kwargs)

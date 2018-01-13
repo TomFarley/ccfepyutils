@@ -10,7 +10,7 @@ from time import time
 
 from copy import deepcopy
 
-from ccfepyutils.utils import args_for
+from ccfepyutils.utils import args_for, caller_details
 
 try:
     import cpickle as pickle
@@ -23,11 +23,21 @@ from logging.config import fileConfig
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+"""
+TODO:
+- add sig2fwhm arg to plot ellipses
+- scale match radius
+- reduce fil size
+- mod fil posns
+"""
+
 def in_state(state):
     """Decorator to change state of object method belongs to for duration of method call"""
     def in_state_wrapper(func):
-        def func_wrapper(self, *args, **kwargs):
-            self.state(state)
+        def func_wrapper(*args, **kwargs):
+            self = args[0]
+            self.state(state, call=(func, args, kwargs))
+            # TODO: log function call and args in state object
             func(*args, **kwargs)
             self.state.reverse()
         return func_wrapper
@@ -35,12 +45,13 @@ def in_state(state):
 
 class State(object):
     call_patterns = ('enter', 'exit')  # Patterns for calls in state transitions
-    def __init__(self, owner, table, initial_state, call_table=None):
+    def __init__(self, owner, table, initial_state, call_table=None, init_call=None, record_calls=True):
         self._owner = owner
         self._table = table
         self._current = initial_state
+        self._record_calls = record_calls
         self._history = [initial_state]
-        self._history_all = [initial_state]
+        self._history_all = [{'state': initial_state, 'call': init_call}]  # caller_details()}]  # TODO: Implement caller_details
         self._call_table = call_table
         assert initial_state in self.possible_states
         self.check_tables()
@@ -54,20 +65,24 @@ class State(object):
 
         # Check structure of call table
         if self._call_table is not None:
-            for key, values in self._call_table:
+            # Check input values in call table are callables and keys are valid
+            for key, values in self._call_table.iteritems():
                 assert key in self.possible_states  # check states
                 assert all([(v in self.call_patterns) for v in values])  # check call patterns
                 for pattern in self.call_patterns:
-                    callables = values[pattern]
                     if pattern not in values:  # Complete call table with empty lists
                         self._call_table[key][pattern] = []
-                    elif not isinstance(callables, (list, tuple)):  # If not collection of callables nest in list
-                        values[pattern] = [values[pattern]]
+                    callables = values[pattern]
+                    if not isinstance(callables, (list, tuple)):  # If not collection of callables nest in list
+                        values[pattern] = [callables]
+                        callables = values[pattern]
                     assert all([callable(v) for v in callables])  # check callables are callable
-            for state in self.possible_states:  # Complete call table with empty lists
+            # Complete call table with dicts of empty lists
+            for state in self.possible_states:
                 if state not in self._call_table:
-                    for pattern in self.call_patterns:
-                        self._call_table[state][pattern] = []
+                    self._call_table[state] = {}
+                for pattern in self.call_patterns:
+                    self._call_table[state][pattern] = []
 
     @property
     def possible_states(self):
@@ -89,13 +104,20 @@ class State(object):
     @property
     def history(self):
         return ' -> '.join(self._history)
+    
+    @property
+    def previous_state(self):
+        if len(self._history_all) > 1:
+            return self._history_all[-2]['state']
+        else:
+            return None
 
     def call_transition(self, old, new, *args, **kwargs):
         if self._call_table is None:
             return
-        kwargs.update(dict(
-                ('state_transition', dict( (('old', old), ('new', new)),),)
-                ))  # Add information out state change
+        kwargs.update(dict((
+                ('state_transition', dict( (('old', old), ('new', new)))),
+                ),))  # Add information out state change
         for func in self._call_table[old]['exit']:
             # TODO: Use args
             kws = args_for(func, kwargs)
@@ -105,7 +127,7 @@ class State(object):
             kws = args_for(func, kwargs)
             func(*args, **kws)
 
-    def __call__(self, new_state, ignore=False, *args, **kwargs):
+    def __call__(self, new_state, call=None, ignore=False, *args, **kwargs):
         """Change state to new_state. Return True if call lead to a state change, False if already in new_state.
         :param new_state: name of state to change to"""
         old_state = self.current_state
@@ -119,9 +141,13 @@ class State(object):
         else:
             raise RuntimeError('{owner} cannot perform state switch {old} -> {new}. Accessible states: {avail}'.format(
                     owner=repr(self._owner), old=self._current, new=new_state, avail=self.accessible_states))
+        
         logger.debug('{owner} state changed {old} -> {new}'.format(
                     owner=repr(self._owner), old=self._current, new=new_state))
-        self._history_all.append(new_state)  # Update irrespective of change
+        self._history_all.append({'state': new_state})
+        if self._record_calls:
+            assert call is None or (isinstance(call, tuple) and len(call) == 3)  # Needs format (func, args, kwargs)
+            self._history_all[-1]['call'] = call
         return new_state != old_state
 
     def __getitem__(self, item):
@@ -147,14 +173,17 @@ class State(object):
             return True
         else:
             return False
+        
+    def repeated(self):
+        """Return True if last state change call was to the same state"""
+        return self == self.previous_state
 
     def reverse(self, steps=1):
         """Reverse to past state if past state is different to current state
         :param steps: number of steps in history_all to reverse"""
-        assert steps > 0
-        new_state = self._history_all[-steps]
-        if new_state != self:
-            self(self._history_all[-steps])
+        assert steps > 0 and steps < len(self._history_all)
+        new_state = self._history_all[-steps]['state']
+        self(new_state)
 
     def undo(self, n):
         """Undo n state changes"""

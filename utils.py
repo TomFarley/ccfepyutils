@@ -1187,6 +1187,11 @@ def args_for(func, kwargs, exclude=[], match_signature=True, named_dict=True, re
                 kwargs.pop(key)
     return kws
 
+def caller_details(level=1):
+    """Return (func_name, args, kwargs) of function that called this function"""
+    inspect
+    raise NotImplementedError
+
 def call_with_kwargs(func, kwargs, exclude=[], match_signature=True, named_dict=True, remove=True, *args):
     """Return output of func called with dict of args from kwargs that match input for func.
     Effectively filters kwargs to return those arguments
