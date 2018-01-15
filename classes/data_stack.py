@@ -90,15 +90,19 @@ class Stack(object):
         self.y_obj = y
         self.z_obj = z
         self._values = np.array(values)
-        self.name = name
-        self.quantity = quantity
-        self._stack_axis = self.dim2xyz(stack_axis)
+        self.name = name  # Name of stack object
+        self.quantity = quantity  # Quantity data represents eg intensity
+        self._stack_axis = self.dim2xyz(stack_axis)  # Axis along which to consider the data a stack of data slices
+
         # If not initialised here, the xarray will be initialised when it is first accessed
         if values is not None:
             self.set_data()
 
-        self.window = None
-        self._slices = {}
+        self.window = None  # Subwindow of stack axis to consider TODO: implement stack window
+        self.roi = None  # Region of interest (sub-window each slice) TODO: implement stack roi
+        self.gui = None  # GUI window instance for navigating the data TODO: implement stack gui
+
+        self._slices = {}  # Cache of slice objects
 
         self._check_types()
 
