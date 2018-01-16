@@ -25,7 +25,7 @@ logger.setLevel(logging.DEBUG)
 
 """
 TODO:
-- add sig2fwhm arg to plot ellipses
+- add sig2fwhm arg to plot ellipses _/
 - scale match radius
 - reduce fil size
 - mod fil posns
@@ -66,7 +66,7 @@ class State(object):
         # Check structure of call table
         if self._call_table is not None:
             # Check input values in call table are callables and keys are valid
-            for key, values in self._call_table.iteritems():
+            for key, values in self._call_table.items():
                 assert key in self.possible_states  # check states
                 assert all([(v in self.call_patterns) for v in values])  # check call patterns
                 for pattern in self.call_patterns:

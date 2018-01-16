@@ -153,3 +153,8 @@ class Ellipses(object):
         plot_ellipses(ax, major, minor, angle, x=x, y=y, **kwargs)
         if show:
             plt.show()
+
+    def inside(self, x, y):
+        """Return True if points inside ellipses"""
+        # TODO: move in_ellipse function here
+        raise NotImplementedError

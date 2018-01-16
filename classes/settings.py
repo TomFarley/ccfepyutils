@@ -2,13 +2,15 @@
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from collections import defaultdict, OrderedDict
 import numbers
 from nested_dict import nested_dict
 from datetime import datetime
 import time
-from copy import deepcopy
+from copy import copy, deepcopy
 import os
+import shutil
 
 from ccfepyutils.classes.state import State
 
@@ -39,12 +41,12 @@ class Settings(object):
         assert isinstance(name, str)
         assert (application, name) not in self.instances.keys_flat(), 'Setting object {}:{} already exists'.format(
                 application, name)
+        self.log_file = None
         self.application = application
         self.name = name
         self.state = State(self, self.state_table, 'init')
-        self.t_created = None
-        self.t_modified = None
-        self.log_file = None
+        self._t_created = None
+        self._t_modified = None
 
         self.instances[application][name] = self
         self.call_table = {'modified': {'exit': [self.save]}}
@@ -55,11 +57,12 @@ class Settings(object):
             self.state('saved')
         else:
             self.df = pd.DataFrame({'value': []})  # Initialise empty dataframe
+            self._column_sets = {}  # Groups of columns with similar purposes
             self.state('modified')
 
     def __str__(self):
         # TODO: set ordering
-        return str(self.df)
+        return repr(self.df)
 
     def __repr__(self):
         return '<Settings: {app};{name}, {state}>'.format(app=self._application, name=self.name, state=self.state)
@@ -120,6 +123,9 @@ class Settings(object):
         """Return True if a settings file with the current application and name already exists else False"""
         return os.path.isfile(self.fn_path)
 
+    @property
+    def t_modified(self):
+        return convert_str_datetime_format(self._t_modified, format1=self.time_format)
 
     def read_file(self):
         raise NotImplementedError
@@ -138,28 +144,20 @@ class Settings(object):
         # TODO: update with config file
         # Find times of exisiting settings for application
         if self.file_exists:
-
-
-            while self.datetime2str(datetime.now()) in log.index:
+            while t_now_str(format=self.time_format) in self.log_file:
                 time.sleep(1.0)
-        return self.datetime2str(datetime.now())
+        return t_now_str(format=self.time_format)
 
     def set_t_created(self):
-        self.t_created = self.new_time()
+        self._t_created = self.new_time()
 
     def set_t_modified(self):
-        self.t_modified = self.new_time()
+        self._t_modified = self.new_time()
 
     def modified(self):
         """Set modified time string"""
-
-    def datetime2str(self, time):
-        string = time.strftime(self.time_format)
-        return string
-
-    def str2datetime(self, string):
-        time = datetime.strptime(string, self.time_format)
-        return time
+        self._t_modified = self.new_time()
+        self.log_file.update(self.name, self._t_modified)
 
     def add_column(self, value):
         assert value not in self.columns
@@ -186,31 +184,124 @@ class Settings(object):
 
 
 class SettingsLogFile(object):
+    t_display_format = "%H:%M:%S %d/%m/%y"
     def __init__(self, application):
         """ """
         assert isinstance(application, str)
         self.application = application
 
     @property
+    def application(self):
+        return self._application
+
+    @application.setter
+    def application(self, value):
+        self._application = value
+        self.load()
+
+    @property
     def path(self):
         """Path to settings log files"""
         ## TODO: Load from config file
-        return os.path.expanduser('~/.ccfetools/setting/')
+        return os.path.expanduser('~/.ccfetools/settings/')
 
     @property
     def fn(self):
         """Filename of current settings file"""
-        return 'settings-{app}.hdf'.format(app=self.application)
+        return 'settings-{app}.nc'.format(app=self.application)
 
     @property
     def fn_path(self):
         return os.path.join(self.path, self.fn)
 
-    def read(self):
-        raise NotImplementedError
+    @property
+    def names(self):
+        return self.df.index
 
-    def update(self):
-        raise NotImplementedError
+    @property
+    def times(self):
+        return self.df['names']
+
+    def create(self):
+        # TODO: add safety checks
+        self.df = pd.DataFrame({'time': []})  # Initialise empty dataframe
+        self.df.index.name = 'name'
+        self.save()
+
+    def save(self):
+        exists = os.path.isfile(self.fn_path)
+        try:
+            self.df.to_xarray().to_netcdf(self.fn_path)
+            if not exists:
+                logger.info('Created SettingsLogFile for application "{app}": {path}'.format(
+                        app=self.application, path=self.fn_path))
+        except PermissionError as e:
+            logger.exception('Unable to write to file')
+
+    def load(self):
+        """Load settings logfile for current application"""
+        if not os.path.isfile(self.fn_path):
+            self.create()
+            return False
+        self.df = xr.open_dataset(self.fn_path).to_dataframe()
+        return True
+
+    def update(self, name, time):
+        """Update the time string of a named settings configuration"""
+        self.df.loc[name] = time
+        self.save()
+
+    def rename(self, old, new):
+        """Rename a settings configuration and update existing instances"""
+        self.df.rename(index={old: new})
+        self.save()
+
+    def backup(self):
+        """Backup current application settings configurations file to backup folder"""
+        self.save()
+        # TODO: Load path setttings from config file
+        backup_path = '~/.ccfetools/settings/backups/'
+        backup_fn = 'settings_backup-{app}-{time}.nc'.format(app=self.application, time=t_now_str())
+        fn_path = os.path.join(backup_path, backup_fn)
+        shutil.copyfile(self.fn_path, fn_path)
+        logger.info('Created backup of SettingsLogFile for application "{app}": {path}'.format(
+                app=self.application, path=fn_path))
+
+    def delete(self):
+        """Delete the configurations file for the current application"""
+        os.remove(self.fn_path)
+
+    def __repr__(self):
+        return '<SettingsLogFile: {app}({l})>'.format(app=self.application, l=len(self.df))
+
+    def __str__(self):
+        tmp = copy(self.df)
+        tmp.loc[:, 'time'] = [convert_str_datetime_format(s, format2=self.t_display_format) for s in tmp['time']]
+        string = u'{}\n{}'.format(repr(self), repr(tmp))
+        return string
+
+    def __contains__(self, item):
+        if (item in self.times) or (item in self.names):
+            return True
+        else:
+            return False
+
+def datetime2str(time, format="%y%m%d%H%M%S"):
+    string = time.strftime(format)
+    return string
+
+def str2datetime(string, format="%y%m%d%H%M%S"):
+    time = datetime.strptime(string, format)
+    return time
+
+def convert_str_datetime_format(string, format1="%y%m%d%H%M%S", format2="%H:%M:%S %d/%m/%y"):
+    time = str2datetime(string, format1)
+    string = datetime2str(time, format2)
+    return string
+
+def t_now_str(format="%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S"):
+    string = datetime2str(datetime.now(), format=format)
+    return string
 
 if __name__ == '__main__':
     s = Settings('test', 'default')

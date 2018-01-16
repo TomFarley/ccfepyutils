@@ -1176,7 +1176,7 @@ def args_for(func, kwargs, exclude=[], match_signature=True, named_dict=True, re
     signature = inspect.getargspec(func)[0]
     name = '{name}_args'.format(name=func.__name__)
     if match_signature:
-        matches = {k: v for k, v in kwargs.iteritems() if (k in signature) and (k not in exclude)}
+        matches = {k: v for k, v in kwargs.items() if (k in signature) and (k not in exclude)}
         kws.update(matches)
     if named_dict:
         if name in kwargs:

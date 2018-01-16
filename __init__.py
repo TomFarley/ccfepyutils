@@ -10,7 +10,6 @@ def script_directory(level=0):
     return path
 this_dir = script_directory()
 
-print('__init__: {}'.format(this_dir))
 fn_log = os.path.join(this_dir, 'logging_config.ini')  # change to using file in ~/.ccfetools ?
 
 try:

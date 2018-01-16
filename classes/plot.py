@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 from ccfepyutils.utils import make_itterable, args_for
 from ccfepyutils.classes.state import State, in_state
+from ccfepyutils.classes.fitter import Fitter
 try:
     string_types = (basestring,)  # python2
 except Exception as e:
@@ -27,7 +28,7 @@ class Plot(object):
     dim_modes = dict((((1, None, None), ('line', 'scatter', 'pdf')),
                       ((1, 1 , None), ('line', 'scatter')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
-                      ((1, 1 , 2), ('contourf', 'contour', 'image')),
+                      ((1, 1, 2), ('contourf', 'contour', 'image')),
                       ((2, None, None), ('contourf', 'contour', 'image')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
@@ -69,13 +70,13 @@ class Plot(object):
         self.fig = None
         self.axes = None
         self.instances.append(self)
-        self.make_figure(num, axes, **fig_args)
+        self.make_figure(num, axes, **fig_args)  # TODO: Add axis naming? .set_axis_names - replace defaults?
         self.plot(x, y, z, mode=mode, **kwargs)
         self.show(show)
         self.save(save)
 
     def make_figure(self, num, axes, **kwargs):
-        assert isinstance(num, (basestring, str, int, type(None)))
+        assert isinstance(num, (string_types, str, int, type(None)))
         assert isinstance(axes, (tuple, list))
         self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
         self.axes = make_itterable(self.axes)
@@ -166,7 +167,7 @@ class Plot(object):
         if mode == 'line':
             kws = args_for(plot_1d, kwargs, remove=True)
             plot_1d(x, y, ax, **kws)
-        if mode == 'scatter':
+        elif mode == 'scatter':
             kws = args_for(scatter_1d, kwargs, remove=True)
             scatter_1d(x, y, ax, **kws)
         elif mode == 'contourf':
