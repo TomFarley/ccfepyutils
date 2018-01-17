@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
+from future.utils import iteritems
 """Class for performing quick fits to data and plotting them"""
 import inspect
 import logging
@@ -18,7 +19,12 @@ from ccfepyutils.utils import is_scalar, sub_range, args_for  # fix import path 
 from ccfepyutils.plotUtils import repeat_color  # fix import path ****
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
+
+try:
+    string_types = (basestring,)  # python2
+except Exception as e:
+    string_types = (str,)  # python3
 
 class Fitter(object):
     """Class for fitting to data
@@ -102,7 +108,7 @@ class Fitter(object):
             raise NotImplementedError('3D fitting not implemented yet')
 
         x, y = self.data(window=window)
-        if isinstance(func, (str, unicode)):
+        if isinstance(func, string_types):
             if func in functions.keys():
                 func = functions[func]
             elif func == 'auto':
@@ -135,7 +141,6 @@ class Fitter(object):
         chi2r = chi2 / len(popt)
 
         logger.debug('{} fitted with chi2: {:0.0f}, chi2r: {:0.0f}, popt: {}'.format(func.__name__, chi2, chi2r, popt))
-        print('{} fitted with chi2: {:0.0f}, chi2r: {:0.0f}, popt: {}'.format(func.__name__, chi2, chi2r, popt))
         return func, popt, pcov, chi2r
 
     def auto_fit(self, funcs=('linear', 'exp', 'normal', 'lognormal'), p0s=None, window=None, ax=None):
@@ -153,8 +158,6 @@ class Fitter(object):
         chi2 = chi2r * len(popt)
         logger.debug('Best autofit: {} fitted with chi2={:0.0f}, chi2r: {:0.0f}, popt: {}'.format(
             func.__name__, chi2, chi2r, popt))
-        print('Best autofit: {} fitted with chi2={:0.0f}, chi2r: {:0.0f}, popt: {}'.format(
-            func.__name__, chi2, chi2r, popt))
         return best
 
     def plot_fit(self, func='auto', p0=None, window=None, extrapolate=[None, None], ax=None, show=False,
@@ -164,7 +167,8 @@ class Fitter(object):
         """
         if func is None:  # If None don't plot
             return
-        fig, ax = self.get_fig_ax(ax)
+        if ax is None:
+            fig, ax = self.get_fig_ax(ax)
 
         func, popt, pcov, chi2r = self.fit(func, p0=p0, window=window, **kwargs)
         if popt is None:
@@ -181,7 +185,7 @@ class Fitter(object):
         popt_dict = {'p{}'.format(i+1): p for i, p in enumerate(popt)}
         label = fit_label.format(func=func_name, Func=func_name.capitalize(), chi2r=chi2r, chi2=chi2r*len(popt),
                                  **popt_dict)
-        if isinstance(color, (str, basestring)) and 'repeat' in color:
+        if isinstance(color, string_types) and 'repeat' in color:
             color = repeat_color(color, ax=ax)
 
         try:  # first try all keyword arguments in order to include **kwargs to ax.plot(**kwargs)
@@ -255,7 +259,6 @@ if __name__ == '__main__':
     # p_in = (3.4, 2.1, 4.6, 1.9)
 
     logger.info('Using fuction {} with params {}'.format(func_name, p_in))
-    print('Using fuction {} with params {}'.format(func_name, p_in))
 
     x_true = np.linspace(0, 10, 200)
     y_true = func(x_true, *p_in)

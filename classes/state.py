@@ -21,7 +21,7 @@ from logging.config import fileConfig
 
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 """
 TODO:
@@ -143,7 +143,7 @@ class State(object):
                     owner=repr(self._owner), old=self._current, new=new_state, avail=self.accessible_states))
         
         logger.debug('{owner} state changed {old} -> {new}'.format(
-                    owner=repr(self._owner), old=self._current, new=new_state))
+                    owner=repr(self._owner), old=old_state, new=new_state))
         self._history_all.append({'state': new_state})
         if self._record_calls:
             assert call is None or (isinstance(call, tuple) and len(call) == 3)  # Needs format (func, args, kwargs)

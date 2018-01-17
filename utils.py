@@ -208,14 +208,21 @@ def is_number(s):
         return False
     return True
 
-def safe_len(var):
+def safe_len(var, scalar=1):
     """ Length of variable returning 1 instead of type error for scalars """
     if is_scalar(var): # checks if has atribute __len__
-        return 1
+        return scalar
     elif len(np.array(var) == np.nan) == 1 and var == np.nan: # If value is NaN return zero length
         return 0
     else:
         return len(var)
+
+def safe_zip(*args):
+    """Return zip iterator even if supplied with scaler values"""
+    args = list(args)
+    for i, arg in enumerate(args):
+        args[i] = make_itterable(arg)
+    return zip(*args)
 
 def any_equal(object, list):
     """ Return true if object is equal to any of the elements of list
@@ -223,7 +230,7 @@ def any_equal(object, list):
     return np.any([object == l for l in list])
 
 def to_array(obj, silent=True):
-    """Return object as an ndarray"""
+    """Return object as an itterable ndarray"""
     if isinstance(obj, np.ndarray):
         return obj
 
@@ -241,7 +248,7 @@ def to_array(obj, silent=True):
         obj = np.array([obj])
     else:
         try:
-            obj = np.array(obj)
+            obj = np.array([obj])
         except:
             if not silent:
                 print('Could not convert {} to a np.ndarray'.format())
@@ -1162,7 +1169,7 @@ def exists_equal(value, obj, indices):
     obj = exists_lookup(obj, *indices)
     return obj == value
 
-def args_for(func, kwargs, exclude=[], match_signature=True, named_dict=True, remove=True):
+def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_dict=True, remove=True):
     """Return filtered dict of args from kwargs that match input for func.
     Effectively filters kwargs to return those arguments
     func            - function to provide compatible arguments for
@@ -1176,14 +1183,14 @@ def args_for(func, kwargs, exclude=[], match_signature=True, named_dict=True, re
     signature = inspect.getargspec(func)[0]
     name = '{name}_args'.format(name=func.__name__)
     if match_signature:
-        matches = {k: v for k, v in kwargs.items() if (k in signature) and (k not in exclude)}
+        matches = {k: v for k, v in kwargs.items() if (((k in signature) and (k not in exclude)) or (k in include))}
         kws.update(matches)
     if named_dict:
         if name in kwargs:
             kws.update(kwargs[name])
     if remove:
-        for key in signature+[name]:
-            if key in kwargs:
+        for key in signature+[name]+list(include):
+            if (key in kwargs) and (key not in exclude):
                 kwargs.pop(key)
     return kws
 

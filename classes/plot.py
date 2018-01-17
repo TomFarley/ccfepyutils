@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+from mpl_toolkits.mplot3d import Axes3D
 from collections import OrderedDict
 from copy import copy, deepcopy
 try:
@@ -14,11 +15,11 @@ from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable, args_for
+from ccfepyutils.utils import make_itterable, args_for, to_array
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 try:
-    string_types = (basestring,)  # python2
+    string_types = (basestring, unicode)  # python2
 except Exception as e:
     string_types = (str,)  # python3
 
@@ -28,7 +29,8 @@ class Plot(object):
     dim_modes = dict((((1, None, None), ('line', 'scatter', 'pdf')),
                       ((1, 1 , None), ('line', 'scatter')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
-                      ((1, 1, 2), ('contourf', 'contour', 'image')),
+                      ((2, 2 , 2), ('surface3D')),
+                      ((1, 1, 2), ('contourf', 'contour', 'image', 'surface3D')),
                       ((2, None, None), ('contourf', 'contour', 'image')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
@@ -37,6 +39,8 @@ class Plot(object):
                    'ready': ['plotting'],
                    'plotting': ['ready'],
                    }
+    plot_args = ['ls', 'lw', 'c', 'color', 'marker', 'label']  # TODO: extend plot_args
+    scatter_args = ['s', 'c', 'color', 'marker', 'label']  # TODO: extend plot_args
 
     def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), default_ax=1, ax=None, mode=None,
                  legend='each axis', save=False, show=False, fig_args={}, **kwargs):
@@ -60,7 +64,7 @@ class Plot(object):
         self.state = State(self, self.state_table, 'init', call_table=self.call_table)
 
         self._num = num  # Name of figure window
-        self._ax_shape = axes  # Shape of axes grid
+        self._ax_shape = np.array(axes)  # Shape of axes grid
         self._default_ax = default_ax  # Default axis for actions when no axis is specified
         self._current_ax = ax
         self._data = OrderedDict()  # Data used in plots stored for provenance
@@ -71,6 +75,7 @@ class Plot(object):
         self.axes = None
         self.instances.append(self)
         self.make_figure(num, axes, **fig_args)  # TODO: Add axis naming? .set_axis_names - replace defaults?
+        # kws = args_for(self.plot, kwargs, include=self.plot_args)
         self.plot(x, y, z, mode=mode, **kwargs)
         self.show(show)
         self.save(save)
@@ -79,7 +84,7 @@ class Plot(object):
         assert isinstance(num, (string_types, str, int, type(None)))
         assert isinstance(axes, (tuple, list))
         self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
-        self.axes = make_itterable(self.axes)
+        self.axes = to_array(self.axes)
 
     def set_ready(self):
         """Set plot object in 'ready' state by finalising/tidying up plot actions"""
@@ -103,19 +108,20 @@ class Plot(object):
 
     def _name2ax(self, ax):
         if isinstance(ax, int):
-            ax = self.axes[ax-1]  # TODO: Make compatible with 2d grid of axes
+            assert ax <= self.axes.size
+            ax = self.axes.flatten()[ax-1]  # TODO: Make compatible with 2d grid of axes
         elif isinstance(ax, string_types):
             raise NotImplementedError
         elif isinstance(ax, (tuple, list)):
-            raise NotImplementedError
-        elif isinstance(ax, type(self.axes[0])):  # TODO: improve this!
+            ax = self.axes[self._ax_shape-1]
+        elif isinstance(ax, matplotlib.axes.Axes):  # TODO: improve this!
             ax = ax  # already an axis instance
         else:
             raise TypeError
         return ax
 
     def _check_mode(self, x, y, z, mode):
-        assert isinstance(mode, str)
+        assert isinstance(mode, string_types)
         pos_modes = self._get_modes(x, y, z)
         if pos_modes is None:
             raise ValueError('No data')
@@ -131,19 +137,23 @@ class Plot(object):
                 ax = self._current_ax
             else:
                 ax = self._default_ax
-        elif isinstance(ax, type(self.axes[0])):  # TODO: improve this!
+        elif isinstance(ax, matplotlib.axes.Axes):
             ax = ax
         elif isinstance(ax, string_types+(int, tuple, list)):
             ax = ax
         ax = self._name2ax(ax)  # Convert axis name to axis instance
         self._current_ax = ax
+        try:
+            plt.sca(ax)  # Set as current axis for plt. calls
+        except ValueError:
+            logger.exception('Axis problem!')
         return ax
 
     def _use_data(self, x, y, z, mode):
         """Inspect supplied data to see whether further actions should be taken with it"""
         raise NotImplementedError
 
-    def call_if_args(self, kwargs, raise_on_excess=True):
+    def call_if_args(self, kwargs, raise_on_exception=True):
         for func in (self.set_axis_labels, self.show):
             kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
@@ -154,27 +164,36 @@ class Plot(object):
                 
     @in_state('plotting')
     def plot(self, x=None, y=None, z=None, ax=None, mode=None, fit=None, smooth=None, **kwargs):
-        # self.state('plotting')
-        if fit is not None:
-            raise NotImplementedError
+        """Common interface for plotting data, whether 1d, 2d or 3d. 
+        
+        Type of plotting is controlled by mode."""
+        ax = self.ax(ax)
+      
         if smooth is not None:
             raise NotImplementedError
 
         if mode is None:
             mode = self._get_modes(x, y, z)[0]  # take first compatible mode as default
-        self._check_mode(x, y, z, mode)
-        ax = self.ax(ax)
+        self._check_mode(x, y, z, mode)  # Check mode is compatible with supplied data
         if mode == 'line':
-            kws = args_for(plot_1d, kwargs, remove=True)
+            kws = args_for(plot_1d, kwargs, include=self.plot_args, remove=True)
             plot_1d(x, y, ax, **kws)
         elif mode == 'scatter':
-            kws = args_for(scatter_1d, kwargs, remove=True)
+            kws = args_for(scatter_1d, kwargs, include=self.scatter_args, remove=True)
             scatter_1d(x, y, ax, **kws)
         elif mode == 'contourf':
             kws = args_for(contourf, kwargs, remove=True)
             contourf(x, y, z, ax, **kws)
+        elif mode == 'surface3D':
+            ax = self.convert_ax_to_3d(ax)
+            plot3d_surface(ax, x, y, z)
         else:
             raise NotImplementedError('Mode={}'.format(mode))
+
+        if fit is not None:
+            kws = args_for(Fitter.plot, kwargs, remove=True)
+            f = Fitter(x, y).plot(ax=ax, data=False, envelope=False, show=False, **kws)
+
         self.call_if_args(kwargs)
 
     def set_axis_labels(self, xlabel, ylabel, ax=None):
@@ -193,7 +212,7 @@ class Plot(object):
     def legend(self):
         """Finalise legends of each axes"""
         if self._legend == 'each axis':
-            for ax in self.axes:
+            for ax in self.axes.flatten():
                 # TODO: check if more than one legend handels exist
                 handles, labels = ax.get_legend_handles_labels()
                 if len(handles) > 1:  # Only produce legend if more than one artist has a label
@@ -215,6 +234,17 @@ class Plot(object):
         plot_ellipses(ax, **kws)
         self.call_if_args(kwargs)
         self.state('ready')
+
+    def convert_ax_to_3d(self, ax):
+        ax = self.ax(ax)
+        nx, ny = self._ax_shape[0], self._ax_shape[1]
+        for i in np.arange(nx):
+            axes_subset = self.axes[i] if nx > 1 else self.axes  # Extract row of axes
+            for j, ax0 in enumerate(axes_subset):
+                if ax0 is ax:
+                    ax.remove()
+                    axes_subset[j] = self.fig.add_subplot(nx, ny, i*ny+j+1, projection='3d')
+                    return axes_subset[j]
 
     def save(self, save=False):
         if save:
@@ -363,6 +393,14 @@ def plot_2d(self, z, x, y, ax, raw=False, show=True, save=False, annotate=True,
     if show:
         plt.show()
     return ax
+
+def plot3d_surface(ax, x, y, z, cmap='viridis', colorbar=True, **kwargs):
+    if x.ndim == 1 and y.ndim == 1:
+        x, y = np.meshgrid(x, y)
+    surf = ax.plot_surface(x, y, z, cmap=cmap, **kwargs)
+    if colorbar:  # TODO: Move to Plot object?
+        ax.figure.colorbar(surf, shrink=0.5, aspect=5, pad=0.015)
+
 
 def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, color='k', lw=1, ls='-', alpha=0.7,
                   label=False, half_widths=False, **kwargs):
