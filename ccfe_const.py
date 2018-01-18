@@ -83,7 +83,7 @@ class FitFunction(object):
     instances = defaultdict(None)  # Dict of FitFunction instances
     fitter = None
     def __init__(self, key, func, name=None, name_short=None, description=None, equation=None, eqn_latex=None,
-                 symbol='y', constraints=None, fit_params='all', p0=None):
+                 symbol='y', constraints=None, fit_params=None, n_fit_params_min=3, p0=None):
         assert callable(func)
         assert key not in self.instances, 'FitFunction with key {} already exists: {}'.format(key, self.instances)
         signature = inspect.getfullargspec(func)
@@ -98,8 +98,9 @@ class FitFunction(object):
         self._dependent_vars = signature.args[:self._ndim]  # Names of dependent variables
         self._params = signature.args[self._ndim:]  # Names of parameters
         self._n_params = len(self._params)  # Number of parameters
-        self._fit_params = signature.args[self._ndim:] if fit_params == 'all' else fit_params  # Parameters to fit
-        self._n_fit_params = len(self._fit_params)  # Number of fit parameters
+        self._fit_params = self._params[:self._n_fit_params_min] if fit_params is None else fit_params  # Parameters to fit
+        self._n_fit_params_min = n_fit_params_min  # Number of fit parameters
+        self._n_fit_params_max = len(self._fit_params)  # Number of fit parameters
         self._p0 = signature.defaults if p0 is None else p0  # Default initial guess values for each parameter
         self._symbol = symbol  # Symbol representing function
         self._constraints = constraints  # Constraints on possible parameter values eg strictly sigma > 0 for fitting
@@ -148,7 +149,7 @@ class FitFunction(object):
         """Get an existing FitFunction instance"""
         return cls.instances[key]
 
-    def plot(self, *args, annotate=True, **kwargs):
+    def plot(self, annotate=True, *args, **kwargs):
         """Plot the function with supplied values"""
         from ccfepyutils.classes.plot import Plot  # avoid cyclic import
         # Convert args in the form of ranges to linspace arrays
