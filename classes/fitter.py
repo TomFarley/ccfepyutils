@@ -35,6 +35,7 @@ class Fitter(object):
         Fitter(x, y, ax=ax).plot_fit('exp', window='max->')
     """
     def __init__(self, x, y, z=None, ax=None):
+        # TODO: Implement y_errors (and x_errors?)
         ind = np.argsort(x)  # Make sure x data ordered
         self.x = x[ind]
         self.y = y[ind]

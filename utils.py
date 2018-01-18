@@ -229,6 +229,16 @@ def any_equal(object, list):
     """
     return np.any([object == l for l in list])
 
+def to_list(obj):
+    """Convert to list, nesting if nessesary"""
+    if isinstance(obj, list):
+        out = obj
+    elif is_scalar(obj):
+        out = (obj,)  # number to [num] etc
+    else:
+        out = list(obj)  # convert tuple, ndarray etc
+    return out
+
 def to_array(obj, silent=True):
     """Return object as an itterable ndarray"""
     if isinstance(obj, np.ndarray):

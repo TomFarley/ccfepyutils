@@ -41,6 +41,8 @@ class Plot(object):
                    }
     plot_args = ['ls', 'lw', 'c', 'color', 'marker', 'label']  # TODO: extend plot_args
     scatter_args = ['s', 'c', 'color', 'marker', 'label']  # TODO: extend plot_args
+    other_args = ['show', 'xlabel', 'ylabel', 'legend', 'ax']
+    args = plot_args + scatter_args + other_args # List of all possible args for use with external kwargs
 
     def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), default_ax=1, ax=None, mode=None,
                  legend='each axis', save=False, show=False, fig_args={}, **kwargs):
@@ -196,17 +198,21 @@ class Plot(object):
 
         self.call_if_args(kwargs)
 
-    def set_axis_labels(self, xlabel, ylabel, ax=None):
-        assert isinstance(xlabel, string_types)
-        assert isinstance(ylabel, string_types)
+    def set_axis_labels(self, xlabel=None, ylabel=None, ax=None):
+        assert isinstance(xlabel, (string_types, type(None)))
+        assert isinstance(ylabel, (string_types, type(None)))
         if ax == 'all':
             for ax in self.axes:
-                ax.set_xlabel(xlabel)
-                ax.set_ylabel(ylabel)
+                if xlabel is not None:
+                    ax.set_xlabel(xlabel)
+                    if ylabel is not None:
+                        ax.set_ylabel(ylabel)
         else:
             ax = self.ax(ax)
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
+            if xlabel is not None:
+                ax.set_xlabel(xlabel)
+            if ylabel is not None:
+                ax.set_ylabel(ylabel)
 
 
     def legend(self):
@@ -264,6 +270,9 @@ class Plot(object):
             plt.tight_layout()
         if show:
             plt.show()
+
+    def to_plotly(self):
+        raise  NotImplementedError
 
 
 # TODO: Move functions to separate file

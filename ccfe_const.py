@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
+
+import inspect
+
 """ tf_const.py: Physical constants and function forms
 
 Detailed description:
@@ -22,6 +25,10 @@ from numpy import exp as exp0
 from numpy import log as log0
 from numpy import sqrt as sqrt0
 from numpy import pi as pi0
+import pandas as pd
+
+from ccfepyutils.utils import args_for, to_list
+
 ## CAN import:    Debug, simple
 ## CANNOT import:
 # import tf_libs.tf_simple as tf_simple
@@ -75,19 +82,28 @@ class FitFunction(object):
     Wrapper for standard functions with additional meta data"""
     instances = defaultdict(None)  # Dict of FitFunction instances
     fitter = None
-    def __init__(self, func, key, name=None, name_short=None, description=None, equation=None, eqn_latex=None,
-                 params=None, symbol=None, constraints=None):
+    def __init__(self, key, func, name=None, name_short=None, description=None, equation=None, eqn_latex=None,
+                 symbol='y', constraints=None, fit_params='all', p0=None):
         assert callable(func)
-        self.func = func  # Callable to evaluate
+        assert key not in self.instances, 'FitFunction with key {} already exists: {}'.format(key, self.instances)
+        signature = inspect.getfullargspec(func)
         self.key = key  # Key to look up this FitFunction instance with
+        self.func = func  # Callable to evaluate
         self._name = name  # Name for labels etc
         self._name_short = name_short  # Abreviated/less verbose name for labels
         self._description = description  # Verbose description of the function
         self._equation = equation  # String showing implementation of equation
-        self._eqn_latex = eqn_latex # Latex string showing implementation of equation
-        self._params = params  # Dict of param strings and arg numbers
+        self._eqn_latex = eqn_latex  # Latex string showing implementation of equation
+        self._ndim = len(signature.args) - len(signature.defaults)
+        self._dependent_vars = signature.args[:self._ndim]  # Names of dependent variables
+        self._params = signature.args[self._ndim:]  # Names of parameters
+        self._n_params = len(self._params)  # Number of parameters
+        self._fit_params = signature.args[self._ndim:] if fit_params == 'all' else fit_params  # Parameters to fit
+        self._n_fit_params = len(self._fit_params)  # Number of fit parameters
+        self._p0 = signature.defaults if p0 is None else p0  # Default initial guess values for each parameter
         self._symbol = symbol  # Symbol representing function
         self._constraints = constraints  # Constraints on possible parameter values eg strictly sigma > 0 for fitting
+        
 
         self.instances[key] = self
 
@@ -108,6 +124,19 @@ class FitFunction(object):
         else:
             return self._description
 
+    @property
+    def p0(self):
+        df = pd.DataFrame({'value': self._p0}, index=self._params)
+        df.index.name = 'param'
+        return df
+
+    def func_defn(self, print_=True):
+        lines = inspect.getsourcelines(self.func)
+        body = "".join(lines[0])
+        if print_:
+            print(body)
+        return body
+
     @classmethod
     def avail(self):
         """Print out list of available FitFunction instances"""
@@ -117,7 +146,27 @@ class FitFunction(object):
     @classmethod
     def get(cls, key):
         """Get an existing FitFunction instance"""
-        return self.instances[key]
+        return cls.instances[key]
+
+    def plot(self, *args, annotate=True, **kwargs):
+        """Plot the function with supplied values"""
+        from ccfepyutils.classes.plot import Plot  # avoid cyclic import
+        # Convert args in the form of ranges to linspace arrays
+        args = to_list(args)
+        for i, arg in enumerate(args):
+            if len(arg) == 2:
+                args[i] = np.linspace(arg[0], arg[1], 500)
+        kws = args_for(self.func, kwargs)
+        out = self.func(*args, **kws)  # get output from function
+
+        kws = args_for(Plot.plot, kwargs, include=Plot.args)
+        arg = {k: v for k, v in zip('xyz', to_list(args) + [out])}  # collate x, y, z values as nessesary
+        if annotate:  # auto add axis labels
+            labels = {k: v for k, v in zip(['xlabel', 'ylabel', 'zlabel'], to_list(self._dependent_vars)+[self._symbol])}  # collate x, y, z values as nessesary
+            kws.update(labels)
+        kws.update(arg)
+        plot = Plot(**kws)
+        return plot
 
 ## Functions
 def poly(x, coefs, str_eqn = False):
@@ -250,6 +299,10 @@ def distributions():
 
 functions = {'poly': poly, 'linear': linear, 'exp': exp, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 'normal':
     gaussian, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 'lognormal': lognormal}
+
+
+
+func_obs = {'lognormal': lognormal}
 
 if __name__ == "__main__":
     print("e = ", e)
