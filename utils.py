@@ -16,6 +16,7 @@ except:
     from tkinter import filedialog as askopenfilename
 from matplotlib.widgets import RectangleSelector
 import numpy as np
+import pandas as pd
 import itertools
 from scipy.signal import lfilter, lfilter_zi, filtfilt, butter
 from copy import copy, deepcopy
@@ -32,6 +33,11 @@ except ImportError:
     import pickle
 import logging
 logger = logging.getLogger(__name__)
+
+try:
+    string_types = (basestring, unicode)  # python2
+except Exception as e:
+    string_types = (str,)  # python3
 
 signal_abbreviations = {
     'Ip': "amc_plasma current",
@@ -271,6 +277,11 @@ def to_arrays(*args, **kwargs):
         out.append(to_array(arg, **kwargs))
     return tuple(out)
 
+def describe_array(array):
+    """Return string containing n elements, mean, std, min, max of array"""
+    array = np.array(array).flatten()
+    df = pd.DataFrame({'values': array})
+    return df.describe()
 
 def getUserFile(type=""):
     Tk().withdraw()
@@ -582,6 +593,17 @@ def low_pass(signal, order=3, critical_freq=0.05):
     y = filtfilt(b, a, signal)
 
     return y
+
+def pos_path(value):
+    """Return True if value is a potential file path else False"""
+    if not isinstance(value, string_types):
+        return False
+    value = os.path.expanduser(value)
+    path, fn = os.path.split(value)
+    if os.path.isdir(path):
+        return True
+    else:
+        return False
 
 def file_filter(path, extension='.p', contain=None, not_contain=None):
 
@@ -1181,27 +1203,30 @@ def exists_equal(value, obj, indices):
 
 def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_dict=True, remove=True):
     """Return filtered dict of args from kwargs that match input for func.
-    Effectively filters kwargs to return those arguments
-    func            - function to provide compatible arguments for
-    kwargs          - list of kwargs to filter for supplied function
-    exclude         - list of kwargs to exclude from filtering
-    match_signature - apply filtering to kwargs based on func call signature
-    named_dict      - if kwargs contains a dict under key '<func_name>_args' return its contents (+ filtered kwargs)
-    remove          - remove filtered kwargs from original kwargs
+    :param - Effectively filters kwargs to return those arguments
+    :param - func            - function(s) to provide compatible arguments for
+    :param - kwargs          - list of kwargs to filter for supplied function
+    :param - exclude         - list of kwargs to exclude from filtering
+    :param - match_signature - apply filtering to kwargs based on func call signature
+    :param - named_dict      - if kwargs contains a dict under key '<func_name>_args' return its contents (+ filtered kwargs)
+    :param - remove          - remove filtered kwargs from original kwargs
     """
+    func = make_itterable(func)  # Nest lone function in list for itteration
     kws = {}
-    signature = inspect.getargspec(func)[0]
-    name = '{name}_args'.format(name=func.__name__)
+    keep = []
+    name_args = []
+    for f in func:
+        keep += inspect.getargspec(f)[0]  # Add arguments for each function to list of arguments to keep
+        name_args += '{name}_args'.format(name=f.__name__)
     if match_signature:
-        matches = {k: v for k, v in kwargs.items() if (((k in signature) and (k not in exclude)) or (k in include))}
+        matches = {k: v for k, v in kwargs.items() if (((k in keep) and (k not in exclude)) or (k in include))}
         kws.update(matches)
-    if named_dict:
-        if name in kwargs:
-            kws.update(kwargs[name])
-    if remove:
-        for key in signature+[name]+list(include):
-            if (key in kwargs) and (key not in exclude):
-                kwargs.pop(key)
+    if named_dict:  # Look for arguments <function>_args={dict of keyword arguments}
+        keep_names = {k: v for k, v in kwargs.items() if (k in name_args)}
+        kws.update(keep_names)
+    if remove:  # Remove key value pairs from kwargs that were transferred to kws
+        for key in kws:
+            kwargs.pop(key)
     return kws
 
 def caller_details(level=1):

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 try:
-    string_types = (basestring,)  # python2
+    string_types = (basestring, unicode)  # python2
 except Exception as e:
     string_types = (str,)  # python3
 

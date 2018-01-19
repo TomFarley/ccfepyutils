@@ -17,7 +17,7 @@ from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable, is_scalar, safe_len, safe_zip
+from ccfepyutils.utils import make_itterable, is_scalar, safe_len, safe_zip, describe_array
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.classes.plot import plot_ellipses
 
@@ -181,26 +181,38 @@ class Ellipses(object):
         :param x - x grid axis values
         :param y - y grid axis values
         :param amps - amplitudes of each 2d gaussian"""
-        RR, TT = np.meshgrid(x, y)
+        if x.ndim == 1 and y.ndim == 1:
+            xx, yy = np.meshgrid(x, y)
+        else:
+            xx, yy = x, y
         x_centre, y_centre = self.position_safe
         dx, dy, angle = self.get(convention)    # Get ellipse dimensions
         if is_scalar(amps):  # Make sure same length as ellipse info
             amps = np.full_like(dx, amps)
 
+        # To avoid large negative expoenents which go to zero in fp precision, rescale axes - numerical problems
+        dxy_extrema = np.min(np.concatenate((dx, dy)))
+        multiplier = 10**(-np.round(np.log10(dxy_extrema)))  # Rescale minima to order 1
+        # multiplier = 10**(-np.log10(dxy_extrema))  # Rescale minima to 1
+        x_centre, y_centre, dx, dy, xx, yy = [v * multiplier for v in (x_centre, y_centre, dx, dy, xx, yy)]
+
         out = []
+        # TODO: switch to single vectorised opperation
         for x0, y0, dx0, dy0, angle0, amp0 in safe_zip(x_centre, y_centre, dx, dy, angle, amps):
-            
-            a = (np.cos(angle0) * np.cos(angle0) / (2.0 * dx0 * dx0)) + (
-            np.sin(angle0) * np.sin(angle0) / (2.0 * dy0 * dy0))
-    
-            b = (-np.sin(2.0 * angle0) / (4.0 * dx0 * dx0)) + (np.sin(2.0 * angle0) / (4.0 * dy0 * dy0))
-    
-            c = (np.sin(angle0) * np.sin(angle0) / (2.0 * dx0 * dx0)) + (
-            np.cos(angle0) * np.cos(angle0) / (2.0 * dy0 * dy0))
-    
-            exponent = - (a * (RR.T - x0) * (RR.T - x0) + 2.0 * b * (RR.T - x0) * (TT.T - y0) + c * (
-            TT.T - y0) * (TT.T - y0))
+            angle0 = -angle0  # switch to anticlockwise rotation like in matplotlib etc
+            sin2, cos2 = np.sin(angle0)**2, np.cos(angle0)**2
+            sin_2a, cos_2a = np.sin(2*angle0), np.cos(2*angle0)
+
+            # Equation of elliptic 2d Gaussian: f(x,y) = A exp(- (a(x-x_o)^2 + 2b(x-x_o)(y-y_o) + c(y-y_o)^2)
+            a = (cos2 / (2.0 * dx0**2)) + (sin2 / (2.0 * dy0**2))
+            b = (-sin_2a / (4.0 * dx0**2)) + (sin_2a / (4.0 * dy0**2))
+            c = (sin2 / (2.0 * dx0**2)) + (cos2 / (2.0 * dy0**2))
+            exponent = - (a*(xx - x0)**2 + 2.0*b*(xx - x0)*(yy - y0) + c*(yy - y0)**2)
             grid = amp0 * np.exp(exponent)
+
+            #tmp: unrotated gaussian
+            grid_tmp = amp0 * np.exp(-(((xx - x0)**2)/(2.0 * dx0**2) + ((yy - y0)**2)/(2.0 * dy0**2)))
+
             out.append(grid)
 
         return np.array(out)

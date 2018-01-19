@@ -15,7 +15,7 @@ from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable, args_for, to_array
+from ccfepyutils.utils import make_itterable, args_for, to_array, pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 try:
@@ -26,7 +26,8 @@ except Exception as e:
 class Plot(object):
     """Convenience plotting class"""
     # Plotting modes compatible with different input data dimensions. The first mode for each dimension is the default
-    dim_modes = dict((((1, None, None), ('line', 'scatter', 'pdf')),
+    dim_modes = dict((((0, 0, None), ('scatter',)),  # single point
+                      ((1, None, None), ('line', 'scatter', 'pdf')),
                       ((1, 1 , None), ('line', 'scatter')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
                       ((2, 2 , 2), ('surface3D')),
@@ -186,6 +187,9 @@ class Plot(object):
         elif mode == 'contourf':
             kws = args_for(contourf, kwargs, remove=True)
             contourf(x, y, z, ax, **kws)
+        elif mode == 'image':
+            kws = args_for((imshow, plt.imshow), kwargs, remove=True)
+            imshow(ax, x, y, z, **kws)
         elif mode == 'surface3D':
             ax = self.convert_ax_to_3d(ax)
             plot3d_surface(ax, x, y, z)
@@ -197,6 +201,7 @@ class Plot(object):
             f = Fitter(x, y).plot(ax=ax, data=False, envelope=False, show=False, **kws)
 
         self.call_if_args(kwargs)
+        return self
 
     def set_axis_labels(self, xlabel=None, ylabel=None, ax=None):
         assert isinstance(xlabel, (string_types, type(None)))
@@ -225,10 +230,10 @@ class Plot(object):
                     leg = ax.legend()
                     leg.draggable()
 
+    @in_state('plotting')
     def plot_ellipses(self, ax=None, obj=None, convention='ellipse_axes', **kwargs):
         """Plot ellipses either by providing keyword arguments 'major, minor and angle' or by providing an Ellipses
         onject"""
-        self.state('plotting')
         from ccfepyutils.geometry import Ellipses
         ax = self.ax(ax)
         if isinstance(obj, Ellipses):
@@ -239,7 +244,13 @@ class Plot(object):
         kws = args_for(plot_ellipses, kwargs)
         plot_ellipses(ax, **kws)
         self.call_if_args(kwargs)
-        self.state('ready')
+
+    @in_state('plotting')
+    def plot_rectangle(self, x_lims, y_lims, fill=False, alpha=None, facecolor=None,
+                    edgecolor=None, linewidth=None, linestyle='solid', ax=None, **kwargs):
+        ax = self.ax(ax)
+        plot_rectangles(ax, x_lims, y_lims, fill=fill, alpha=alpha, facecolor=facecolor,
+                    edgecolor=edgecolor, linewidth=linewidth, linestyle=linestyle, **kwargs)
 
     def convert_ax_to_3d(self, ax):
         ax = self.ax(ax)
@@ -252,9 +263,14 @@ class Plot(object):
                     axes_subset[j] = self.fig.add_subplot(nx, ny, i*ny+j+1, projection='3d')
                     return axes_subset[j]
 
-    def save(self, save=False):
-        if save:
+    def save(self, save=False, bbox_inches='tight', transparent=True, dpi=90):
+        if save is False:
+            return
+        elif pos_path(save):  # string path
+            path_fn = save
+        else:
             raise NotImplementedError
+        self.fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
 
     def save_image(self, z, fn, bit_depth=12):
         """Save image to file preserving resolution"""
@@ -272,14 +288,17 @@ class Plot(object):
             plt.show()
 
     def to_plotly(self):
-        raise  NotImplementedError
+        raise NotImplementedError
 
 
 # TODO: Move functions to separate file
 def plot_1d(x, y, ax, **kwargs):
     # TODO: Add error bar plot functionality
     #
-    ax.plot(x, y, **kwargs)
+    if y is not None:
+        ax.plot(x, y, **kwargs)
+    else:
+        ax.plot(x, **kwargs)
 
 def scatter_1d(x, y, ax, **kwargs):
     ax.scatter(x, y, **kwargs)
@@ -294,14 +313,23 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
     if transpose:
         z = z.T
 
-    if not None in (x, y, z):
-        im = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
-        im = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
-    else:
-        im = ax.contour(z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
-        im = ax.contourf(z, levels, cmap=cmap, **kwargs)
+    if np.ptp(z) == 0:  # If 
+        v = z.flatten()[0]
+        levels = [v, 0.1]
 
-    if colorbar:
+    try:
+        if not None in (x, y, z):
+            im = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
+            im = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
+        else:
+            im = ax.contour(z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
+            im = ax.contourf(z, levels, cmap=cmap, **kwargs)
+    except ValueError as e:
+        logger.exception('Failed to plot contour. min(z)={}, max(z)={}'.format(np.min(z), np.max(z)))
+        im = None
+
+    # TODO: move to Plot class
+    if colorbar and im:
         from mpl_toolkits.axes_grid1 import make_axes_locatable
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
@@ -310,6 +338,30 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
             cbar_label = ''
         cbar = plt.colorbar(im, cax=cax, format=fmt)
         cbar.set_label(cbar_label)
+
+def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
+           **kwargs):
+    """Plot data as 2d image"""
+    if (x is not None) and (y is None) and (z is None):  # if 2d data passed to x treat x as z data
+        x, y, z = y, z, x
+    if x is None and y is None:
+        ax.set_axis_off()
+        if len(ax.figure.axes) == 1:
+            ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
+    else:
+        kwargs.update({'extent': (np.min(x), np.max(x), np.min(y), np.max(y))})
+    ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
+    if set_axis_limits:
+        if x is None and y is None:
+            ax.set_xlim(-0.5, z.shape[1] - 0.5)
+            ax.set_ylim(z.shape[0] - 0.5, -0.5)
+        else:
+            ax.set_xlim(np.min(x), np.max(x))  # TODO: Handle half pixel offset properly...
+            ax.set_ylim(np.min(y), np.max(y))
+    # if aspect:
+    #     ax.set_aspect(aspect)
+    img = ax.imshow(z, cmap=cmap, interpolation=interpolation, origin=origin, **kwargs)
+    return img
 
 def plot_2d(self, z, x, y, ax, raw=False, show=True, save=False, annotate=True,
          path='~/elzar/images/frames/', extension='.png',
@@ -444,6 +496,24 @@ def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, 
             min_size = 4
             max_size = 25
             ax.scatter(x, y, s=np.array(min_size + a * (max_size - min_size)), c=color, lw=0, alpha=0.6)
+
+def plot_rectangles(ax, x_lims, y_lims, fill=False, alpha=None, facecolor=None,
+                    edgecolor=None, linewidth=None, linestyle='solid',
+                    **kwargs):
+    """Plot rectangle on axis.
+    :param x_lims: x limits of rectangle to plot or array from which min and max limits will be taken
+    :param y_lims: y limits of rectangle to plot or array from which min and max limits will be taken
+    """
+    import matplotlib.patches as patches
+    x1, x2 = np.min(x_lims), np.max(x_lims)
+    y1, y2 = np.min(y_lims), np.max(y_lims)
+    rectangle = patches.Rectangle((x1, y1),  # (x,y)
+                                  x2-x1,  # width
+                                  y1-y1,  # height
+                                  fill=fill, alpha=alpha, facecolor=facecolor,
+                                  edgecolor=edgecolor, linewidth=linewidth, linestyle=linestyle,
+                                  **kwargs)
+    ax.add_patch(rectangle)
 
 if __name__ == '__main__':
     x = np.linspace(-10, 10, 41)
