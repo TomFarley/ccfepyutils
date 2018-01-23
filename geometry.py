@@ -181,6 +181,7 @@ class Ellipses(object):
         :param x - x grid axis values
         :param y - y grid axis values
         :param amps - amplitudes of each 2d gaussian"""
+        #TODO: Ideally enable some kind of periodic boundary conditions for y axis
         if x.ndim == 1 and y.ndim == 1:
             xx, yy = np.meshgrid(x, y)
         else:
@@ -219,6 +220,7 @@ class Ellipses(object):
 
     def superimpose_2d(self, x, y, amps, convention='ellipse_axes'):
         grids = self.grid_2d(x, y, amps, convention=convention)
+        # import pdb; pdb.set_trace()
         return np.sum(grids, axis=0)
 
     def plot_3d(self, x, y, amps, convention='ellipse_axes', mode='surface3D', show=True, **kwargs):

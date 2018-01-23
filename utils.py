@@ -1331,13 +1331,16 @@ def join_with_one(sep, *args):
         out += sep+arg12[1]
     return out
 
-def python_path():
+def python_path(filter=None):
     import os
     try:
         user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
     except KeyError:
         print('PYTHONPATH not set')
         user_paths = []
+    if filter:
+        filter = os.path.expanduser(path)
+        user_paths = [p for p in user_paths if filter in p]
     return user_paths
 
 def locate_file(fn, paths, _raise=True):

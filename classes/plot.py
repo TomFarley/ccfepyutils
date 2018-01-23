@@ -187,7 +187,7 @@ class Plot(object):
         elif mode == 'contourf':
             kws = args_for(contourf, kwargs, remove=True)
             contourf(x, y, z, ax, **kws)
-        elif mode == 'image':
+        elif mode in ('image', 'imshow'):
             kws = args_for((imshow, plt.imshow), kwargs, remove=True)
             imshow(ax, x, y, z, **kws)
         elif mode == 'surface3D':
