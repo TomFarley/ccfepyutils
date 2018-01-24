@@ -1218,7 +1218,7 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
     name_args = []
     for f in func:
         keep += inspect.getargspec(f)[0]  # Add arguments for each function to list of arguments to keep
-        name_args += '{name}_args'.format(name=f.__name__)
+        name_args += ['{name}_args'.format(name=f.__name__)]
     if match_signature:
         matches = {k: v for k, v in kwargs.items() if (((k in keep) and (k not in exclude)) or (k in include))}
         kws.update(matches)
