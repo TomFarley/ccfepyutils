@@ -1340,7 +1340,7 @@ def python_path(filter=None):
         print('PYTHONPATH not set')
         user_paths = []
     if filter:
-        filter = os.path.expanduser(path)
+        filter = os.path.expanduser(filter)
         user_paths = [p for p in user_paths if filter in p]
     return user_paths
 
