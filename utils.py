@@ -884,14 +884,21 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     return np.convolve( m[::-1], y, mode='valid')
 
 
-def in_ellipse(point, centre, rx, ry, boundary=True, return_r=False):
+def in_ellipse(point, centre, rx, ry, angle=0, boundary=True, return_r=False):
     """ Return true if point is within ellipse with centre at centre and semi-major and semi-minor axes rx and ry
-    Note rx and ry are radii not diameters
+    NOTE: rx and ry are radii not diameters
     """
     assert len(point) == 2
     assert len(centre) == 2
 
-    r = ((point[0]-centre[0])/rx)**2 + ((point[1]-centre[1])/ry)**2
+    x, y = point[0], point[1]
+    x0, y0 = centre[0], centre[1]
+    dx, dy = x - x0, y-y0
+    sin, cos = np.sin(angle), np.cos(angle)
+
+    r = (cos*dx+sin*dy)/rx**2 + (sin*dx-cos*dy)/ry**2
+    # r = ((point[0]-centre[0])/rx)**2 + ((point[1]-centre[1])/ry)**2
+
     if return_r:
         return r
     from numbers import Number
