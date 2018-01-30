@@ -887,16 +887,18 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
 def in_ellipse(point, centre, rx, ry, angle=0, boundary=True, return_r=False):
     """ Return true if point is within ellipse with centre at centre and semi-major and semi-minor axes rx and ry
     NOTE: rx and ry are radii not diameters
+    Equation for rotated ellipse from:
+    https://www.maa.org/external_archive/joma/Volume8/Kalman/General.html
     """
     assert len(point) == 2
     assert len(centre) == 2
 
     x, y = point[0], point[1]
     x0, y0 = centre[0], centre[1]
-    dx, dy = x - x0, y-y0
+    dx, dy = x-x0, y-y0
     sin, cos = np.sin(angle), np.cos(angle)
 
-    r = (cos*dx+sin*dy)/rx**2 + (sin*dx-cos*dy)/ry**2
+    r = ((cos*dx+sin*dy)/rx)**2 + ((sin*dx-cos*dy)/ry)**2
     # r = ((point[0]-centre[0])/rx)**2 + ((point[1]-centre[1])/ry)**2
 
     if return_r:
