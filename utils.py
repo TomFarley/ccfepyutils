@@ -230,7 +230,8 @@ def safe_len(var, scalar=1):
     """ Length of variable returning 1 instead of type error for scalars """
     if is_scalar(var): # checks if has atribute __len__
         return scalar
-    elif len(np.array(var) == np.nan) == 1 and var == np.nan: # If value is NaN return zero length
+    elif len(np.array(var) == np.nan) == 1 and np.all(np.array(var) == np.nan):
+        # If value is [Nan] return zero length # TODO: change to catch [Nan, ..., Nan] ?
         return 0
     else:
         return len(var)
