@@ -64,6 +64,14 @@ class TestStack(unittest.TestCase):
         slice = stack.loc(R=1.36)
         logger.debug('slice = {}'.format(slice))
 
+    def test_meta(self):
+        logger.info('** Running test_meta')
+        # coords = self.coords2
+        # stack = Stack(coords['x'], coords['y'], coords['z'])
+        # slice = stack.loc(R=1.36)
+        # logger.debug('slice = {}'.format(slice))
+
+
 
 
 def suite():

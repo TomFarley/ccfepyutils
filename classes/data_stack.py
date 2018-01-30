@@ -3,7 +3,8 @@
 import xarray as xr
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
+# import multiprocessing as mp
+import concurrent.futures as cf
 from collections import defaultdict, OrderedDict
 import numbers
 
@@ -23,11 +24,11 @@ from logging.config import fileConfig
 fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-pool = mp.Pool(processes=16)
+pool = cf.ThreadPoolExecutor(max_workers=None)
 
 class Slice(object):
 
-    def __init__(self, stack, dim, value):
+    def __init__(self, stack, dim, value, roi=None):
         assert issubclass(type(stack), Stack)
         self.stack = stack
         self.dim = stack.xyz2dim(dim)
@@ -37,11 +38,16 @@ class Slice(object):
         self.iother.pop(self.idim)  # dimensions remaining in slice
         self.dim_other = [self.stack.dims[i] for i in self.iother]
         self.value = stack.closest_coord(dim, value)
+        self.roi = roi
 
     @property
     def data(self):
         # TODO cache xarray
-        return self.stack.data.loc[{self.dim:self.value}]
+        # TODO: use roi
+        if not self.roi:
+            return self.stack.data.loc[{self.dim:self.value}]
+        else:
+            raise NotImplementedError
 
     @property
     def df(self):
@@ -86,12 +92,13 @@ class Stack(object):
     def __init__(self, x, y, z, values=None, name=None, quantity=None, stack_axis='x'):
         #TODO: convert param objects to dict or vv
         self.data = None
-        self.x_obj = x
-        self.y_obj = y
-        self.z_obj = z
-        self._values = np.array(values)
+        self.x_obj = x  # dict or Param object containing at least name and values of x coordinate
+        self.y_obj = y  # dict or Param object containing at least name and values of y coordinate
+        self.z_obj = z  # dict or Param object containing at least name and values of z coordinate
+        self._values = np.array(values) if values is not None else None  # 3D data indexed by x, y and z
         self.name = name  # Name of stack object
         self.quantity = quantity  # Quantity data represents eg intensity
+        self._meta = None  # Meta data associated with coord axes
         self._stack_axis = self.dim2xyz(stack_axis)  # Axis along which to consider the data a stack of data slices
 
         # If not initialised here, the xarray will be initialised when it is first accessed
@@ -104,7 +111,8 @@ class Stack(object):
 
         self._slices = {}  # Cache of slice objects
 
-        self._check_types()
+        self._check_types()  # Check consistency of input types etc
+        self.initialise_meta()
 
     def _check_types(self):
         """Check internal attributes are all valid types"""
@@ -112,9 +120,18 @@ class Stack(object):
         assert isinstance(self._x, (dict,))
         assert isinstance(self._y, (dict,))
         assert isinstance(self._z, (dict,))
-        assert isinstance(self._values, np.ndarray)
+        assert isinstance(self._values, (np.ndarray, type(None)))
         assert isinstance(self._name, (str, type(None)))
         assert self._stack_axis in ['x', 'y', 'z']
+
+    def initialise_meta(self, columns=()):
+        """Initialise meta data dataframe with coordinate values"""
+        if self.stack_axis_values is not None:
+            self._meta = pd.DataFrame({self.stack_axis: self.stack_axis_values})
+
+    def set_stack_axis(self, coord):
+        """Change stack axis coordinate"""
+        raise NotImplementedError
 
     @property
     def x_obj(self):
@@ -211,10 +228,33 @@ class Stack(object):
         return tuple(self.num2xyz[i] for i in (0, 1, 2))
 
     @property
+    def stack_axis(self):
+        """Name of coordinate along stack axis"""
+        return self._stack_axis
+
+    @property
+    def slice_axes(self):
+        """Names of coordinates in a slice ie perpendicular to the stack axis"""
+        out = list(self.xyz_order)
+        out.pop(self.stack_axis)
+        return out
+
+    @property
+    def stack_axis_values(self):
+        """Coordinate values along stack axis"""
+        return self.coord_objs[self.stack_axis]['values']
+
+    @property
+    def slice_axes_values(self):
+        """Coordinate values along slice axes"""
+        axes = self.slice_axes
+        return [self.coord_obj(coord)['values'] for coord in axes]
+
+    @property
     def coord_objs(self):
         """Coordinate objects ordered in index order"""
         xyz2obj = {'x': self._x, 'y': self._y, 'z': self._z}
-        return tuple(xyz2obj[xyz] for xyz in self.xyz_order)
+        return OrderedDict(((xyz, xyz2obj[xyz]) for xyz in self.xyz_order))
 
     def coord_obj(self, key):
         xyz2obj = {'x': self._x, 'y': self._y, 'z': self._z}
@@ -225,16 +265,16 @@ class Stack(object):
     @property
     def dims(self):
         """Names of coordinate dimensions"""
-        return [i['name'] for i in self.coord_objs]
+        return [i['name'] for i in self.coord_objs.values()]
 
     @property
     def coords(self):
         """Coordinate values"""
-        return OrderedDict(((i['name'], i['values']) for i in self.coord_objs))
+        return OrderedDict(((i['name'], i['values']) for i in self.coord_objs.values()))
 
     @property
     def shape(self):
-        return tuple((len(i['values']) for i in self.coord_objs))
+        return tuple((len(i['values']) for i in self.coord_objs.values()))
 
     @property
     def dim_xyz(self):
@@ -253,7 +293,7 @@ class Stack(object):
                                                               (values, x, y, z))
         if self._values is None:
             self._values = np.empty(self.shape) * np.nan
-        self.data = xr.DataArray(self._values, coords=self.coords, dims=self.dims, name=self.quantity)
+        self.data = xr.DataArray(self._values, coords=self.coords.values(), dims=self.dims, name=self.quantity)
 
     def set_data(self, values=None, reset=True):
         """Ready xarray for data access"""
@@ -339,6 +379,7 @@ class Stack(object):
     def closest_coord(self, dim, value, tol=None):
         """Return value in coordinates closest to value"""
         #TODO: implement tol
+        #TODO: use meta
         dim = self.xyz2dim(dim)
         value = find_nearest(self.coords[dim], value, index=False)
         return value
@@ -372,6 +413,36 @@ class Stack(object):
     def window(self):
         """Wibndow the data so return letterboxed subset of data perp to stack axis"""
         raise NotImplementedError
+
+    def get(self, var, **kwargs):  # TODO: Need to extend to multiple kwargs
+        """ Return value of var in self.frames_meta for which each keyword value is satisfied
+        Example call signature
+        self.lookup('n', t=0.2615)  # Return frame number of frame with time stamp 't'=0.2615 s
+        """
+        # TODO: add meta dataframe tied to stack axis
+        raise NotImplementedError
+        if len(kwargs) == 0:
+            return None
+        assert len(kwargs) == 1
+        assert var in self.frames_meta.columns, 'Lookup variable "{}" not recognised. frameHistory.lookup requries ' \
+                                                'one of the following metadata: {}'.format(var,
+                                                                                           self.frames_meta.columns)
+        for key, value in kwargs.iteritems():
+            try:
+                assert key in self.frames_meta.columns.tolist(), 'index varaible "{}" not recognised. ' \
+                                                                 'frameHistory.lookup requries one of the following ' \
+                                                                 'metadata: {}'.format(var,
+                                                                                       self.frames_meta.columns)
+            except:
+                pass
+            series = self.frames_meta[self.frames_meta[key] == value][var]
+            # idx1.intersection(idx2)
+
+        if len(series.values) == 1:
+            return series.values[0]
+        else:
+            return series.values
+
 
 class Movie(Stack):
     # TODO: Load compatibilities from config file
@@ -442,11 +513,13 @@ class Movie(Stack):
 
 class Enhancer(object):
     """Class to apply image enhancements to stack data"""
+    desciptions = {'bgsub': {'requires_window': True}}
     def __init__(self, stack):
         assert issubclass(type(stack), Stack)
         self.stack = stack
 
     def apply(self, enhancements, x):
+        """Apply enhancements to frame x"""
         raise NotImplementedError
         results = pool.map(func, inputs)
         intensity, phase, contrast = zip(*results)

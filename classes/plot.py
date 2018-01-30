@@ -15,7 +15,7 @@ from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable, args_for, to_array, pos_path
+from ccfepyutils.utils import make_itterable, make_itterables, args_for, to_array, pos_path, is_scalar
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 try:
@@ -24,13 +24,22 @@ except Exception as e:
     string_types = (str,)  # python3
 
 class Plot(object):
-    """Convenience plotting class"""
+    """Convenience plotting class
+
+    TODO:
+    - Save output using settings object
+    - Change default save filetype easily (png -> eps etc)
+    - Share axis
+    - Multiple axes
+    - Seg line plot
+    - Arrow plot
+    """
     # Plotting modes compatible with different input data dimensions. The first mode for each dimension is the default
     dim_modes = dict((((0, 0, None), ('scatter',)),  # single point
                       ((1, None, None), ('line', 'scatter', 'pdf')),
                       ((1, 1 , None), ('line', 'scatter')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
-                      ((2, 2 , 2), ('surface3D')),
+                      ((2, 2 , 2), ('surface3D',)),
                       ((1, 1, 2), ('contourf', 'contour', 'image', 'surface3D')),
                       ((2, None, None), ('contourf', 'contour', 'image')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
@@ -86,12 +95,21 @@ class Plot(object):
     def make_figure(self, num, axes, **kwargs):
         assert isinstance(num, (string_types, str, int, type(None)))
         assert isinstance(axes, (tuple, list))
+        # if plt.fignum_exists(num):
+        #     plt.figure(num).clear()  # unnessesary?
         self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
         self.axes = to_array(self.axes)
+        if self._num is None:
+            self._num = self.fig.canvas.get_window_title()
 
     def set_ready(self):
         """Set plot object in 'ready' state by finalising/tidying up plot actions"""
         self._current_ax = None
+
+    def __repr__(self):
+        """Representation: Plot(<axes_shape>;<default_axis>:<name>)"""
+        out = '<Plot{};{}:"{}">'.format(tuple(self._ax_shape), self._default_ax, self._num)
+        return out
 
     def _get_modes(self, x, y, z, data_requried=False):
         """Inspect supplied data to see whether further actions should be taken with it"""
@@ -149,7 +167,7 @@ class Plot(object):
         try:
             plt.sca(ax)  # Set as current axis for plt. calls
         except ValueError:
-            logger.exception('Axis problem!')
+            logger.exception('Failed to set current plotting axis!')
         return ax
 
     def _use_data(self, x, y, z, mode):
@@ -263,12 +281,14 @@ class Plot(object):
                     axes_subset[j] = self.fig.add_subplot(nx, ny, i*ny+j+1, projection='3d')
                     return axes_subset[j]
 
-    def save(self, save=False, bbox_inches='tight', transparent=True, dpi=90):
-        if save is False:
+    def save(self, save=False, settings=None, prefix='', description=None,
+             bbox_inches='tight', transparent=True, dpi=90):
+        if save is False:  # Don't save!
             return
         elif pos_path(save):  # string path
             path_fn = save
         else:
+            assert settings is not None
             raise NotImplementedError
         self.fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
 
@@ -288,7 +308,17 @@ class Plot(object):
             plt.show()
 
     def to_plotly(self):
-        raise NotImplementedError
+        """Convert figure to plotly figure"""
+        import plotly
+        import plotly.plotly as py
+        import plotly.tools as tls
+        # Converting to Plotly's Figure object..
+        try:
+            plotly_fig = tls.mpl_to_plotly(self.fig)
+            py.iplot(plotly_fig, filename='Plot_obj_tmp')
+            # raise NotImplementedError
+        except plotly.exceptions.PlotlyEmptyDataError as e:
+            logger.error('Could not convert mpl plot to plotly format')
 
 
 # TODO: Move functions to separate file
@@ -318,7 +348,7 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
         levels = [v, 0.1]
 
     try:
-        if not None in (x, y, z):
+        if not any(v is None  for v in (x, y, z)):
             im = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
             im = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
         else:
@@ -464,7 +494,26 @@ def plot3d_surface(ax, x, y, z, cmap='viridis', colorbar=True, **kwargs):
 
 
 def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, color='k', lw=1, ls='-', alpha=0.7,
-                  label=False, half_widths=False, **kwargs):
+                  label=False, half_widths=False, scale_factor=1, **kwargs):
+    """Plot ellipses (2d outlines) with centres marked
+    :param ax: axis to plot to
+    :param major: ellipse major diameter
+    :param minor: ellipse minor diameter
+    :param angle: ellipse tilt angle anticlockwise between major axis and x axis
+    :param x: ellipse centre x coords
+    :param y: ellipse centre y coords
+    :param a: amplitude to scale size of ellipse centre dot with
+    :param a_lims: amplitude limits
+    :param color: shape color
+    :param lw: shape line widths
+    :param ls: shape line style
+    :param alpha: transparency
+    :param label: add numerical labels to ellipse centres (bool)
+    :param half_widths: if true double input major and minor to get diameters
+    :param scale_factor: value to scale ellipse dimensions by (eg 2 will double widths) - can be a list
+    :param kwargs: keyword arguments to pass to Ellipse patch object
+    :return:
+    """
     from matplotlib.patches import Ellipse
 
     if x is None:
@@ -477,13 +526,24 @@ def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, 
         major = 2 * copy(major)
         minor = 2 * copy(minor)
 
+    x, y, major, minor, angle = make_itterables(x, y, major, minor, angle)
+
     for i, (x0, y0, major0, minor0, angle0) in enumerate(list(zip(x, y, major, minor, angle))):
         # Matplotlib ellipse takes:
         #  width:  total length (diameter) of horizontal axis
         #  height: total length (diameter) of vertical axis
         #  angle:  rotation in degrees (anti-clockwise)
-        ax.add_patch(Ellipse((x0, y0), major0, minor0, angle=angle0,
-                              facecolor='none', edgecolor=color, lw=lw, alpha=alpha, ls=ls, zorder=2, **kwargs))
+
+        # Scale ellipse size
+        scale_factor = to_array(scale_factor)
+        for scale, alpha0 in zip(scale_factor, np.linspace(1, 0.3, len(scale_factor))):
+            major0i = scale * major0
+            minor0i = scale * minor0
+            alpha0i = alpha * alpha0
+
+            ax.add_patch(Ellipse((x0, y0), major0i, minor0i, angle=angle0,
+                                  facecolor='none', edgecolor=color, lw=lw, alpha=alpha0, ls=ls, zorder=2, **kwargs))
+
         if label:
             plt.text(x0, y0, '{}'.format(i + 1), ha="center", family='sans-serif', size=10, color=color)
         # Mark centres of ellipses with dots

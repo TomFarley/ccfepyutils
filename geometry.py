@@ -17,7 +17,7 @@ from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable, is_scalar, safe_len, safe_zip, describe_array
+from ccfepyutils.utils import make_itterable, is_scalar, safe_len, safe_zip, describe_array, args_for
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.classes.plot import plot_ellipses
 
@@ -37,8 +37,8 @@ class Ellipses(object):
         assert safe_len(arg1) == safe_len(arg2) == safe_len(arg3)
         self.convention = convention.lower()
         self.params = {key: None for key in itertools.chain.from_iterable(self.conventions.values())}  # initialise
-        self.x = x
-        self.y = y
+        self.x = x if is_scalar(x) else np.array(x)
+        self.y = y if is_scalar(y) else np.array(y)
         self.half_widths = half_widths
         self.n = safe_len(arg1, scalar=0)  # number of ellipses
         params = self.params
@@ -132,7 +132,7 @@ class Ellipses(object):
             values = [self.params[k] for k in self.conventions[convention]]
         if nested:
             values = [np.array([v]) if not hasattr(v, '__iter__') else v for v in values]
-        return values
+        return np.array(values)
 
     @property
     def ellipse_axes(self):
@@ -167,6 +167,8 @@ class Ellipses(object):
         if ax is None:
             plot = Plot()
             ax = plot.ax
+        if self.half_widths:  # Convert to full widths for plotting
+            major, minor = 2*major, 2*minor
         plot_ellipses(ax, major, minor, angle, x=x, y=y, **kwargs)
         if show:
             plt.show()
@@ -188,19 +190,21 @@ class Ellipses(object):
             xx, yy = x, y
         x_centre, y_centre = self.position_safe
         dx, dy, angle = self.get(convention)    # Get ellipse dimensions
+        if not self.half_widths:  # Convert to half widths for gaussian calculation
+            dx, dy = 0.5*dx, 0.5*dy
         if is_scalar(amps):  # Make sure same length as ellipse info
             amps = np.full_like(dx, amps)
 
         # To avoid large negative expoenents which go to zero in fp precision, rescale axes - numerical problems
         dxy_extrema = np.min(np.concatenate((dx, dy)))
-        multiplier = 10**(-np.round(np.log10(dxy_extrema)))  # Rescale minima to order 1
         # multiplier = 10**(-np.log10(dxy_extrema))  # Rescale minima to 1
+        multiplier = 10**(-np.round(np.log10(dxy_extrema)))  # Rescale minima to order 1
         x_centre, y_centre, dx, dy, xx, yy = [v * multiplier for v in (x_centre, y_centre, dx, dy, xx, yy)]
 
         out = []
-        # TODO: switch to single vectorised opperation
+        # TODO: switch to single vectorised opperation for efficiency
         for x0, y0, dx0, dy0, angle0, amp0 in safe_zip(x_centre, y_centre, dx, dy, angle, amps):
-            angle0 = -angle0  # switch to anticlockwise rotation like in matplotlib etc
+            angle0 = np.deg2rad(-angle0)  # switch to anticlockwise rotation like in matplotlib etc
             sin2, cos2 = np.sin(angle0)**2, np.cos(angle0)**2
             sin_2a, cos_2a = np.sin(2*angle0), np.cos(2*angle0)
 
@@ -213,6 +217,9 @@ class Ellipses(object):
 
             #tmp: unrotated gaussian
             grid_tmp = amp0 * np.exp(-(((xx - x0)**2)/(2.0 * dx0**2) + ((yy - y0)**2)/(2.0 * dy0**2)))
+            from ccfepyutils.plotly_tools import plotly_surface
+            # plotly_surface(xx, yy, grid)
+            # Plot(xx, yy, grid, show=True, mode='contourf')#.to_plotly()
 
             out.append(grid)
 
@@ -228,9 +235,15 @@ class Ellipses(object):
         for grid in grids:
             Plot(x, y, grid, mode=mode, show=show, **kwargs)
 
-    def plot_3d_superimposed(self, x, y, amps, convention='ellipse_axes', mode='surface3D', show=True, **kwargs):
+    def plot_3d_superimposed(self, x, y, amps, convention='ellipse_axes', mode='surface3D', show=True, outlines=True,
+                             **kwargs):
+        kws = args_for(plot_ellipses, kwargs, remove=True)
         grid = self.superimpose_2d(x, y, amps, convention=convention)
-        Plot(x, y, grid, mode=mode, show=show, **kwargs)
+        plot = Plot(x, y, grid, mode=mode, show=False, **kwargs)
+        if outlines:
+            self.plot(plot.ax(), **kws)
+        plot.show(show)
+        return plot
 
 
 

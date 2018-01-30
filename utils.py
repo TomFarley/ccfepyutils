@@ -191,6 +191,18 @@ def make_itterable(obj, ndarray=False):
         obj = np.array(obj)
     return obj
 
+def make_itterables(*args):
+    """Convert multiple input arguments to itterables"""
+    # TODO: make compatible with ndarray
+    out = []
+    for obj in args:
+        if not hasattr(obj, '__iter__') or isinstance(obj, basestring):
+            obj = [obj]
+        # if ndarray:
+        #     obj = np.array(obj)
+        out.append(obj)
+    return out
+
 def is_scalar(var):
     """ True if variable is scalar """
     if hasattr(var, "__len__"):
@@ -1217,7 +1229,7 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
     name_args = []
     for f in func:
         keep += inspect.getargspec(f)[0]  # Add arguments for each function to list of arguments to keep
-        name_args += '{name}_args'.format(name=f.__name__)
+        name_args += ['{name}_args'.format(name=f.__name__)]
     if match_signature:
         matches = {k: v for k, v in kwargs.items() if (((k in keep) and (k not in exclude)) or (k in include))}
         kws.update(matches)

@@ -40,7 +40,7 @@ from copy import copy
 
 # from filaments import user_settings
 # from figure_of_merit import FigureOfMerit
-from elzar.utils import compare_dict
+from ccfepyutils.utils import compare_dict
 #
 # from pyEquilibrium.equilibrium import equilibrium
 from pyFastcamTools.frameHistory import frameHistory

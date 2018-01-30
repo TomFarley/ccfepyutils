@@ -4,9 +4,9 @@ from collections import OrderedDict
 import numpy as np
 import logging
 
-import plotly
-import plotly.plotly as py
-import plotly.graph_objs as go
+import plotly_tools
+import plotly_tools.plotly as py
+import plotly_tools.graph_objs as go
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def hoverinfo_text(names, values, format='0.3g'):
 def input_output_scatter3d(inp, output, extra_points={}, axis_labels=None, online=True, join_in_out=True,
                            online_name='scatter3d_tmp', offline_name='input_output_scatter.html', auto_open=False):
     # import pdb; pdb.set_trace()
-    import plotly.graph_objs as go
+    import plotly_tools.graph_objs as go
     if axis_labels is None:
         axis_labels = ('x', 'y', 'z')
     data = []
@@ -93,14 +93,14 @@ def input_output_scatter3d(inp, output, extra_points={}, axis_labels=None, onlin
                                 font=legendfont)  # '#E2E2E2'
                   )
     if online:
-        import plotly.plotly as py
+        import plotly_tools.plotly as py
         url = py.plot(data, layout=layout, filename=online_name, auto_open=auto_open)
         logger.info('Plotly input_output_scatter3d plot "{n}" saved online at url: {u}'.format(n=online_name, u=url))
         return  url
     else:  # offline
-        import plotly
+        import plotly_tools
         fig = go.Figure(data=data, layout=layout)
-        plotly.offline.plot(fig, filename=offline_name, auto_open=auto_open)
+        plotly_tools.offline.plot(fig, filename=offline_name, auto_open=auto_open)
         logger.info('Plotly input_output_scatter3d plot saved to local file: {n}'.format(n=offline_name))
 
 
