@@ -17,7 +17,7 @@ from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable, is_scalar, safe_len, safe_zip, describe_array, args_for
+from ccfepyutils.utils import make_itterable, make_itterables, is_scalar, safe_len, safe_zip, describe_array, args_for
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.classes.plot import plot_ellipses
 
@@ -178,56 +178,54 @@ class Ellipses(object):
         # TODO: move in_ellipse function here
         raise NotImplementedError
 
-    def grid_2d(self, x, y, amps, convention='ellipse_axes'):
+    def grid_2d(self, x_grid, y_grid, amp, convention='ellipse_axes', combine=True):
         """Return tilted 2D elliptic gaussians on x, y grid for each ellipse
         :param x - x grid axis values
         :param y - y grid axis values
         :param amps - amplitudes of each 2d gaussian"""
-        #TODO: Ideally enable some kind of periodic boundary conditions for y axis
-        if x.ndim == 1 and y.ndim == 1:
-            xx, yy = np.meshgrid(x, y)
-        else:
-            xx, yy = x, y
-        x_centre, y_centre = self.position_safe
+        x, y = self.position_safe
         dx, dy, angle = self.get(convention)    # Get ellipse dimensions
-        if not self.half_widths:  # Convert to half widths for gaussian calculation
-            dx, dy = 0.5*dx, 0.5*dy
-        if is_scalar(amps):  # Make sure same length as ellipse info
-            amps = np.full_like(dx, amps)
-
-        # To avoid large negative expoenents which go to zero in fp precision, rescale axes - numerical problems
-        dxy_extrema = np.min(np.concatenate((dx, dy)))
-        # multiplier = 10**(-np.log10(dxy_extrema))  # Rescale minima to 1
-        multiplier = 10**(-np.round(np.log10(dxy_extrema)))  # Rescale minima to order 1
-        x_centre, y_centre, dx, dy, xx, yy = [v * multiplier for v in (x_centre, y_centre, dx, dy, xx, yy)]
-
-        out = []
-        # TODO: switch to single vectorised opperation for efficiency
-        for x0, y0, dx0, dy0, angle0, amp0 in safe_zip(x_centre, y_centre, dx, dy, angle, amps):
-            angle0 = np.deg2rad(-angle0)  # switch to anticlockwise rotation like in matplotlib etc
-            sin2, cos2 = np.sin(angle0)**2, np.cos(angle0)**2
-            sin_2a, cos_2a = np.sin(2*angle0), np.cos(2*angle0)
-
-            # Equation of elliptic 2d Gaussian: f(x,y) = A exp(- (a(x-x_o)^2 + 2b(x-x_o)(y-y_o) + c(y-y_o)^2)
-            a = (cos2 / (2.0 * dx0**2)) + (sin2 / (2.0 * dy0**2))
-            b = (-sin_2a / (4.0 * dx0**2)) + (sin_2a / (4.0 * dy0**2))
-            c = (sin2 / (2.0 * dx0**2)) + (cos2 / (2.0 * dy0**2))
-            exponent = - (a*(xx - x0)**2 + 2.0*b*(xx - x0)*(yy - y0) + c*(yy - y0)**2)
-            grid = amp0 * np.exp(exponent)
-
-            #tmp: unrotated gaussian
-            grid_tmp = amp0 * np.exp(-(((xx - x0)**2)/(2.0 * dx0**2) + ((yy - y0)**2)/(2.0 * dy0**2)))
-            from ccfepyutils.plotly_tools import plotly_surface
-            # plotly_surface(xx, yy, grid)
-            # Plot(xx, yy, grid, show=True, mode='contourf')#.to_plotly()
-
-            out.append(grid)
-
-        return np.array(out)
+        grid = elliptic_gaussian_grid(x_grid, y_grid, x, y, dx, dy, angle, amp, full_widths=(not self.half_widths),
+                               combine=combine)
+        return grid
+        # if not self.half_widths:  # Convert to half widths for gaussian calculation
+        #     dx, dy = 0.5*dx, 0.5*dy
+        # if is_scalar(amps):  # Make sure same length as ellipse info
+        #     amps = np.full_like(dx, amps)
+        #
+        # # To avoid large negative expoenents which go to zero in fp precision, rescale axes - numerical problems
+        # dxy_extrema = np.min(np.concatenate((dx, dy)))
+        # # multiplier = 10**(-np.log10(dxy_extrema))  # Rescale minima to 1
+        # multiplier = 10**(-np.round(np.log10(dxy_extrema)))  # Rescale minima to order 1
+        # x_centre, y_centre, dx, dy, xx, yy = [v * multiplier for v in (x_centre, y_centre, dx, dy, xx, yy)]
+        #
+        # out = []
+        # # TODO: switch to single vectorised opperation for efficiency
+        # for x0, y0, dx0, dy0, angle0, amp0 in safe_zip(x_centre, y_centre, dx, dy, angle, amps):
+        #     angle0 = np.deg2rad(-angle0)  # switch to anticlockwise rotation like in matplotlib etc
+        #     sin2, cos2 = np.sin(angle0)**2, np.cos(angle0)**2
+        #     sin_2a, cos_2a = np.sin(2*angle0), np.cos(2*angle0)
+        #
+        #     # Equation of elliptic 2d Gaussian: f(x,y) = A exp(- (a(x-x_o)^2 + 2b(x-x_o)(y-y_o) + c(y-y_o)^2)
+        #     a = (cos2 / (2.0 * dx0**2)) + (sin2 / (2.0 * dy0**2))
+        #     b = (-sin_2a / (4.0 * dx0**2)) + (sin_2a / (4.0 * dy0**2))
+        #     c = (sin2 / (2.0 * dx0**2)) + (cos2 / (2.0 * dy0**2))
+        #     exponent = - (a*(xx - x0)**2 + 2.0*b*(xx - x0)*(yy - y0) + c*(yy - y0)**2)
+        #     grid = amp0 * np.exp(exponent)
+        #
+        #     #tmp: unrotated gaussian
+        #     grid_tmp = amp0 * np.exp(-(((xx - x0)**2)/(2.0 * dx0**2) + ((yy - y0)**2)/(2.0 * dy0**2)))
+        #     from ccfepyutils.plotly_tools import plotly_surface
+        #     # plotly_surface(xx, yy, grid)
+        #     # Plot(xx, yy, grid, show=True, mode='contourf')#.to_plotly()
+        #
+        #     out.append(grid)
+        #
+        # return np.array(out)
 
     def superimpose_2d(self, x, y, amps, convention='ellipse_axes'):
+        # TODO: remove, redundant
         grids = self.grid_2d(x, y, amps, convention=convention)
-        # import pdb; pdb.set_trace()
         return np.sum(grids, axis=0)
 
     def plot_3d(self, x, y, amps, convention='ellipse_axes', mode='surface3D', show=True, **kwargs):
@@ -245,6 +243,69 @@ class Ellipses(object):
         plot.show(show)
         return plot
 
+def elliptic_gaussian_grid(x_grid, y_grid, x, y, dx, dy, angle=0, amp=1, full_widths=False, combine=True, deg=True,
+                           equal_aspect=True):
+    """Return 2D grid with values set to 2d gaussian values"""
+    """Return tilted 2D elliptic gaussians on x, y grid for each ellipse
+    :param x_grid - x grid axis values
+    :param y_grid - y grid axis values
+    :param x - gaussian x coordinates
+    :param amps - amplitudes of each 2d gaussian"""
+    # TODO: Ideally enable some kind of periodic boundary conditions for y axis
+    if x_grid.ndim == 1 and y_grid.ndim == 1:
+        xx, yy = np.meshgrid(x_grid, y_grid)
+    else:
+        xx, yy = x_grid, y_grid
+    if full_widths:  # Convert to half widths for gaussian calculation
+        dx, dy = 0.5 * dx, 0.5 * dy
+    # Make sure inputs same length itterables
+    x, y, dx, dy, angle, amp = make_itterables(x, y, dx, dy, angle, amp)
+    if is_scalar(amp):  # Make sure same length as ellipse info
+        amp = np.full_like(dx, amp)
+    if is_scalar(angle):  # Make sure same length as ellipse info
+        angle = np.full_like(dx, angle)
+    if deg:  # degress to radians
+        angle = np.deg2rad(angle)
+
+    # For rotation to be correct need to work in equal aspect ratio
+    if equal_aspect and any(angle > 0):
+        x_range = np.ptp(x_grid)
+        y_range = np.ptp(y_grid)
+        aspect_ratio = x_range/y_range
+        yy, y, dy = [v * aspect_ratio for v in (yy, y, dy)]
+
+    # To avoid large negative expoenents which go to zero in fp precision, rescale axes - numerical problems
+    dxy_extrema = np.min(np.concatenate((dx, dy)))
+    # multiplier = 10**(-np.log10(dxy_extrema))  # Rescale minima to 1
+    multiplier = 10 ** (-np.round(np.log10(dxy_extrema)))  # Rescale minima to order 1
+    x, y, dx, dy, xx, yy = [v * multiplier for v in (x, y, dx, dy, xx, yy)]
+
+    out = []
+    # TODO: switch to single vectorised opperation for efficiency
+    for x0, y0, dx0, dy0, angle0, amp0 in safe_zip(x, y, dx, dy, angle, amp):
+        angle0 = -angle0  # switch to anticlockwise rotation like in matplotlib etc
+        sin2, cos2 = np.sin(angle0) ** 2, np.cos(angle0) ** 2
+        sin_2a, cos_2a = np.sin(2 * angle0), np.cos(2 * angle0)
+
+        # Equation of elliptic 2d Gaussian: f(x,y) = A exp(- (a(x-x_o)^2 + 2b(x-x_o)(y-y_o) + c(y-y_o)^2)
+        a = (cos2 / (2.0 * dx0 ** 2)) + (sin2 / (2.0 * dy0 ** 2))
+        b = (-sin_2a / (4.0 * dx0 ** 2)) + (sin_2a / (4.0 * dy0 ** 2))
+        c = (sin2 / (2.0 * dx0 ** 2)) + (cos2 / (2.0 * dy0 ** 2))
+        exponent = - (a * (xx - x0) ** 2 + 2.0 * b * (xx - x0) * (yy - y0) + c * (yy - y0) ** 2)
+        grid = amp0 * np.exp(exponent)
+
+        # tmp: unrotated gaussian
+        grid_tmp = amp0 * np.exp(-(((xx - x0) ** 2) / (2.0 * dx0 ** 2) + ((yy - y0) ** 2) / (2.0 * dy0 ** 2)))
+        from ccfepyutils.plotly_tools import plotly_surface
+        # plotly_surface(xx, yy, grid)
+        # Plot(xx, yy, grid, show=True, mode='contourf')#.to_plotly()
+
+        out.append(grid)
+    out = np.array(out)
+    # Supperimpse gaussians onto one grid
+    if combine and out.ndim == 3:
+        out = np.sum(out, axis=0)
+    return out
 
 
 if __name__ == '__main__':

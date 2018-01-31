@@ -39,7 +39,7 @@ class Plot(object):
                       ((1, None, None), ('line', 'scatter', 'pdf')),
                       ((1, 1 , None), ('line', 'scatter')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
-                      ((2, 2 , 2), ('surface3D',)),
+                      ((2, 2 , 2), ('contourf', 'surface3D',)),
                       ((1, 1, 2), ('contourf', 'contour', 'image', 'surface3D')),
                       ((2, None, None), ('contourf', 'contour', 'image')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
@@ -166,8 +166,8 @@ class Plot(object):
         self._current_ax = ax
         try:
             plt.sca(ax)  # Set as current axis for plt. calls
-        except ValueError:
-            logger.exception('Failed to set current plotting axis!')
+        except ValueError as e:
+            logger.error('Failed to set current plotting axis! {}'.format(e))
         return ax
 
     def _use_data(self, x, y, z, mode):
@@ -371,7 +371,10 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
            **kwargs):
-    """Plot data as 2d image"""
+    """Plot data as 2d image
+
+    Note:
+    - aspect = 'auto' useful for extreeme aspect ratio data"""
     if (x is not None) and (y is None) and (z is None):  # if 2d data passed to x treat x as z data
         x, y, z = y, z, x
     if x is None and y is None:
