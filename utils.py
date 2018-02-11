@@ -1380,18 +1380,30 @@ def locate_file(fn, paths, _raise=True):
 def return_none():
     return None
 
-def none_filter(old, new):
+def none_filter(old, new, nest=None):
     """Return new values, replacing None values with corresponding old values"""
-    nest = False
-    if not (type(old)==type(new) and isinstance(old, (tuple, list))):  # if not both tuple or list, nest in list
+    # If necessary nest values in list so can iterate over them
+    if nest is None:
+        # If either old or new is not a tuple or list nest them
+        # NOTE: this will fail if single values are passed which are naturally lists or tuples - then use keyword
+        nest = (not isinstance(old, (tuple, list))) or (not isinstance(new, (tuple, list)))
+    # old, new = make_itterables(old, new)
+    if nest:  # and (not (type(old) == type(new)))  # if not both tuple or list, nest in list
         old, new = [old], [new]
-        nest = True
+    # Make sure old is mutable
+    if isinstance(old, tuple):
+        old = list(old)
     for i, (o, n) in enumerate(zip(old, new)):
         if n is not None:
             old[i] = n
     if nest:
         old = old[0]
     return old
+
+def class_name(obj):
+    import re
+    out = re.search(".*\.(\w+)\'", str(obj.__class__)).group(1)
+    return out
 
 def fwhm2sigma(values):
     fwhm = 2*np.sqrt(2*np.log(2))

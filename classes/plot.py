@@ -86,21 +86,30 @@ class Plot(object):
         self.fig = None
         self.axes = None
         self.instances.append(self)
-        self.make_figure(num, axes, **fig_args)  # TODO: Add axis naming? .set_axis_names - replace defaults?
+        self.set_figure_variables(ax=ax, num=num, axes=axes, **fig_args)  # TODO: Add axis naming? .set_axis_names - replace defaults?
         # kws = args_for(self.plot, kwargs, include=self.plot_args)
         self.plot(x, y, z, mode=mode, **kwargs)
         self.show(show)
         self.save(save)
 
+    def set_figure_variables(self, ax=None, num=None, axes=None, **kwargs):
+        """Set figure attributes"""
+        if ax is None:
+            self.make_figure(num, axes, **kwargs)
+        else:
+            self.fig = ax.figure
+            self.axes = self.fig.axes
+            self._ax_shape = np.array(np.array(self.fig.axes).shape)  # TODO fix so 2 element shape, not len
+        self._num = self.fig.canvas.get_window_title()
+
     def make_figure(self, num, axes, **kwargs):
+        """Create new figure if no axis instance passed"""
         assert isinstance(num, (string_types, str, int, type(None)))
         assert isinstance(axes, (tuple, list))
         # if plt.fignum_exists(num):
         #     plt.figure(num).clear()  # unnessesary?
         self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
         self.axes = to_array(self.axes)
-        if self._num is None:
-            self._num = self.fig.canvas.get_window_title()
 
     def set_ready(self):
         """Set plot object in 'ready' state by finalising/tidying up plot actions"""

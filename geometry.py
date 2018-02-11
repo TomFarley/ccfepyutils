@@ -161,7 +161,7 @@ class Ellipses(object):
             values = [self.params[k] for k in self.conventions[convention]]
         return values
 
-    def plot(self, ax=None, show=False, **kwargs):
+    def plot(self, ax=None, show=False, equal_aspect=False, deg=True, **kwargs):
         major, minor, angle = self.get('ellipse_axes', nested=True)
         x, y = self.position
         if ax is None:
@@ -169,6 +169,23 @@ class Ellipses(object):
             ax = plot.ax
         if self.half_widths:  # Convert to full widths for plotting
             major, minor = 2*major, 2*minor
+
+        if deg:
+            rad = np.deg2rad(angle)
+        else:
+            angle, rad = np.rad2deg(angle), angle
+
+        # For rotation to be correct need to work in equal aspect ratio
+        if equal_aspect and any(angle > 0):
+            x_range = np.ptp(ax.get_xlim())
+            y_range = np.ptp(ax.get_ylim())
+            aspect_ratio = x_range / y_range
+
+            sin, cos = np.sin(rad)**2, np.cos(rad)**2
+            major = major * np.sqrt(1*cos + sin * (1/aspect_ratio))
+            minor = minor * np.sqrt(1*cos - sin * aspect_ratio)
+            # yy, y, dy = [v * aspect_ratio for v in (yy, y, dy)]
+
         plot_ellipses(ax, major, minor, angle, x=x, y=y, **kwargs)
         if show:
             plt.show()
