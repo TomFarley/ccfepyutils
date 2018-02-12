@@ -3,6 +3,7 @@ import itertools
 from abc import ABC
 import gc
 import re
+import inspect
 
 import numpy as np
 import pandas as pd
@@ -19,7 +20,7 @@ from pathlib import Path
 from netCDF4 import Dataset
 
 from ccfepyutils.classes.state import State
-from ccfepyutils.utils import mkdir
+from ccfepyutils.utils import mkdir, make_itterable
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
 
 try:
@@ -38,14 +39,13 @@ settings_dir = os.path.expanduser('~/.ccfetools/settings/')
 
 class Setting(ABC):
     def __init__(self, settings, item):
-        print('__init__ Setting')
         self._settings = settings
         self._item = item
         self._df = self._settings.df.loc[[item], :]
 
     def __repr__(self):
         class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
-        return '<{}: "{}">'.format(class_name, str(self))
+        return '<{}: {}={}>'.format(class_name, self._item, str(self))
 
     def __getitem__(self, item):
         if isinstance(item, slice):
@@ -54,6 +54,11 @@ class Setting(ABC):
             if item in self._settings.column_sets_names:
                 item = self._settings.column_sets_names[item]
             return self._settings.df.loc[self._item, item]
+
+    def __setitem__(self, item, value):
+        if item not in self._settings.columns:
+            raise ValueError('Item "{}" is not a setting column'.format(item))
+        self._settings.df.loc[self._item, item] = value
 
     def __iter__(self):
         raise NotImplementedError
@@ -138,8 +143,9 @@ class Settings(object):
         """
         assert isinstance(application, str)
         assert isinstance(name, str)
-        assert (application, name) not in self.instances.keys_flat(), 'Setting object {}:{} already exists'.format(
-                application, name)
+        assert (application, name) not in self.instances.keys_flat(), ('Setting object {}:{} already exists. '
+                'Use Settings.get(application, name) to ensure there is only one instance'.format(
+                application, name))
         self.log_file = None
         self.application = application  # property sets logfile
         self.name = name
@@ -153,6 +159,13 @@ class Settings(object):
             self.load()
         else:
             self.init()
+
+    @classmethod
+    def get(cls, application, name):
+        if (application, name) in cls.instances.keys_flat():
+            return cls.instances[application][name]
+        else:
+            return Settings(application, name)
 
     def __str__(self):
         # TODO: set ordering
@@ -181,8 +194,8 @@ class Settings(object):
         :value: value to set the item to
         :kwargs: Use to set non-value columns"""
         df = self.df
-        new = item not in list(self.items)
-        if item not in self.items:  # add item setting type columns appropriately
+        # new = item not in list(self.items)
+        if item not in list(self.items):  # add item setting type columns appropriately
             self.add_item(item, value)
         elif value is not None:  # set value given we already know type
             if any(df.loc[item, ['bool', 'int', 'float']]):
@@ -417,8 +430,17 @@ class Settings(object):
         else:
             return False
 
-    def __setitem__(self, key, value):
-        raise NotImplementedError
+    def __setitem__(self, item, value):
+        self(item, value)
+
+    def set(self, item, value, ignore=[None]):
+        """Set setting provided it is not an ignore value"""
+        if value in ignore:
+            return
+        # No change, so do nothing
+        if item in self and self[item] == value:
+            return
+        self[item] = value
 
     def view(self, cols='repr'):
         if cols in self.column_sets_names.keys():
@@ -428,6 +450,10 @@ class Settings(object):
     def check_consistency(self):
         """Checks on consistency of dataframe"""
         # TODO: Check format of columns
+        # Make sure each item only has one type
+        unique_type = self.view('type').astype(int).sum(axis=1) == 1
+        if not all(unique_type):
+            raise ValueError('Inconsistent types:\n{}'.format(self.view('type').loc[~unique_type]))
         if True:
             self._reset_solumn_types()
 
@@ -450,7 +476,7 @@ class Settings(object):
             self.add_column(value)
 
     def add_item(self, item, value):
-        assert item not in self.items, 'Item {} already exists'.format(item)
+        assert item not in list(self.items), 'Item {} already exists'.format(item)
         type_to_col = {'bool': 'value_num', 'int': 'value_num', 'float': 'value_num', 'str': 'value_str'}
         if isinstance(value, bool):
             dtype = 'bool'
@@ -458,14 +484,32 @@ class Settings(object):
             dtype = 'int'
         elif isinstance(value, numbers.Real):
             dtype = 'float'
-        else:
+        elif isinstance(value, str):
             dtype = 'str'
+        else:
+            raise TypeError('Setting {}={} of type {} is not supported.'.format(item, value, type(value)))
         self.df.loc[item, [type_to_col[dtype], dtype]] = value, True
+        other_types = list(set([k for k in type_to_col if k != dtype]))
+        self.df.loc[item, other_types] = False
+
         self.check_consistency()
         logger.info('Added new item to settings: {} = {}'.format(item, value))
 
     def add_items(self, items):
         raise NotImplementedError
+
+    def rename_item(self, old_name, new_name):
+        """Rename setting key"""
+        assert old_name in self.df.index
+        self.df = self.df.rename({old_name: new_name}, axis='index')
+
+    def delete_items(self, items):
+        """Remove item(s) from settings"""
+        assert items in self.items, 'Items {} not in {}'.format(items, repr(self))
+        items = make_itterable(items)
+        self.df = self.df.drop(items)
+        logger.info('Deleted items {} from settings: {} = {}'.format(items, repr(self)))
+
 
     def append_item(self, name, values={'value': []}, categories=[], create_cols=True):
         """Add item with an already existing name to settings.
@@ -487,6 +531,24 @@ class Settings(object):
         else:
             logger.warning('No saved settings for {}'.format(application))
             return None
+
+    def set_func_args(self, func, func_name=None, kwargs=None):
+        raise NotImplementedError
+
+    def get_func_args(self, func, func_name=None, **kwargs):
+        """Get arguments for function from settings object"""
+        if func_name is None:
+            func_name = func.__name__
+        args, kws = [], {}
+        sig = inspect.signature(func)
+        for i, kw in enumerate(sig.parameters.values()):
+            name = kw.name
+            setting = '{func}::{arg}'.format(func=func_name, arg=name)
+            if setting in self:
+                kws[name] = self[setting].value
+            if setting in kwargs:
+                kws[name] = kwargs[name]
+        return kws
 
 
 class SettingsLogFile(object):

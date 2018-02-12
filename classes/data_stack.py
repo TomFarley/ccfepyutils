@@ -247,6 +247,23 @@ class Stack(object):
         if item in self._slices.keys():
             self._slices.pop(item)
 
+    def extract_contiguous_chunk(self, x='all', y='all', z='all'):
+        """Extract chunk of data from stack within coordinate ranges"""
+        x_all = self.x_obj['values']
+        y_all = self.y_obj['values']
+        z_all = self.z_obj['values']
+        if x == 'all':
+            x = [np.min(x_all), np.max(x_all)]
+        if y == 'all':
+            y = [np.min(y_all), np.max(y_all)]
+        if z == 'all':
+            z = [np.min(z_all), np.max(z_all)]
+        ix = x[0] < x_all < x[1]
+        iy = y[0] < y_all < y[1]
+        iz = z[0] < z_all < z[1]
+        out = self.df.loc[{self.xyz2dim(xyz): values for xyz, values in zip(['x', 'y', 'z'], [ix, iy, iz])}]
+        return out
+
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 

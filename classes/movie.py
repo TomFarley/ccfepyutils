@@ -43,7 +43,8 @@ def get_mast_camera_data_path(camera, pulse):
 
 def get_mast_movie_transforms(camera, pulse):
     if camera == 'SA1.1':
-        transforms = ['transpose', 'reverse_y']
+        # transforms = ['transpose', 'reverse_y']
+        transforms = ['transpose']#, 'reverse_y']
     return transforms
 
 class Frame(Slice):
@@ -71,7 +72,8 @@ class Frame(Slice):
             return raw(raw=True, **{self.dim: self.value})
             pass
         else:
-            raise ValueError('Frame does not have a raw movie')
+            return self.stack(raw=True, **{self.dim: self.value})
+            # raise ValueError('Frame does not have a raw movie')
 
     def plot(self, ax=None, annotate=True, **kwargs):
         # TODO: Add automatic axis labeling once parameter class is complete
@@ -110,16 +112,18 @@ class Movie(Stack):
         ))
     slice_class = Frame
     time_format = '{:0.5f}s'
-    def __init__(self, pulse=None, machine=None, camera=None, fn=None, **kwargs):
+    def __init__(self, pulse=None, machine=None, camera=None, fn=None, source='repeat', **kwargs):
         # TODO: load default machine and camera from config file
         assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
-        self._pulse = None
-        self._machine = None
-        self._camera = None
+        self.source_settings = Settings('Movie_source', source)
+        s = self.source_settings
+        s.set('pulse', pulse, ignore=[None])
+        s.set('machine', machine, ignore=[None])
+        s.set('camera', camera, ignore=[None])
         self._frame_range = None  # Dict of info detailing which frames to read from movie file
         self._transforms = None  # Transformations applied to frames when they are read eg rotate
         self._movie_meta = None  # meta data for movie format etc
-        self._enhancements = None  # Flag for whether this data is enhanced or not
+        self._enhancements = []  # Flag for whether this data is enhanced or not
         self._enhanced_frames = [] #  Which frames have currently had enhancements applied
         self._enhancer = None
         self._enhanced_movie = None  # Movie instance containing enhanced data
@@ -364,7 +368,7 @@ class Movie(Stack):
         return self.__getitem__(item, raw=raw)
 
     @classmethod
-    def get_frame_list(cls, current, n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1, skip_backwards=0,
+    def get_frame_list(cls, n, current=True, n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1, skip_backwards=0,
                        skip_forwards=0, limits=None, unique=True, verbose=False):
         """ Return list of frame numbers (frame marks) given input
         """
@@ -373,22 +377,25 @@ class Movie(Stack):
                                'step_backwards': step_backwards, 'step_forwards': step_forwards}
         # import pdb; pdb.set_trace()
 
-        ## Get list of frames equal to length of frame history that bracket the current frame and do not go outside
-        ##  the range of frame numbers
-        frameNumStart = current - frame_list_settings['skip_backwards'] - frame_list_settings['step_backwards'] * (
+        # Get list of frames equal to length of frame history that bracket the current frame and do not go outside
+        #  the range of frame numbers
+        start_frame = n - frame_list_settings['skip_backwards'] - frame_list_settings['step_backwards'] * (
         frame_list_settings['n_backwards'] - 1) - 1
-        frameNumEnd = current + frame_list_settings['skip_forwards'] + frame_list_settings['step_forwards'] * (
+        end_frame = n + frame_list_settings['skip_forwards'] + frame_list_settings['step_forwards'] * (
         frame_list_settings['n_forwards'] - 1) + 1
 
-        frame_nos = (np.linspace(frameNumStart,
-                                 current - frame_list_settings['skip_backwards'] - 1,
-                                 num=frame_list_settings['n_backwards']),
-                    # np.array([frameNum0]),
-                    np.linspace(current + frame_list_settings['skip_forwards'] + 1,
-                                frameNumEnd,
+        # Frames preceding current frame
+        frame_nos = [np.linspace(start_frame,
+                                 n - frame_list_settings['skip_backwards'] - 1,
+                                 num=frame_list_settings['n_backwards'])]
+        # Include current frame
+        if current:
+            frame_nos.append(np.array([n]))
+        # Frames after current frame
+        frame_nos.append(np.linspace(n + frame_list_settings['skip_forwards'] + 1,
+                                end_frame,
                                 num=frame_list_settings['n_forwards']))
         frame_nos = np.round(np.hstack(frame_nos)).astype(int)
-        logger.debug('Frames in frame_list:  {}'.format(str(frame_nos)))
 
         # Make sure frames are in frame range
         if limits is not None:
@@ -396,33 +403,85 @@ class Movie(Stack):
         # frameMarks = frameNos + self.frameNumbers[0]
         if unique:  # remove duplicates
             frame_nos = list(set(frame_nos))
+        logger.debug('Frames in frame_list:  {}'.format(str(frame_nos)))
         return frame_nos
 
-    def _enahnace_frame(self, enhancements, **kwargs):
-        # TODO: Make Enhancements class
-        # TODO: Enable storing of multiple enhancements at once? bg, fg, raw?
-        assert len(kwargs) > 0, 'Enahnace_frame requires keyword arg meta data to select frame'
-        i = self.lookup('i', **kwargs)
-        if self._enhanced_movie is None:
+    def extract_frame_stack(self, frames):
+        """Extract array of frame data for set of frames"""
+        # TODO: move functionality to Stack class
+        self._init_xarray()
+        frame_stack = self._data.loc[{'n': frames}].values
+        return frame_stack
+
+    def extract_frame_stack_window(self, current, n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1,
+                                   skip_backwards=0, skip_forwards=0, unique=True, verbose=False):
+        frames = self.get_frame_list(current, n_backwards=n_backwards, n_forwards=n_forwards,
+                                    step_backwards=step_backwards, step_forwards=step_forwards,
+                                    skip_backwards=skip_backwards, skip_forwards=skip_forwards,
+                                    unique=unique, limits=self._frame_range['frame_range'])
+        # If movie is enhanced, but some of the required frames are not enhanced, enhance those that have been missed
+        #  -> return consisten enhanced output
+        if self._raw_movie is not None and len(self._raw_movie._enhancements) > 0:  # TODO enhanced check
+            not_enhanced = np.array(list(set(frames) - set(self._raw_movie._enhanced_frames)))
+            self.enhance(self._raw_movie._enhancements, not_enhanced)
+
+        frame_stack = self.extract_frame_stack(frames)
+        return frame_stack
+
+    def _setup_enhanced_movie(self, enhancements):
+        """Reset enhanced movie if enhancements are to change"""
+        if self._enhanced_movie is None or self._enhanced_movie._enhancements != enhancements:
             self._enhanced_movie = deepcopy(self)
-            self._enhanced_movie._enhancements = enhancements
-            self._enhanced_movie._raw_movie = self
-            self._enhanced_movie.name = self.name+'_enhanced'
+            enhanced_movie = self._enhanced_movie
+            enhanced_movie._enhancements = []
+            enhanced_movie._raw_movie = self
+            enhanced_movie.name = self.name + '_enhanced'
             self._enhancer = Enhancer(setting='default')  # TODO: specify enhancement settings
             self._enhanced_frames = []
-        frame = self._enhanced_movie(i=i)
-        frame[:] = self._enhancer(enhancements, frame[:])
-        self._enhanced_frames.append(i)
-        # raise NotImplementedError
+            return True
+        else:
+            return False
+
+    def _apply_enhancement(self, frames, enhancement, **kwargs):
+        # TODO: Make Enhancements class
+        # TODO: Enable storing of multiple enhancements at once? bg, fg, raw?
+        # assert len(kwargs) > 0, 'Enahnace_frame requires keyword arg meta data to select frame'
+        # i = self.lookup('i', **kwargs)
+        # n = self.lookup('n', **kwargs)
+        enhanced_movie = self._enhanced_movie
+        enhanced_movie._enhancements.append(enhancement)
+        # from concurrent import futures
+        # Executor = futures.ProcessPoolExecutor
+        # with Executor(max_workers=max_workers) as executor:
+        #     results = executor.map(self._enhancer, args[:, 0], args[:, 1], args[:, 2], args[:, 3])
+        #     intensity, phase, contrast = zip(*results)
+        args = []
+        frame_arrays = []
+        # TODO: Make parallel - threading?
+        for n in frames:
+            args.append(self._enhancer.prepare_arguments(enhancement, self, n))
+            frame_arrays.append(self._enhanced_movie(n=n)[:])
+
+        # TODO: Make parallel - processes
+        for i, n in enumerate(frames):
+            # NOTE: movie and n args only needed for fg and bg extraction
+            self._enhanced_movie(n=n)[:] = self._enhancer(enhancement, frame_arrays[i], **args[i])
+            self._enhanced_frames.append(n)
+            # raise NotImplementedError
 
     def enhance(self, enhancements, frames='all', keep_raw=False, **kwargs):
+        """Apply mutiple enhancements to a set of frames in order"""
         # TODO: make t ect valid input
+        enhancements = make_itterable(enhancements)
+        if not self._setup_enhanced_movie(enhancements):
+            logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
+            return
         if frames == 'all':
             frames = self.stack_axis_values
         frames = to_array(frames)
         # TODO: check all frame values in stack axis
-        for n in frames:
-            self._enahnace_frame(enhancements, n=n)
+        for enhancement in enhancements:
+            self._apply_enhancement(frames, enhancement)
         if not keep_raw:
             self._data = None
         # raise NotImplementedError
@@ -467,17 +526,17 @@ class Movie(Stack):
 
     @property
     def pulse(self):
-        return self._pulse
+        return self.source_settings['pulse']
 
     @pulse.setter
     def pulse(self, value):
         if value is not None:
             assert isinstance(value, numbers.Number)
-            self._pulse = value
+            self.source_settings['pulse'] = value
 
     @property
     def machine(self):
-        return self._machine
+        return self.source_settings['machine']
 
     @machine.setter
     def machine(self, value):
@@ -485,11 +544,11 @@ class Movie(Stack):
             if value not in self.compatibities:
                 raise ValueError('Movie class is not compatible with machine "{}". Options: {}'.format(
                         value, self.compatibities.keys()))
-            self._machine = value
+            self.source_settings['machine'] = value
 
     @property
     def camera(self):
-        return self._camera
+        return self.source_settings['camera']
 
     @camera.setter
     def camera(self, value):
@@ -498,7 +557,7 @@ class Movie(Stack):
             if value not in self.compatibities[self.machine]:
                 raise ValueError('Movie class is not compatible with camera "{}". Options: {}'.format(
                         value, self.compatibities[self.machine].keys()))
-            self._camera = value
+            self.source_settings['camera'] = value
 
     @property
     def movie_frame_range(self):
@@ -522,31 +581,39 @@ class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""
     desciptions = {'bgsub': {'requires_window': True}}
     default_settings = {}
-    from ccfepyutils.image import threshold, reduce_noise, sharpen
-    functions = {'threshold': threshold, 'reduce_noise': reduce_noise, 'sharpen': sharpen}
+    from ccfepyutils.image import threshold, reduce_noise, sharpen, extract_bg, extract_fg
+    functions = {'threshold': threshold, 'reduce_noise': reduce_noise, 'sharpen': sharpen, 'extract_bg': extract_bg,
+                 'extract_fg': extract_fg}
 
-    def __init__(self, setting='default', movie=None):
-        self.settings = Settings('Enhancer', setting)
-        self.movie = movie
+    def __init__(self, setting='default'):
+        self.settings = Settings.get('Enhancer', setting)
+        # self.movie = movie
 
     def __repr__(self):
         return '<Enhancer: {}>'.format(self.settings.name)
 
-    def get_func_args(self, func):
+    def get_func_args(self, func, func_name=None, **kwargs):
         """Get arguments for enhancement function from settings object"""
-        func_name = func.__name__
-        args, kwargs = [], {}
+        if func_name is None:
+            func_name = func.__name__
+        args, kws = [], {}
         sig = inspect.signature(func)
         for i, kw in enumerate(sig.parameters.values()):
             name = kw.name
-            if name == 'image':
-                continue
+            # if name == 'image':
+            #     continue
+            # if setting == 'movie':
+            #     if self.movie is None:
+            #         raise ValueError('Enhancer must have a Movie object assigned to perform {}'.format(func_name))
+            #     kws['movie'] = self.movie
             setting = '{func}_{arg}'.format(func=func_name, arg=name)
             if setting in self.settings:
-                kwargs[name] = self.settings[setting].value
-        return args, kwargs
+                kws[name] = self.settings[setting].value
+            if setting in kwargs:
+                kws[name] = kwargs[name]
+        return args, kws
 
-    def __call__(self, enhancements, data):
+    def __call__(self, enhancements, data, **kwargs):
         out = copy(data)
         funcs = self.functions
         enhancements = make_itterable(enhancements)
@@ -555,18 +622,22 @@ class Enhancer(object):
                 raise ValueError('Enhancement {} not recognised'.format(enhancement))
             ## TODO:
             func = funcs[enhancement]
-            args, kwargs = self.get_func_args(func)
-            out = funcs[enhancement](out, *args, **kwargs)
+            if len(kwargs) == 0:  # if keyword arguments havent been passed, look them up
+                kwargs.update(self.settings.get_func_args(func, **kwargs))
+            out = funcs[enhancement](image=out, **kwargs)
         return out
 
-    def apply(self, enhancements, x):
-        """Apply enhancements to frame x"""
-        raise NotImplementedError
-        results = pool.map(func, inputs)
-        intensity, phase, contrast = zip(*results)
+    def prepare_arguments(self, enhancement, movie, n):
+        """Prepare arguments for enhancement function. Get inputs ready for parallel processing."""
+        kwargs = {}
+        func = self.functions[enhancement]
+        sig = inspect.signature(func).parameters.keys()
+        if 'frame_stack' in sig:
+            kws = self.settings.get_func_args(movie.extract_frame_stack_window, func_name=enhancement)
+            frame_stack = movie._enhanced_movie.extract_frame_stack_window(n, **kws)
+            kwargs['frame_stack'] = frame_stack
 
-    def chain_enhancements(self):
-        raise NotImplementedError
+        return kwargs
 
     @classmethod
     def to_8bit(cls, data):

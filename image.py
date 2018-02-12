@@ -54,12 +54,33 @@ def sharpen(image, ksize_x=15, ksize_y=15, sigma=16, alpha=1.5, beta=-0.5, gamma
     sharpened = cv2.addWeighted(image, alpha, blured_image, beta, gamma)
     return sharpened
 
-def extract_bg(movie, i, window, method='min'):
-    """Extract"""
-    funcs = {'min': np.min}
-    raise NotImplementedError
+def extract_bg(image, frame_stack, method='min'):
+    """Extract slowly varying background from range of frames"""
+    funcs = {'min': np.min, 'mean': np.mean}  # TODO: Add scipy.fftpack.fft
+    func = funcs[method]
+    out = func(frame_stack, axis=0)
+    return out
+    # assert method in funcs, 'Background extraction method "{}" not supported. Options: {}'.format(method, funcs.keys())
+    # limits = movie._frame_range['frame_range']
+    # frames = movie.get_frame_list(n, n_backwards=n_backwards, n_forwards=n_forwards, step_backwards=step_backwards,
+    #                               step_forwards=step_forwards, skip_backwards=skip_backwards,
+    #                               skip_forwards=skip_forwards, limits=limits, unique=unique)
 
-def extract_fg(movie, i, window, method='min'):
-    """ """
-    raise NotImplementedError
-    return
+def extract_fg(image, frame_stack, method='min'):
+    """Extract rapidly varying forground from range of frames"""
+    bg = extract_bg(image, frame_stack, method=method)
+    # Subtract background to leave foreground
+    out = image - bg
+    return out
+
+# def extract_fg(movie, n, method='min', n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1,
+#                skip_backwards=0, skip_forwards=0, unique=True, **kwargs):
+#     """Extract rapidly varying forground from range of frames"""
+#     frame = movie[n][:]
+#     bg = extract_bg(movie, n, method=method, n_backwards=n_backwards, n_forwards=n_forwards,
+#                     step_backwards=step_backwards, step_forwards=step_forwards,
+#                     skip_backwards=skip_backwards, skip_forwards=skip_forwards,
+#                     unique=unique)
+#     # Subtract background to leave foreground
+#     out = frame - bg
+#     return out
