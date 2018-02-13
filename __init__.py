@@ -19,7 +19,9 @@ except KeyError as e:
     print('Failed to load logger settings from {}\nKeyError: {}'.format(fn_log, e))
 except AssertionError as e:
     print('Failed to load logger settings from {}\nFile does not exist {}'.format(fn_log, e))
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 logger.addHandler(logging.NullHandler())
 
-logger.info('Created logger: {}'.format(logger))
+logger.debug('Created logger: {}'.format(logger))

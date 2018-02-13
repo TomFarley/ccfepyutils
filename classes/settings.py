@@ -4,6 +4,7 @@ from abc import ABC
 import gc
 import re
 import inspect
+import configparser
 
 import numpy as np
 import pandas as pd
@@ -317,6 +318,20 @@ class Settings(object):
         self.df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
         self.state('saved')
         self.log_file.loaded(self.name)
+
+    def from_config(self, fn):
+        assert os.path.isfile(os.path.expanduser(fn)), 'Config file does not exist: {}'.format(fn)
+        config = configparser.ConfigParser()
+        config.read(fn)
+        for section, item in config.items():
+            if len(item) == 0:
+                continue
+            for key, value in item.items():
+                name = '{}::{}'.format(section, key)
+                # If no change required, skip
+                if name in self and self[name] == value:
+                    continue
+                self[name] = value
 
     def save(self, state_transition=None):
         if not self.file_exists:

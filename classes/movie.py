@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Classes for working with fusion camera data"""
+
 import numbers
 from collections import defaultdict
 from pathlib import Path
@@ -114,7 +116,7 @@ class Movie(Stack):
     time_format = '{:0.5f}s'
     def __init__(self, pulse=None, machine=None, camera=None, fn=None, source='repeat', **kwargs):
         # TODO: load default machine and camera from config file
-        assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
+        # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
         self.source_settings = Settings('Movie_source', source)
         s = self.source_settings
         s.set('pulse', pulse, ignore=[None])
