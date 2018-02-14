@@ -31,7 +31,7 @@ TODO:
 - mod fil posns
 """
 
-def in_state(state):
+def in_state(state, end_state=None):
     """Decorator to change state of object method belongs to for duration of method call"""
     def in_state_wrapper(func):
         def func_wrapper(*args, **kwargs):
@@ -39,11 +39,22 @@ def in_state(state):
             self.state(state, call=(func, args, kwargs))
             # TODO: log function call and args in state object
             func(*args, **kwargs)
-            self.state.reverse()
+            # Return to state before decorated method was called
+            if end_state is None:
+                self.state.reverse()
+            # Don't make transition if internally state has already been changed
+            elif self.state != end_state:
+                self.state(end_state)
         return func_wrapper
     return in_state_wrapper
 
 class State(object):
+    """Easy to implement state class
+    
+    Supplying a state_table dictionary specifies what state transitions are valid.  
+    Supplying a call_table dictionary specifies what functions should be called during particular state transitions.  
+    
+    """
     call_patterns = ('enter', 'exit')  # Patterns for calls in state transitions
     def __init__(self, owner, table, initial_state, call_table=None, init_call=None, record_calls=True):
         self._owner = owner
@@ -81,8 +92,8 @@ class State(object):
             for state in self.possible_states:
                 if state not in self._call_table:
                     self._call_table[state] = {}
-                for pattern in self.call_patterns:
-                    self._call_table[state][pattern] = []
+                    for pattern in self.call_patterns:
+                        self._call_table[state][pattern] = []
 
     @property
     def possible_states(self):
@@ -113,10 +124,13 @@ class State(object):
             return None
 
     def call_transition(self, old, new, *args, **kwargs):
+        """Call function from call_table during state transition"""
         if self._call_table is None:
             return
         kwargs.update(dict((
-                ('state_transition', dict( (('old', old), ('new', new)))),
+                ('state_transition', dict((
+                    ('old', old), ('new', new))
+                )),
                 ),))  # Add information out state change
         for func in self._call_table[old]['exit']:
             # TODO: Use args
@@ -126,6 +140,12 @@ class State(object):
             # TODO: Use args
             kws = args_for(func, kwargs)
             func(*args, **kws)
+        # Execute functions in call table specificall for this transition 
+        if new in self._call_table[old]:
+            for func in self._call_table[old][new]:
+                # TODO: Use args
+                kws = args_for(func, kwargs)
+                func(*args, **kws)
 
     def __call__(self, new_state, call=None, ignore=False, *args, **kwargs):
         """Change state to new_state. Return True if call lead to a state change, False if already in new_state.
@@ -163,7 +183,7 @@ class State(object):
         # return '{owner} in state {current}'.format(owner=repr(self._owner), current=self.current_state)
 
     def __repr__(self):
-        return '<State: {owner};{current}>'.format(owner=repr(self._owner), current=self.current_state)
+        return '<State: ({owner});{current}>'.format(owner=repr(self._owner)[1:-1], current=self.current_state)
 
     def __eq__(self, other):
         """Return True if other is current state name or state object with same self.__dict__"""
@@ -182,7 +202,7 @@ class State(object):
         """Reverse to past state if past state is different to current state
         :param steps: number of steps in history_all to reverse"""
         assert steps > 0 and steps < len(self._history_all)
-        new_state = self._history_all[-steps]['state']
+        new_state = self._history_all[-(steps+1)]['state']
         self(new_state)
 
     def undo(self, n):
