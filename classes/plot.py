@@ -71,8 +71,8 @@ class Plot(object):
         :param fig_args:
         :param kwargs:
         """
-        self.call_table = {'ready': {'enter': self.set_ready}
-                      }
+        self.call_table = {'ready': {'enter': self.set_ready}}
+
         self.state = State(self, self.state_table, 'init', call_table=self.call_table)
 
         self._num = num  # Name of figure window

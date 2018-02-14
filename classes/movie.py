@@ -17,7 +17,7 @@ from pyIpx.movieReader import ipxReader,mrawReader,imstackReader
 
 from ccfepyutils.classes.data_stack import Stack, Slice
 from ccfepyutils.classes.settings import Settings
-from ccfepyutils.utils import return_none, is_number, none_filter, to_array, make_itterable, args_for
+from ccfepyutils.utils import return_none, is_number, none_filter, to_array, make_itterable, args_for, is_subset
 from ccfepyutils.classes.plot import Plot
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class Frame(Slice):
     def __repr__(self):
         """Frame representation"""
         # TODO: add enhancement information
-        if 't' in self.stack.meta.columns:
+        if 't' in self.stack._meta.columns:
             t = ', t={}'.format(self.stack.time_format)
             t = t.format(self.stack.lookup('t', n=self.value))
         else:
@@ -84,7 +84,7 @@ class Frame(Slice):
         show = args_for(Plot.show, kws)
         plot = Slice.plot(self, ax=ax, show=False, **kws)
         if annotate:
-            t = self.stack.lookup('t', **{self.stack.stack_dim: self.value}) if 't' in self.stack.meta.columns else None
+            t = self.stack.lookup('t', **{self.stack.stack_dim: self.value}) if 't' in self.stack._meta.columns else None
             self._annotate_plot(plot.ax(), self.value, t=t)
         plot.show(**show)
         return plot
@@ -117,33 +117,48 @@ class Movie(Stack):
     def __init__(self, pulse=None, machine=None, camera=None, fn=None, source='repeat', **kwargs):
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
-        self.source_settings = Settings('Movie_source', source)
-        s = self.source_settings
+        self._reset_stack_attributes()  # Initialise attributes to None
+        self._reset_movie_attributes()  # Initialise attributes to None
+        self._source_settings = Settings.get('Movie_source', source)
+        s = self._source_settings
         s.set('pulse', pulse, ignore=[None])
         s.set('machine', machine, ignore=[None])
         s.set('camera', camera, ignore=[None])
-        self._frame_range = None  # Dict of info detailing which frames to read from movie file
-        self._transforms = None  # Transformations applied to frames when they are read eg rotate
-        self._movie_meta = None  # meta data for movie format etc
-        self._enhancements = []  # Flag for whether this data is enhanced or not
-        self._enhanced_frames = [] #  Which frames have currently had enhancements applied
-        self._enhancer = None
-        self._enhanced_movie = None  # Movie instance containing enhanced data
-        self._raw_movie = None  # Movie instance containing raw (unenhanced) data
-        self.meta = None  # Dataframe of meta data related to each frame
+
+        # Locate source of movie data
+        kws = args_for(self.set_movie_file, kwargs)
+        # TODO: change to set movie source
+        self.set_movie_file(pulse, machine, camera, fn=fn, **kws)
 
         x = defaultdict(return_none, name='n')
         y = defaultdict(return_none, name='x_pix')
         z = defaultdict(return_none, name='y_pix')
         # quantity = defaultdict(return_none, name='pix_intensity')
         quantity = 'pix_intensity'
-
+        
+        # Initialise data xarray
         kws = args_for(super(Movie, self).__init__, kwargs)
         super(Movie, self).__init__(x, y, z, quantity=quantity, stack_axis='x', **kws)
-        kws = args_for(self.set_movie_file, kwargs)
-        # TODO: change to set movie source
-        self.set_movie_file(pulse, machine, camera, fn=fn, **kws)
         logger.debug('Initialised {}'.format(repr(self)))
+
+    def _reset_movie_attributes(self):
+        """Set all Stack class attributes to None"""
+        self._source_settings = None
+        self._frame_range = None  # Dict of info detailing which frames to read from movie file
+        self._transforms = None  # Transformations applied to frames when they are read eg rotate
+        self._movie_meta = None  # meta data for movie format etc
+        self._enhancements = None  # Enhancements applied to _ENHANCED_movie data
+        self._enhancer = None
+        self._enhanced_movie = None  # Movie instance containing enhanced data
+        self._raw_movie = None  # Movie instance containing raw (unenhanced) data
+
+        self.fn_path = None
+        self.path = None
+        self.fn = None
+        self.movie_format = None
+
+        self._movie_meta = None
+        self.movie_format = None
 
     def __repr__(self):
         enhanced = self._enhanced_movie is not None
@@ -198,7 +213,35 @@ class Movie(Stack):
         if self._movie_meta is None:
             assert RuntimeError('The movie file must be set before the frame range is set')
         self._transforms = none_filter(self._transforms, transforms)  # update transforms if passed
+        
+        frames, nframes, frame_range = self.get_frame_range(frames=frames, 
+                                                            start_frame=start_frame, end_frame=end_frame, 
+                                                            start_time=start_time, end_time=end_time,
+                                                            nframes=nframes, duration=duration, stride=stride)
+        
+        self._frame_range = {'frame_range': frame_range, 'n': nframes, 'stride': stride, 'frames': frames}
 
+        self.check_frame_range()
+
+        fps = self._movie_meta['fps']
+        t_range = self._movie_meta['t_range'][0] + frame_range / fps
+        t = np.arange(t_range[0], t_range[1]+1.0/fps, 1.0/fps)
+        self._frame_range['t_range'] = t_range
+        self._frame_range['t'] = t
+        x_dim = {'name': 'x_pix', 'values': np.arange(self._movie_meta['frame_shape'][1])}
+        y_dim = {'name': 'y_pix', 'values': np.arange(self._movie_meta['frame_shape'][0])}
+        t_dim = {'name': 'n', 'values': frames}
+        self.set_dimensions(x=t_dim, y=y_dim, z=x_dim)
+
+        self._meta = pd.DataFrame({'t': t, 'n': frames, 'i': np.arange(0, nframes),
+                                  'enhanced': np.zeros(nframes).astype(bool)})
+        # self._meta.index.name = 'i'
+        assert len(frames) == len(t) == nframes
+        pass
+        
+    
+    def get_frame_range(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
+                   nframes=None, duration=None, stride=1):
         if all:
             # Read whole movie
             raise NotImplementedError
@@ -224,25 +267,7 @@ class Movie(Stack):
 
         # tODO: change start stop to range list []
         frame_range = np.array([start_frame, end_frame])
-        self._frame_range = {'frame_range': frame_range, 'n': nframes, 'stride': stride, 'frames': frames}
-
-        self.check_frame_range()
-
-        fps = self._movie_meta['fps']
-        t_range = self._movie_meta['t_range'][0] + frame_range / fps
-        t = np.arange(t_range[0], t_range[1]+1.0/fps, 1.0/fps)
-        self._frame_range['t_range'] = t_range
-        self._frame_range['t'] = t
-        x_dim = {'name': 'x_pix', 'values': np.arange(self._movie_meta['frame_shape'][1])}
-        y_dim = {'name': 'y_pix', 'values': np.arange(self._movie_meta['frame_shape'][0])}
-        t_dim = {'name': 'n', 'values': frames}
-        self.set_dimensions(x=t_dim, y=y_dim, z=x_dim)
-
-        self.meta = pd.DataFrame({'t': t, 'n': frames, 'i': np.arange(0, nframes),
-                                  'enhanced': np.zeros(nframes).astype(bool)})
-        # self.meta.index.name = 'i'
-        assert len(frames) == len(t) == nframes
-        pass
+        return frames, nframes, frame_range
 
     def check_frame_range(self):
         # TODO: break into sub functions for each file format
@@ -335,19 +360,19 @@ class Movie(Stack):
             raise ValueError('No input meta data passed to lookup')
         if output == 'frame_coord':
             output = self.stack_dim
-        elif output not in self.meta.columns:
-            raise ValueError('out={} is not a valid meta data type. Options: {}'.format(output, self.meta.columns))
+        elif output not in self._meta.columns:
+            raise ValueError('out={} is not a valid meta data type. Options: {}'.format(output, self._meta.columns))
 
         # TODO: Loop for multiple values per key
-        mask = np.ones(len(self.meta)).astype(bool)
+        mask = np.ones(len(self._meta)).astype(bool)
         for key, value, in kwargs.items():
-            if key not in self.meta.columns:
-                raise ValueError('inp={} is not a valid meta data type. Options: {}'.format(key, self.meta.columns))
-            values = self.meta[key].values
+            if key not in self._meta.columns:
+                raise ValueError('inp={} is not a valid meta data type. Options: {}'.format(key, self._meta.columns))
+            values = self._meta[key].values
             if value not in values.astype(type(value)):
-                raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, self.meta[key]))
-            mask *= self.meta[key] == value
-        new_value = self.meta.loc[mask, output].values
+                raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, self._meta[key]))
+            mask *= self._meta[key] == value
+        new_value = self._meta.loc[mask, output].values
         if len(new_value) == 1:
             new_value = new_value[0]
         return new_value
@@ -416,30 +441,38 @@ class Movie(Stack):
         return frame_stack
 
     def extract_frame_stack_window(self, current, n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1,
-                                   skip_backwards=0, skip_forwards=0, unique=True, verbose=False):
+                                   skip_backwards=0, skip_forwards=0, unique=True, verbose=False, raw=False):
         frames = self.get_frame_list(current, n_backwards=n_backwards, n_forwards=n_forwards,
                                     step_backwards=step_backwards, step_forwards=step_forwards,
                                     skip_backwards=skip_backwards, skip_forwards=skip_forwards,
                                     unique=unique, limits=self._frame_range['frame_range'])
         # If movie is enhanced, but some of the required frames are not enhanced, enhance those that have been missed
-        #  -> return consisten enhanced output
-        if self._raw_movie is not None and len(self._raw_movie._enhancements) > 0:  # TODO enhanced check
-            not_enhanced = np.array(list(set(frames) - set(self._raw_movie._enhanced_frames)))
+        #  -> return consistent enhanced output
+        if self.is_enhanced and not raw:
+            # Make sure all the required frames have been enhanced
+            mask = (self._raw_movie._meta['enhanced'] == True).values
+            not_enhanced = np.array(list(set(frames) - set(self._raw_movie._meta['n'][mask].values)))
             self.enhance(self._raw_movie._enhancements, not_enhanced)
-
-        frame_stack = self.extract_frame_stack(frames)
+            # Get frames from enhanced movie
+            frame_stack = self._enhanced_movie.extract_frame_stack(frames)
+        else:
+            frame_stack = self.extract_frame_stack(frames)
         return frame_stack
 
     def _setup_enhanced_movie(self, enhancements):
         """Reset enhanced movie if enhancements are to change"""
-        if self._enhanced_movie is None or self._enhanced_movie._enhancements != enhancements:
+        if not self.is_enhanced or self._enhancements != enhancements:
+            # Update attributes of self
+            self._enhancer = Enhancer(setting='default')  # TODO: specify enhancement settings
+            self._enhancements = []  # Enhancements applied to _ENHANCED_movie
+            self._meta.loc[:, 'enhanced'] = False
+            # Set fresh enhanced movie to copy of self
             self._enhanced_movie = deepcopy(self)
             enhanced_movie = self._enhanced_movie
-            enhanced_movie._enhancements = []
+            enhanced_movie._enhancer = None
+            enhanced_movie._enhancements = None
             enhanced_movie._raw_movie = self
             enhanced_movie.name = self.name + '_enhanced'
-            self._enhancer = Enhancer(setting='default')  # TODO: specify enhancement settings
-            self._enhanced_frames = []
             return True
         else:
             return False
@@ -450,8 +483,8 @@ class Movie(Stack):
         # assert len(kwargs) > 0, 'Enahnace_frame requires keyword arg meta data to select frame'
         # i = self.lookup('i', **kwargs)
         # n = self.lookup('n', **kwargs)
-        enhanced_movie = self._enhanced_movie
-        enhanced_movie._enhancements.append(enhancement)
+        # enhanced_movie = self._enhanced_movie
+        # self._enhancements.append(enhancement)
         # from concurrent import futures
         # Executor = futures.ProcessPoolExecutor
         # with Executor(max_workers=max_workers) as executor:
@@ -465,25 +498,31 @@ class Movie(Stack):
             frame_arrays.append(self._enhanced_movie(n=n)[:])
 
         # TODO: Make parallel - processes
-        for i, n in enumerate(frames):
+        for j, n in enumerate(frames):
+            i = self.lookup('i', n=n)
+            # Skip frame if already enhanced
+            if self._meta.loc[i, 'enhanced'] == True:
+                continue
             # NOTE: movie and n args only needed for fg and bg extraction
-            self._enhanced_movie(n=n)[:] = self._enhancer(enhancement, frame_arrays[i], **args[i])
-            self._enhanced_frames.append(n)
-            # raise NotImplementedError
+            self._enhanced_movie(n=n)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
 
     def enhance(self, enhancements, frames='all', keep_raw=False, **kwargs):
         """Apply mutiple enhancements to a set of frames in order"""
         # TODO: make t ect valid input
-        enhancements = make_itterable(enhancements)
-        if not self._setup_enhanced_movie(enhancements):
-            logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
-            return
         if frames == 'all':
             frames = self.stack_axis_values
+        enhancements = make_itterable(enhancements)
+        if not self._setup_enhanced_movie(enhancements) and is_subset(frames, self.enhanced_frames):
+            logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
+            return
         frames = to_array(frames)
         # TODO: check all frame values in stack axis
         for enhancement in enhancements:
             self._apply_enhancement(frames, enhancement)
+        # Set frames as having been enhanced
+        self._enhancements = enhancements
+        mask = self._meta['n'].isin(frames)
+        self._meta.loc[mask, 'enhanced'] = True
         if not keep_raw:
             self._data = None
         # raise NotImplementedError
@@ -528,17 +567,17 @@ class Movie(Stack):
 
     @property
     def pulse(self):
-        return self.source_settings['pulse']
+        return self._source_settings['pulse']
 
     @pulse.setter
     def pulse(self, value):
         if value is not None:
             assert isinstance(value, numbers.Number)
-            self.source_settings['pulse'] = value
+            self._source_settings['pulse'] = value
 
     @property
     def machine(self):
-        return self.source_settings['machine']
+        return self._source_settings['machine']
 
     @machine.setter
     def machine(self, value):
@@ -546,11 +585,11 @@ class Movie(Stack):
             if value not in self.compatibities:
                 raise ValueError('Movie class is not compatible with machine "{}". Options: {}'.format(
                         value, self.compatibities.keys()))
-            self.source_settings['machine'] = value
+            self._source_settings['machine'] = value
 
     @property
     def camera(self):
-        return self.source_settings['camera']
+        return self._source_settings['camera']
 
     @camera.setter
     def camera(self, value):
@@ -559,7 +598,7 @@ class Movie(Stack):
             if value not in self.compatibities[self.machine]:
                 raise ValueError('Movie class is not compatible with camera "{}". Options: {}'.format(
                         value, self.compatibities[self.machine].keys()))
-            self.source_settings['camera'] = value
+            self._source_settings['camera'] = value
 
     @property
     def movie_frame_range(self):
@@ -570,14 +609,23 @@ class Movie(Stack):
 
     @property
     def nframes(self):
-        if self.meta is not None:
-            return len(self.meta)
+        if self._meta is not None:
+            return len(self._meta)
         else:
             return None
 
     @property
     def image_resolution(self):
         return self._movie_meta['frame_shape']
+    
+    @property
+    def is_enhanced(self):
+        return self._enhancements is not None
+    
+    @property
+    def enhanced_frames(self):
+        mask = self._meta['enhanced'] == True
+        return self._meta.loc[mask, 'n'].values
 
 class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""
@@ -619,6 +667,8 @@ class Enhancer(object):
         out = copy(data)
         funcs = self.functions
         enhancements = make_itterable(enhancements)
+        if np.max(data) == 0:
+            logging.warning('Enhancements {} are being applied to an empty frame'.format(enhancements))
         for enhancement in enhancements:
             if enhancement not in funcs:
                 raise ValueError('Enhancement {} not recognised'.format(enhancement))
@@ -636,7 +686,7 @@ class Enhancer(object):
         sig = inspect.signature(func).parameters.keys()
         if 'frame_stack' in sig:
             kws = self.settings.get_func_args(movie.extract_frame_stack_window, func_name=enhancement)
-            frame_stack = movie._enhanced_movie.extract_frame_stack_window(n, **kws)
+            frame_stack = movie._enhanced_movie.extract_frame_stack_window(n, raw=True, **kws)
             kwargs['frame_stack'] = frame_stack
 
         return kwargs

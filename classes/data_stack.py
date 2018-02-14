@@ -94,23 +94,19 @@ class Stack(object):
 
     def __init__(self, x, y, z, values=None, name=None, quantity=None, stack_axis='x'):
         #TODO: convert param objects to dict or vv
-        self._data = None  # xarray containing data values
+        self._reset_stack_attributes()
         self.x_obj = x  # dict or Param object containing at least name and values of x coordinate
         self.y_obj = y  # dict or Param object containing at least name and values of y coordinate
         self.z_obj = z  # dict or Param object containing at least name and values of z coordinate
         self._values = np.array(values) if values is not None else None  # 3D data indexed by x, y and z
         self.name = name  # Name of stack object
         self.quantity = quantity  # Quantity data represents eg intensity
-        self._meta = None  # Meta data associated with coord axes
         self.set_stack_axis(stack_axis)  # Axis along which to consider the data a stack of data slices
 
         # If not initialised here, the xarray will be initialised when it is first accessed
         if values is not None:
             self.set_data()
 
-        self._window = None  # Subwindow of stack axis to consider TODO: implement stack window
-        self._roi = None  # Region of interest (sub-window each slice) TODO: implement stack roi
-        self._gui = None  # GUI window instance for navigating the data TODO: implement stack gui
 
         self._slices = {}  # Cache of slice objects
 
@@ -118,6 +114,26 @@ class Stack(object):
         self._check_types()  # Check consistency of input types etc
         self.initialise_meta()
 
+    def _reset_stack_attributes(self):
+        """Set all Stack class attributes to None"""
+        self._data = None  # xarray containing data values
+        self._values = None
+        self._meta = None  # Dataframe of meta data related to each slice
+
+        self._name = None  # Name of stack
+        self._quantity = None  # Quantity represented by data
+
+        self._window = None  # Subwindow of stack axis to consider TODO: implement stack window
+        self._roi = None  # Region of interest (sub-window each slice) TODO: implement stack roi
+        self._gui = None  # GUI window instance for navigating the data TODO: implement stack gui
+        
+        self._name = None
+        self._stack_axis = None
+        self._slices = None
+        self._x = None
+        self._y = None
+        self._z = None
+        
     def _check_types(self):
         """Check internal attributes are all valid types"""
         # TODO replace with property setters and update method?
@@ -168,7 +184,10 @@ class Stack(object):
 
     @property
     def shape(self):
-        return tuple((len(i['values']) for i in self.coord_objs.values()))
+        if self.coord_obj_values_set:
+            return tuple((len(i['values']) for i in self.coord_objs.values()))
+        else:
+            return None
 
     @property
     def dim_to_xyz(self):
@@ -180,10 +199,13 @@ class Stack(object):
         """Dict linking x, y, z to dimension name"""
         return OrderedDict(((x, d['name']) for (d, x) in zip(self.coord_objs.values(), ('x', 'y', 'z'))))
 
-    def _init_xarray(self, values=None, x=None, y=None, z=None, refresh_only=False):
+    def _init_xarray(self, values=None, x=None, y=None, z=None, refresh=False):
         """Set up xarray for main Movie (not enhanced Movie)"""
-        if refresh_only and self._data is None:
-            return 
+        # If already set up and not needing refreshing, skip
+        if self._data is not None and not refresh:
+            return
+        if not self.coord_obj_values_set:
+            raise ValueError('Cannot initialise xarray without coordinate values')
         self._values, self._x, self._y, self._z = none_filter((self._values, self._x, self._y, self._z),
                                                               (values, x, y, z))
         self._fill_values()
@@ -446,8 +468,9 @@ class Stack(object):
     def name(self, value):
         """Name identifying stack instance"""
         assert isinstance(value, (str, type(None)))
+        # refresh = self._quantity is not None
         self._name = value
-        self._init_xarray(refresh_only=True)
+        # self._init_xarray(refresh=True)
 
     @property
     def quantity(self):
@@ -461,8 +484,9 @@ class Stack(object):
     def quantity(self, value):
         """Quantity of values in data"""
         assert isinstance(value, (str, type(None))), '{}: {}'.format(value, type(value))
+        # refresh = self._quantity is not None
         self._quantity = value
-        self._init_xarray(refresh_only=True)
+        # self._init_xarray(refresh=refresh)
 
     @property
     def xyz_order(self):
@@ -502,6 +526,10 @@ class Stack(object):
         """Coordinate objects ordered in index order"""
         xyz2obj = {'x': self._x, 'y': self._y, 'z': self._z}
         return OrderedDict(((xyz, xyz2obj[xyz]) for xyz in self.xyz_order))
+
+    @property
+    def coord_obj_values_set(self):
+        return all((self._x['values'] is not None, self._y['values'] is not None, self._z['values'] is not None))
 
 if __name__ == '__main__':
     coords = {'y': defaultdict(return_none, name='R'),

@@ -32,8 +32,15 @@ class TestSettings(unittest.TestCase):
 
     def test_get_logfile(self):
         logger.info('** Running test_get_logfile')
-        log = Settings.get_logfile('test')
-        self.assertTrue(isinstance(log, SettingsLogFile))
+        log = Settings.get_logfile('settings_test')
+        self.assertIsInstance(log, SettingsLogFile)
+        pass
+
+    def test_view(self):
+        logger.info('** Running test_get_logfile')
+        settings = Settings.get('settings_test', 'test1')
+        self.assertIsInstance(settings, Settings)
+        settings.view()
         pass
 
 def suite():
@@ -49,5 +56,5 @@ def suite():
 
 if __name__ == '__main__':
     runner = unittest.TextTestRunner(failfast=True)
-    # unittest.main()
-    runner.run(suite())
+    unittest.main()
+    # runner.run(suite())

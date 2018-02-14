@@ -3,6 +3,8 @@ from copy import copy
 import numpy as np
 import cv2
 
+import logging
+logger = logging.getLogger(__name__)
 
 def threshold(image, thresh, value=0):
     """Set elements of data bellow the value to threshold_value"""

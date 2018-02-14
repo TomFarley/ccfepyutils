@@ -7,26 +7,21 @@ from ccfepyutils.classes.settings import Settings
 
 if __name__ == '__main__':
     # Settings.get_logfile('test').delete_file(force=True)
-    s = Settings('settings_test', 'default')
-    print(s)
-    s('path', '~')
-    s('itterations', 213, name='cycle itterations', description='awsome item')
-    print(s)
+    settings = Settings('Settings_demo', 'default')
+    print()
+    print(settings)
+    print()
+    settings('path', '~/my_path')
+    settings('pulse', 29852, name='Pulse number')
+    settings('processed', True, description='Whether data has been processed using ...')
+    settings('itterations', 213, name='cycle itterations', description='awsome item')
+    print()
+    print(settings)
+    print()
 
-    # print(s.columns)
-    # print(s.items)
-    print(s)
-    print(s.log_file)
-    path_setting = s['path']
+    print(settings.log_file)
+    path_setting = settings['path']
 
-    s2 = Settings('settings_test', 'test1')
-    path_setting[:]
-    s2('path', '~')
-    # s('path', '~')
-    s2('itterations', 213, name='cycle itterations', description='awsome item')
-
-    # for i in np.arange(100):
-    #     print(i, os.fstat(i))
-
+    settings.delete_file(force=True)
 
     pass

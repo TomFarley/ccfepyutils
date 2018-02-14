@@ -248,6 +248,10 @@ def any_equal(object, list):
     """
     return np.any([object == l for l in list])
 
+def is_subset(subset, full_set):
+    """Return True if all elements of subset are in fullset"""
+    return set(subset).issubset(set(full_set))
+
 def to_list(obj):
     """Convert to list, nesting if nessesary"""
     if isinstance(obj, list):
@@ -289,6 +293,13 @@ def to_arrays(*args, **kwargs):
     for arg in args:
         out.append(to_array(arg, **kwargs))
     return tuple(out)
+
+def remove_duplicates_from_list(seq):
+    """Remove duplicates from list while preserving order (Sets don't preserve order)
+    From https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-whilst-preserving-order"""
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
 
 def describe_array(array):
     """Return string containing n elements, mean, std, min, max of array"""
