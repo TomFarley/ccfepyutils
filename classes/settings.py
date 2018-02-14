@@ -157,8 +157,9 @@ class Settings(object):
 
     state_table = {'init': ['modified', 'saved'],
                    'modifying': ['modified'],
-                   'modified': ['modifying', 'accessing', 'saved'],
-                   'accessing': ['modified', 'saved'],
+                   'modified': ['modifying', 'accessing', 'saving'],
+                   'accessing': ['modified', 'saving'],
+                   'saving': ['saved'],
                    'saved': ['accessing', 'modifying'],
                    'loaded': ['accessing', 'modified']
                    }
@@ -509,14 +510,14 @@ class Settings(object):
         if not all(unique_type):
             raise ValueError('Inconsistent types:\n{}'.format(self.view('type').loc[~unique_type]))
         if True:
-            self._reset_solumn_types()
+            self._reset_column_types()
 
-    def _reset_solumn_types(self):
+    def _reset_column_types(self):
         """Set datatypes of dataframe columns"""
         # TODO: remove nans, etc
         type_dict = [dict(v) for k, v in self.column_sets.items()]
         type_dict = {k: v for d in type_dict for k, v in d.items()}
-        self._df = self._df.astype(type_dict)
+        self._df.loc[:, :] = self._df.astype(type_dict)
         pass
         # raise NotImplementedError
 
@@ -573,7 +574,7 @@ class Settings(object):
     
     def _block_protected(self):
         """Block modificaton of a protected file"""
-        if self.log_file[self.name]['protected']:
+        if (self.name in self.log_file) and (self.log_file[self.name]['protected']):
             raise RuntimeError('Cannot modify protected settings file {}!'.format(repr(self)))
     
     def __str__(self):

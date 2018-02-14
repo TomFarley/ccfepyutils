@@ -38,13 +38,13 @@ def in_state(state, end_state=None):
             self = args[0]
             self.state(state, call=(func, args, kwargs))
             # TODO: log function call and args in state object
-            func(*args, **kwargs)
-            # Return to state before decorated method was called
-            if end_state is None:
-                self.state.reverse()
-            # Don't make transition if internally state has already been changed
-            elif self.state != end_state:
+            out = func(*args, **kwargs)
+            if end_state is not None and self.state != end_state:
                 self.state(end_state)
+            # Return to state before decorated method was called, provided state not changed within func
+            elif self.state == state:
+                self.state.reverse()
+            return out
         return func_wrapper
     return in_state_wrapper
 
@@ -151,7 +151,8 @@ class State(object):
         """Change state to new_state. Return True if call lead to a state change, False if already in new_state.
         :param new_state: name of state to change to"""
         old_state = self.current_state
-        assert new_state in self.possible_states
+        assert new_state in self.possible_states, 'State not recognised: {}\nOptions: {}'.format(
+                new_state, self.possible_states)
         if (new_state == self.current_state):  # No change
             pass
         elif (new_state in self.accessible_states):  # Update state
