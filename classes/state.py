@@ -55,7 +55,7 @@ class State(object):
     Supplying a call_table dictionary specifies what functions should be called during particular state transitions.  
     
     """
-    call_patterns = ('enter', 'exit')  # Patterns for calls in state transitions
+    call_patterns = ['enter', 'exit']  # Patterns for calls in state transitions
     def __init__(self, owner, table, initial_state, call_table=None, init_call=None, record_calls=True):
         self._owner = owner
         self._table = table
@@ -79,7 +79,7 @@ class State(object):
             # Check input values in call table are callables and keys are valid
             for key, values in self._call_table.items():
                 assert key in self.possible_states  # check states
-                assert all([(v in self.call_patterns) for v in values])  # check call patterns
+                assert all([(v in self.call_patterns+self.possible_states) for v in values])  # check call patterns
                 for pattern in self.call_patterns:
                     if pattern not in values:  # Complete call table with empty lists
                         self._call_table[key][pattern] = []
@@ -97,7 +97,7 @@ class State(object):
 
     @property
     def possible_states(self):
-        return self._table.keys()
+        return list(self._table.keys())
 
     @property
     def accessible_states(self):
@@ -160,7 +160,8 @@ class State(object):
             self._history.append(new_state)
             self.call_transition(old_state, new_state, *args, **kwargs)
         else:
-            raise RuntimeError('{owner} cannot perform state switch {old} -> {new}. Accessible states: {avail}'.format(
+            raise RuntimeError('{owner} cannot perform state switch "{old}" -> "{new}".\n'
+                               'Accessible states: {avail}'.format(
                     owner=repr(self._owner), old=self._current, new=new_state, avail=self.accessible_states))
         
         logger.debug('{owner} state changed {old} -> {new}'.format(

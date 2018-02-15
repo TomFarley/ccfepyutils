@@ -2,11 +2,12 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
+from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
+
 """
 Utility functions used in the filament tracker program
 """
 from past.builtins import basestring  # pip install future
-import numbers
 from pprint import pprint
 try:
     from Tkinter import Tk  # python2 freia
@@ -17,16 +18,13 @@ except:
 from matplotlib.widgets import RectangleSelector
 import numpy as np
 import pandas as pd
-import itertools
-from scipy.signal import lfilter, lfilter_zi, filtfilt, butter
-from copy import copy, deepcopy
+from copy import copy
 import sys
 import os
-import re
 import inspect
 from collections import Mapping, Container
 from sys import getsizeof
-from pathlib import Path
+
 try:
     import cpickle as pickle
 except ImportError:
@@ -78,54 +76,6 @@ signal_sets = {
         "arp_rp radius"]   # (radial position of the reciprocating probe)
     }
 
-def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, *args, **kwargs):
-    """Get data with IDL_bridge getdata if available, else load from pickle store."""
-    pulse = int(pulse)
-    if signal in signal_abbreviations:
-        signal = signal_abbreviations[signal]
-    save_path = os.path.expanduser(save_path)
-    if save:
-        pulse_str = '{pulse:d}'.format(pulse=pulse)
-        fn = signal.replace('/', '_').replace(' ', '_')+'.p'
-        mkdir(os.path.join(save_path, pulse_str), start_dir=save_path)
-    try:
-        import idlbridge as idl
-        getdata = idl.export_function("getdata")
-        d = getdata(signal, pulse, *args, **kwargs)
-        if d['erc'] != 0:
-            logger.warning('Failed to load data for {}: {}'.format(pulse_str, signal))
-        elif save:
-            pickle_dump(d, os.path.join(save_path, pulse_str, fn), protocol=2)
-            logger.info('Saved data for {}; {} to {}'.format(pulse_str, signal, os.path.join(save_path, pulse_str, fn)))
-        return d
-    except ImportError:
-        try:
-            d = pickle_load(os.path.join(save_path, pulse_str, fn))
-            return d
-        except IOError:
-            logger.warning('Cannot locate data for {}:{} in {}'.format(pulse_str, signal, save_path))
-
-def store_mast_signals(signals, pulses, save_path='~/data/MAST_signals/', *args, **kwargs):
-    if isinstance(signals, (str, basestring)) and signals in signal_sets:
-        signals = signal_sets[signals]
-    pulses = make_itterable(pulses)
-    signals = make_itterable(signals)
-    save_path = os.path.expanduser(save_path)
-    assert os.path.isdir(save_path), 'Save path does not exist'
-    for pulse in pulses:
-        for signal in signals:
-            get_data(signal, pulse, save_path=save_path, noecho=1, *args, **kwargs)
-
-
-def rm_files(path, pattern, verbose=True):
-    path = str(path)
-    if verbose:
-        print('Deleting files with pattern "{}" in path: {}'.format(pattern, path))
-    for fn in os.listdir(path):
-        if re.search(pattern, fn):
-            os.remove(os.path.join(path, fn))
-            if verbose:
-                print('Deleted file: {}'.format(fn))
 
 def nsigfig(values, sig_figs=1):
     """Round input values to given number of significant digits"""
@@ -307,97 +257,6 @@ def describe_array(array):
     df = pd.DataFrame({'values': array})
     return df.describe()
 
-def getUserFile(type=""):
-    Tk().withdraw()
-    filename = askopenfilename(message="Please select "+type+" file:")
-    return filename
-
-def _find_dist_extrema(arr, point, index=True, normalise=False, func=np.argmin):
-    """ Find closest point to supplied point in either 1d array, 2d grid or 2xn array of coordinate pairs
-    """
-    inparr = np.array(arr)
-    if len(inparr) == 0:
-        return None
-    # print('point', point)
-    # print('inparr.shape', inparr.shape)
-    # print('inparr', inparr)
-    shape = inparr.shape
-    if isinstance(point, numbers.Number) and len(inparr.shape) == 1:  # if point is a single number take array to be 1d
-        if index: return func(np.abs(inparr-point))
-        else: return inparr[func(np.abs(inparr-point))]
-    elif len(np.array(point).shape) == 1 and len(point) > 1:  # point is a 2D coordinate
-        point = np.array(point)
-        # Make sure array in two row format
-        if shape[1] == 2 and shape[0] > 0:
-            inparr = inparr.T
-            shape = inparr.shape
-        ## 2D coordinates
-        if shape[0] == 2 and shape[1] > 0 and len(point) == 2:
-            (valx,valy) = point
-            normarr = deepcopy(inparr)
-            # Treat x and y coordinates as having the same fractional accuracy ie as if dx=dy
-            if normalise:
-                normarr[0] = (normarr[0]-np.min(normarr[0])) / (np.max(normarr[0]) - np.min(normarr[0]))
-                normarr[1] = (normarr[1]-np.min(normarr[1])) / (np.max(normarr[1]) - np.min(normarr[1]))
-                valx = (valx-np.min(inparr[0])) / (np.max(inparr[0]) - np.min(inparr[0]))
-                valy = (valy-np.min(inparr[1])) / (np.max(inparr[1]) - np.min(inparr[1]))
-            ixy = func((((normarr[0,:]-valx)**2.0 + (normarr[1,:] - valy)**2.0)**0.5))
-            if index:
-                return ixy
-            else:
-                return inparr[:, ixy]
-        ## 3D coordinates
-        elif len(shape) == 3 and len(point) == 3:
-            # incomplete!
-            (valx, valy, valz) = point
-            return func((((inparr[:,0]-valx)**2.0 + (inparr[:,1] - valy)**2.0 + (inparr[:,2] - valz)**2.0)**0.5))
-
-        else:
-            print('point', point)
-            print('inparr', inparr)
-            print('inparr.shape', inparr.shape)
-            raise RuntimeError('findNearest: Input parameters did not match any anticipated format')
-    # Both imp array and point are sets of 2D coordinates
-    # Find points with shortest distance between them in the two point clouds
-    elif np.array(point).ndim == 2:
-        point = np.array(point)
-        # Make sure inparr and point arrays have shape (n, 2). If (2, n) transpose first
-        if point.shape[0] == 2 and point.shape[1] > 0:
-            point = point.T
-        if np.array(inparr).shape[0] == 2 and np.array(inparr).shape[1] > 0:
-            inparr = inparr.T
-
-        assert np.array(point).shape[1] == 2
-        point = np.array(point)
-
-        def distance2(p1, p2):
-            # return np.hypot(p2[0] - p1[0], p2[1] - p1[1])
-            return (p2[0] - p1[0])**2 + (p2[1] - p1[1])**2  # remove sqrt for speed up
-
-        # TODO: Consider incremental/bisection resolution increase when have only one local distance minima
-        # Get all combinations of points
-        points = np.array([tup for tup in itertools.product(inparr, point)])
-
-        arr0, point0 = points[func([distance2(Pa, Pb) for (Pa, Pb) in points])]
-        if index:
-            return [np.where(np.bitwise_and(inparr[:, 0] == arr0[0], inparr[:, 1] == arr0[1]))[0][0],
-                    np.where(np.bitwise_and(point[:, 0] == point0[0], point[:, 1] == point0[1]))[0][0]]
-        else:
-            return arr0, point0
-
-    else:
-            raise RuntimeError('findNearest: Input array did not match any anticipated format')
-
-def find_nearest(arr, point, index=True, normalise=False):
-    """ Find closest point to supplied point in either 1d array, 2d grid or 2xn array of coordinate pairs
-    """
-    return _find_dist_extrema(arr, point, index=index, normalise=normalise, func=np.argmin)
-
-def find_furthest(arr, point, index=True, normalise=False):
-    """ Find furthest point to supplied point in either 1d array, 2d grid or 2xn array of coordinate pairs
-    """
-    return _find_dist_extrema(arr, point, index=index, normalise=normalise, func=np.argmax)
-
 
 def compare_dict(dict1, dict2, tol=1e-12, top=True):
     """ Recursively check that two dictionaries and all their constituent sub dictionaries have the same numerical
@@ -555,68 +414,8 @@ class ROISelector(object):
         self.selector.set_active(True)
         
     def deactivate(self):
-        self.selector.set_active(False)        
-    
+        self.selector.set_active(False)
 
-def running_mean_periodic(series,window):
-    """ Compute the running mean of a 1D sequence """
-    input = np.asarray(series)
-    output = []
-    if window % 2 == 0:
-        width = window/2
-    else:
-        width = (window - 1)/2
-    for i in np.arange(input.shape[0]):
-        if i - width < 0: # lhs of window spans end     [#i###                  ##]
-            temp = np.concatenate((input[i-width:],input[0:i+width])) # join over end
-        elif i + width > input.shape[0]: # rhs of window spans end   [##                  ###i#]
-            temp = np.concatenate((input[i-width:-1],input[0:i + width - input.shape[0]]))
-        else:
-            temp = input[i-width:i+width]
-
-        output.append(np.mean(temp))
-
-    return np.asarray(output)
-
-def running_mean(series,window):
-    """ Compute the running mean of a 1D sequence """
-    input = np.asarray(series)
-    output = []
-    if window % 2 == 0:
-            width = window/2
-    else:
-            width = (window - 1)/2
-    for i in np.arange(input.shape[0]-(2*width))+width:
-            if i - width < 0:
-                    temp = np.concatenate((input[i-width:],input[0:i+width]))
-            elif i + width > input.shape[0]:
-                    temp = np.concatenate((input[i-width:-1],input[0:i + width - input.shape[0]]))
-            else:
-                    temp = input[i-width:i+width]
-
-            output.append(np.mean(temp))
-    result = np.concatenate((input[0:width],np.asarray(output),input[-width:]))
-    return result
-
-def low_pass(signal, order=3, critical_freq=0.05):
-    """ Apply butterworth low pass filter
-    """
-    # Create a lowpass butterworth filter.
-    b, a = butter(order, critical_freq)
-
-    # # Apply the filter to xn.  Use lfilter_zi to choose the initial condition
-    # # of the filter.
-    # zi = lfilter_zi(b, a)
-    # z, _ = lfilter(b, a, signal, zi=zi*signal[0])
-    #
-    # # Apply the filter again, to have a result filtered at an order
-    # # the same as filtfilt.
-    # z2, _ = lfilter(b, a, z, zi=zi*z[0])
-
-    # Use filtfilt to apply the filter.
-    y = filtfilt(b, a, signal)
-
-    return y
 
 def pos_path(value):
     """Return True if value is a potential file path else False"""
@@ -628,27 +427,6 @@ def pos_path(value):
         return True
     else:
         return False
-
-def file_filter(path, extension='.p', contain=None, not_contain=None):
-
-    for (dirpath, dirnames, filenames) in os.walk(path_in):
-        break  # only look at files in path_in
-    if extension is not None:
-        filenames = [f for f in filenames if f[-len(extension):] == extension]  # eg only pickle files
-    if contain is not None:
-        if isinstance(contain, basestring):
-            contain = [contain]
-        for pat in contain:
-            filenames = [f for f in filenames if pat in f] # only files with fixed variable
-    if not_contain is not None:
-        if isinstance(not_contain, basestring):
-            not_contain = [not_contain]
-        for pat in not_contain:
-            filenames = [f for f in filenames if pat not in f] # only files with fixed variable
-
-    fn = filenames[0]
-
-    return filenames
 
 
 def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
@@ -698,202 +476,6 @@ def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
         sys.stdout.write('\n')
         sys.stdout.flush()
 
-def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_longest=False, verbose=True):
-    """ Split data at gaps where difference between x data points in much greater than the average/modal difference
-    Return indices and values of data in each continuous section (and y values if supplied)"""
-    i = np.arange(len(x))
-    ## Find the average distace between the x data
-    diff = np.diff(x)               # differences between adjacent data
-    av_gap = np.mode(diff) if not av_diff else np.average(diff)       # average/modal separation
-    ## Get indices of begining of gaps sufficiently greater than the average
-    igap = np.nonzero(diff>gap_length*av_gap)[0] # nonzero nested in tuple
-
-    if verbose: print('data_split: {} gap(s) identified: {}'.format(len(igap), igap))
-
-    xsplit = []
-    if y is not None:
-        ysplit = []
-    isplit_all = []
-    ## No gap => 1 linear section, 1 gap => 2 linear sections, 2 pags => 3 linear sections etc.
-    ## If no gaps, don't split the data
-    if len(igap) == 0:
-        xsplit.append(x)
-        if y is not None:
-            ysplit.append(y)
-        isplit_all.append(i)
-    else:
-        ## First set of linear data before first gap
-        if igap[0]-0 >= data_length: # Only add data if set is long enough
-            isplit = np.arange(0, igap[0]) # begining of data to begining of gap
-            xsplit.append(x[isplit])
-            if y is not None:
-                ysplit.append(y[isplit])
-            isplit_all.append(isplit)
-        else:
-            if verbose: print('data_split: First set exluded as too short')
-
-        ## Deal with linear data that isn't bordered by the ends of the set
-        for i in np.arange(1,len(igap)): # if start=stop, loop over empty array -> do nothing when len(ifap)=1
-            ## Note: arange doesn't include stop, so len 2 just loops over i=1
-            if igap[i]-igap[i-1]+1 >= data_length: # Only add data if set is long enough
-                isplit = np.arange(igap[i-1]+1, igap[i]) # end of last gap begining of next gap
-                xsplit.append(x[isplit])
-                if y is not None:
-                    ysplit.append(y[isplit])
-                isplit_all.append(isplit)
-            else:
-                if verbose: print('data_split: Set {} exluded as too short'.format(i))
-
-        ## Last set of linear data after last gap
-        if (len(x)-1)-igap[-1]+1 >= data_length: # Only add data if set is long enough
-            isplit = np.arange(igap[-1]+1, len(x)-1) # end of last gap to end of data
-            xsplit.append(x[isplit])
-            if y is not None:
-                ysplit.append(y[isplit])
-            isplit_all.append(isplit)
-        else:
-            if verbose: print('data_split: Last set exluded as too short')
-
-    # If return_longest is True, only return longest section of data without gaps, else return all data with gap removed
-    ind = np.array([len(x) for x in xsplit]).argmax() if return_longest else np.arange(len(xsplit))
-    if y is not None:
-        return isplit_all[ind], xsplit[ind], ysplit[ind]
-    else:
-        return isplit_all[ind], xsplit[ind]
-
-def smooth(x, window_len=10, window='hanning'):
-    """smooth the data using a window with requested size.
-
-    From scipy cookbook recipe: http://scipy.org/Cookbook/SignalSmooth
-
-    This method is based on the convolution of a scaled window with the signal.
-    The signal is prepared by introducing reflected copies of the signal
-    (with the window size) in both ends so that transient parts are minimized
-    in the begining and end part of the output signal.
-
-    input:
-        x: the input signal
-        window_len: the dimension of the smoothing window
-        window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
-            flat window will produce a moving average smoothing.
-
-    output:
-        the smoothed signal
-
-    example:
-
-    import numpy as np
-    t = np.linspace(-2,2,0.1)
-    x = np.sin(t)+np.random.randn(len(t))*0.1
-    y = smooth(x)
-
-    see also:
-
-    numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman, numpy.convolve
-    scipy.signal.lfilter
-
-    TODO: the window parameter could be the window itself if an array instead of a string
-    """
-    # print('\n\nIn tf_data.smooth()\n\n')
-    if x.ndim != 1:
-        raise ValueError("smooth only accepts 1 dimension arrays.")
-
-    if x.size < window_len:
-        raise ValueError("Input vector needs to be bigger than window size.")
-
-    if window_len < 3:
-        return x
-
-    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
-
-    # s=np.r_[2*x[0]-x[window_len:1:-1], x, 2*x[-1]-x[-1:-window_len:-1]]  # original
-    s=np.r_[2*x[0]-x[window_len-1::-1], x, 2*x[-1]-x[-1:-(window_len+1):-1]]
-    #print(len(s))
-    assert(len(s) == len(x) + 2*window_len)
-
-    if window == 'flat': #moving average
-        w = np.ones(window_len,'d')
-    else:
-        w = getattr(np, window)(window_len)
-    y = np.convolve(w/w.sum(), s, mode='same')  # len(y) = len(s)-2 ?
-    # return y[window_len-1:-window_len+1]  # original
-    y = y[window_len:-window_len]
-    assert(len(y) == len(x))
-    return y
-
-def savitzky_golay(y, window_size, order, deriv=0, rate=1):
-    r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
-    The Savitzky-Golay filter removes high frequency noise from data.
-    It has the advantage of preserving the original shape and
-    features of the signal better than other types of filtering
-    approaches, such as moving averages techniques.
-    Parameters
-    ----------
-    y : array_like, shape (N,)
-        the values of the time history of the signal.
-    window_size : int
-        the length of the window. Must be an odd integer number.
-    order : int
-        the order of the polynomial used in the filtering.
-        Must be less then `window_size` - 1.
-    deriv: int
-        the order of the derivative to compute (default = 0 means only smoothing)
-    Returns
-    -------
-    ys : ndarray, shape (N)
-        the smoothed signal (or it's n-th derivative).
-    Notes
-    -----
-    The Savitzky-Golay is a type of low-pass filter, particularly
-    suited for smoothing noisy data. The main idea behind this
-    approach is to make for each point a least-square fit with a
-    polynomial of high order over a odd-sized window centered at
-    the point.
-    Examples
-    --------
-    t = np.linspace(-4, 4, 500)
-    y = np.exp( -t**2 ) + np.random.normal(0, 0.05, t.shape)
-    ysg = savitzky_golay(y, window_size=31, order=4)
-    import matplotlib.pyplot as plt
-    plt.plot(t, y, label='Noisy signal')
-    plt.plot(t, np.exp(-t**2), 'k', lw=1.5, label='Original signal')
-    plt.plot(t, ysg, 'r', label='Filtered signal')
-    plt.legend()
-    plt.show()
-    References
-    ----------
-    .. [1] A. Savitzky, M. J. E. Golay, Smoothing and Differentiation of
-       Data by Simplified Least Squares Procedures. Analytical
-       Chemistry, 1964, 36 (8), pp 1627-1639.
-    .. [2] Numerical Recipes 3rd Edition: The Art of Scientific Computing
-       W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery
-       Cambridge University Press ISBN-13: 9780521880688
-    """
-    import numpy as np
-    from math import factorial
-
-    try:
-        window_size = np.abs(np.int(window_size))
-        order = np.abs(np.int(order))
-    except ValueError as e:
-        raise ValueError("window_size and order have to be of type int")
-    if window_size % 2 != 1 or window_size < 1:
-        raise TypeError("window_size size must be a positive odd number")
-    if window_size < order + 2:
-        raise TypeError("window_size is too small for the polynomials order")
-    order_range = range(order+1)
-    half_window = (window_size -1) // 2
-    # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
-    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
-    # pad the signal at the extremes with
-    # values taken from the signal itself
-    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
-    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
-    y = np.concatenate((firstvals, y, lastvals))
-    return np.convolve( m[::-1], y, mode='valid')
-
 
 def in_ellipse(point, centre, rx, ry, angle=0, boundary=True, return_r=False):
     """ Return true if point is within ellipse with centre at centre and semi-major and semi-minor axes rx and ry
@@ -942,23 +524,6 @@ def geo_mean_w(x, weights=None, axis=None, **kwargs):
         # Weighted geometric mean of fom values (using +1, -1 method for avoiding infs from log)
         return np.exp(np.sum(weights * np.log(x+1), axis=axis) / np.sum(weights, axis=axis)) - 1
 
-def moving_average (values, window):
-    """ Return moving average with window length
-    """
-    weights = np.repeat(1.0, window)/window
-    try:
-        sma = np.convolve(values, weights, 'valid')
-    except:
-        pass
-    return sma
-
-def correlation(x, y):
-    """ Return linear correlation coefficient and line of best fit
-    """
-    pear_r = np.corrcoef(x, y)[1,0]
-    A = np.vstack([x, np.ones(len(x))]).T
-    m, c = np.linalg.lstsq(A, np.array(y))[0]
-    return pear_r, (m, c)
 
 def deep_getsizeof(o, ids):
     """Find the memory footprint of a Python object
@@ -993,63 +558,6 @@ def deep_getsizeof(o, ids):
  
     return r
 
-def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
-    """ Create a set of directories, provided they branch of from an existing starting directory. This helps prevent
-    erroneous directory creation. Checks if each directory exists and makes it if necessary. Alternatively, if a depth
-    is supplied only the last <depth> levels of directories will be created i.e. the path <depth> levels above must
-    pre-exist.
-    Inputs:
-        dirs 			- Directory path
-        start_dir       - Path from which all new directories must branch
-        depth           - Maximum levels of directories what will be created for each path in <dirs>
-        info            - String to write to DIR_INFO.txt file detailing purpose of directory etc
-        verbatim = 0	- True:  print whether dir was created,
-                          False: print nothing,
-                          0:     print only if dir was created
-    """
-    from pathlib import Path
-    # raise NotImplementedError('Broken!')
-    if start_dir is not None:
-        start_dir = os.path.expanduser(str(start_dir))
-        if isinstance(start_dir, Path):
-            start_dir = str(start_dir)
-        start_dir = os.path.abspath(start_dir)
-        if not os.path.isdir(start_dir):
-            print('Directories {} were not created as start directory {} does not exist.'.format(dirs, start_dir))
-            return 1
-
-    if isinstance(dirs, Path):
-        dirs = str(dirs)
-    if isinstance(dirs, basestring):  # Nest single string in list for loop
-        dirs = [dirs]
-    # import pdb; pdb.set_trace()
-    for d in dirs:
-        if isinstance(d, Path):
-            d = str(d)
-        d = os.path.abspath(d)
-        if depth is not None:
-            depth = np.abs(depth)
-            d_up = d
-            for i in np.arange(depth):  # walk up directory by given depth
-                d_up = os.path.dirname(d_up)
-            if not os.path.isdir(d_up):
-                print('Directory {} was not created as start directory {} (depth={}) does not exist.'.format(
-                    d, d_up, depth))
-                continue
-        if not os.path.isdir(d):  # Only create if it doesn't already exist
-            if (start_dir is not None) and (start_dir not in d):  # Check dir stems from start_dir
-                print('Directory {} was not created as does not start at {} .'.format(dirs,
-                                                                                          os.path.relpath(start_dir)))
-                continue
-            os.makedirs(d)
-            print('Created directory: ' + d)
-            if info:  # Write file describing purpose of directory etc
-                with open(os.path.join(d, 'DIR_INFO.txt'), 'w') as f:
-                    f.write(info)
-        else:
-            if verbose:
-                print('Directory "' + d + '" already exists')
-    return 0
 
 def fails(string):
     """ Return True if evaluating expression produces an error
@@ -1061,93 +569,6 @@ def fails(string):
     else:
         return False
 
-def test_pickle(obj):
-    """Test if an object can successfully be pickled and loaded again
-    Returns True if succeeds
-            False if fails
-    """
-    import pickle
-    # sys.setrecursionlimit(10000)
-    path = 'test.p.tmp'
-    if os.path.isfile(path):
-        os.remove(path)  # remove temp file
-    try:
-        with open(path, 'wb') as f:
-            pickle.dump(obj, f)
-        print('Pickled object')
-        with open(path, 'rb') as f:
-            out = pickle.load(f)
-        print('Loaded object')
-    except Exception as e:
-        print('{}'.format(e))
-        return False
-    if os.path.isfile(path):
-        print('Pickled file size: {:g} Bytes'.format(os.path.getsize(path)))
-        os.remove(path)  # remove temp file
-    import pdb; pdb.set_trace()
-    print('In:\n{}\nOut:\n{}'.format(out, obj))
-    if not isinstance(obj, dict):
-        out = out.__dict__
-        obj = obj.__dict__
-    if compare_dict(out, obj):
-        return True
-    else:
-        return False
-
-def pickle_dump(obj, path, **kwargs):
-    """Wrapper for pickle.dump, accepting multiple path formats (file, string, pathlib.Path).
-    - Automatically appends .p if not pressent.
-    - Uses cpickle when possible.
-    - Automatically closes file objects."""
-    if isinstance(path, Path):
-        path = str(path)
-
-    if isinstance(path, basestring):
-        if path[-2:] != '.p':
-            path += '.p'
-        with open(path, 'wb') as f:
-            pickle.dump(obj, f, **kwargs)
-    elif isinstance(path, file):
-        pickle.dump(obj, path, **kwargs)
-        path.close()
-    else:
-        raise ValueError('Unexpected path format')
-
-def pickle_load(path, base=None, **kwargs):
-    if isinstance(path, Path):
-        path = str(path)
-
-    if base is not None:
-        path = os.path.join(base, path)
-
-    if isinstance(path, basestring):
-        if path[-2:] != '.p':
-            path += '.p'
-        with open(path, 'rb') as f:
-            try:
-                out = pickle.load(f, **kwargs)
-            except EOFError as e:
-                logger.error('path "{}" is not a pickle file. {}'.format(path, e))
-                raise e
-    elif isinstance(path, file):
-        out = pickle.load(path, **kwargs)
-        path.close()
-    else:
-        raise ValueError('Unexpected path format')
-    return out
-
-def to_csv(x, ys, fn, xheading=None, yheadings=None, description='data'):
-    """Quickly and easily save data to csv, with one dependent variable"""
-    import pandas as pd
-    ys = np.squeeze(ys)
-    if ys.shape[0] != len(x) and ys.shape[1] == len(x):
-        ys = ys.T
-    df = pd.DataFrame(data=ys, index=make_itterable(x), columns=yheadings)
-    if xheading:
-        df.index.name = xheading
-    # df.columns.name = 'tor'
-    df.to_csv(str(fn))
-    logger.info('Saved {} to: {}'.format(description, str(fn)))
 
 def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_longest=False, verbose=True):
     """Split data at gaps where difference between x data points in much greater than the average/modal difference
@@ -1279,114 +700,6 @@ def call_with_kwargs(func, kwargs, exclude=[], match_signature=True, named_dict=
     kws = args_for(func, kwargs, exclude=exclude, match_signature=match_signature, named_dict=named_dict)
     output = func(*args, **kws)
     return output
-
-def pdf(x, min_data_per_bin=10, nbins_max=40, max_resolution=None, density=False, max_1=False):
-    """Return distribution in x of peaks in y nsigma above mean"""
-    # Todo: add outlier detection to auto pdf
-    if len(x) < 2:
-        return np.array([]), np.array([])
-    nbins = np.floor(len(x) / min_data_per_bin)
-    nbins = int(np.round(np.max([8, nbins])))
-    nbins = np.min((nbins, nbins_max))
-
-    # Check don't exceed max resolution for x data to avoid jagged beating of pdf
-    if max_resolution is None:  # may overestimate max_resolution for small sample sizes
-        diffs = np.abs(np.diff(x))
-        max_resolution = 2*np.min(diffs[diffs>0])  # twice minimum distance between values to avoid gaps
-    x_range = np.ptp(x)
-    if (max_resolution is not False) and (x_range/nbins < max_resolution):  # Reduce number of bins
-        nbins = int(np.floor(x_range/max_resolution))
-    if nbins < 3:
-        nbins = 3
-
-    counts, bins = np.histogram(x, bins=nbins, density=density)
-    counts = counts / np.max(counts) if max_1 else counts
-    return moving_average(bins, 2), counts
-
-def out_path(input, default_path, default_fn, default_extension, path_obj=False):
-    """Generate output path given input and variable input.
-
-    Any information missing in input with be replaced with defaults.
-    Input can be eg:
-    Full path including filename and extension
-    Just path, no filename
-    Just filename, no path
-    Not a string/Path, in which case defaults will be used """
-    default_path = os.path.expanduser(default_path)
-    try:
-        if isinstance(input, Path):
-            input = str(input)
-        input = os.path.expanduser(input)
-        if os.path.isdir(input) and input[-1] != os.sep:  # Make sure a directory ends in slash
-            input += os.sep
-        # Split up input information
-        path, fn = os.path.split(input)
-        base, ext = os.path.splitext(fn)
-        if len(ext) > 5:  # Avoid full stops in filenames being treated as extensions - 4 char ext len limit
-            base += ext
-            ext = ''
-
-        # Replace missing information with defaults
-        if not path:
-            path = default_path
-        if not fn:
-            fn = os.path.splitext(default_fn)[0]
-        if not ext:
-            ext = default_extension
-        fn = join_with_one('.', fn, ext)
-        out = os.path.join(path, fn)
-
-    except AttributeError as e:
-        # TODO: allow no extension and extension included in default_fn
-        fn = join_with_one('.', default_fn, default_extension)
-        out = os.path.join(default_path, fn)
-    if path_obj:
-        out = Path(out)
-    return out
-
-def join_with_one(sep, *args):
-    """Join strings with exactly one separator"""
-    l = len(sep)
-    out = ''
-    for i, (arg1, arg2) in enumerate(zip(args, args[1:])):
-        arg12 = [arg1, arg2]
-        if i == 0:
-            # If arg1 ends with separator, remove it
-            while arg12[0].endswith(sep):
-                arg12[0] = arg12[0][:len(arg12[0])-l]
-            out += arg12[0]
-        # check if arg2 begins or ends with separator (need to loop over mutable!)
-        while arg12[1].startswith(sep):
-            arg12[1] = arg12[1][l:]
-        while arg12[1].endswith(sep):
-            arg12[1] = arg12[1][:len(arg12[1])-l]
-        # add to output
-        out += sep+arg12[1]
-    return out
-
-def python_path(filter=None):
-    import os
-    try:
-        user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
-    except KeyError:
-        print('PYTHONPATH not set')
-        user_paths = []
-    if filter:
-        filter = os.path.expanduser(filter)
-        user_paths = [p for p in user_paths if filter in p]
-    return user_paths
-
-def locate_file(fn, paths, _raise=True):
-    """Return path to file given number of possible paths"""
-    for path in paths:
-        path = os.path.expanduser(str(path))
-        out = os.path.join(path, fn)
-        if os.path.isfile(out):
-            return out
-    if _raise:
-        raise IOError('File "{}" is not present in any of the following direcgtories: {}'.format(fn, paths))
-    else:
-        return None
 
 def return_none():
     return None

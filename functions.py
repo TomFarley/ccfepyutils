@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
-from future.utils import iteritems
+
 """Class for performing quick fits to data and plotting them"""
-import inspect
-import logging
 
 import numpy as np
 
-from ccfepyutils.ccfe_const import FitFunction
+from ccfe_const import FitFunction
 
 
 def sample_lognormal(mean=0.0, sigma=1.0, scale=1.0, offset=0.0, size=None):

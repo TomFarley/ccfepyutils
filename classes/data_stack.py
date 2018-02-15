@@ -9,7 +9,8 @@ from collections import defaultdict, OrderedDict
 
 from copy import deepcopy
 
-from ccfepyutils.utils import isclose_within, find_nearest, make_itterable, class_name
+from ccfepyutils.utils import isclose_within, make_itterable, class_name
+from ccfepyutils.data_processing import find_nearest
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, none_filter
 

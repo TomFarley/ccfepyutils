@@ -21,7 +21,8 @@ from pathlib import Path
 from netCDF4 import Dataset
 
 from ccfepyutils.classes.state import State, in_state
-from ccfepyutils.utils import mkdir, make_itterable, remove_duplicates_from_list
+from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset
+from ccfepyutils.io_tools import mkdir
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
 
 try:
@@ -156,12 +157,13 @@ class Settings(object):
                  'natural': "%H:%M:%S %d/%m/%y".format(dl='')}
 
     state_table = {'init': ['modified', 'saved'],
-                   'modifying': ['modified'],
+                   'loading': ['loaded', 'modifying', 'accessing'],
+                   'loaded': ['accessing', 'modifying'],
+                   'modifying': ['modified', 'accessing'],
                    'modified': ['modifying', 'accessing', 'saving'],
-                   'accessing': ['modified', 'saving'],
                    'saving': ['saved'],
                    'saved': ['accessing', 'modifying'],
-                   'loaded': ['accessing', 'modified']
+                   'accessing': ['modified', 'saving']
                    }
     column_sets = {'value': [('value_str', str), ('value_num', float)],
                    'info': [('name', str), ('description', str), ('symbol', str), ('unit', str)],
@@ -176,7 +178,7 @@ class Settings(object):
         - The name is a label for a particular set of settings for the application e.g. my_default_settings
         """
         self._reset_settings_attributes()
-        self.call_table = {'modifying': {'enter': [self._block_protected]}, 'accessing': {'enter': [self.save]}}
+        self.call_table = {'modifying': {'enter': [self._block_protected]}, 'modified': {'accessing': [self.save]}}
         self.state = State(self, self.state_table, 'init', call_table=self.call_table)
         assert isinstance(application, str)
         assert isinstance(name, str)
@@ -226,20 +228,23 @@ class Settings(object):
         # Set the types of each column
         type_dict = [dict(v) for k,v in self.column_sets.items()]
         type_dict = {k: v for d in type_dict for k, v in d.items()}
-        self._df = self._df.astype(type_dict)
+        self._df.loc[:, :] = self._df.astype(type_dict)
         # self.df.loc[:, [self.column_sets_names['type']]] = False
         self.state('modified')
 
     def view(self, cols='repr', order=None, ascending=True):
         """Return dataframe containing a subst of columns, with items ordered as reburied"""
-        col_set = []
-        cols = make_itterable(cols)
-        for col in cols:
-            if col in self.column_sets_names.keys():
-                col_set += self.column_sets_names[col]
-            else:
-                assert col in self.columns, 'Column not found: {}'.format(col)
-                col_set += [col]
+        if cols == 'all':
+            col_set = self.ordered_column_names
+        else:
+            col_set = []
+            cols = make_itterable(cols)
+            for col in cols:
+                if col in self.column_sets_names.keys():
+                    col_set += self.column_sets_names[col]
+                else:
+                    assert col in self.columns, 'Column not found: {}'.format(col)
+                    col_set += [col]
         if order is None:
             df = self._df
         elif order == 'alphabetical':
@@ -255,17 +260,18 @@ class Settings(object):
         :item: name of setting to change
         :value: value to set the item to
         :kwargs: Use to set non-value columns"""
+        # Store a list as an enumerated set of items
+        if isinstance(value, (list, tuple)):
+            for i, v in enumerate(value):
+                item_i = '{}:{}'.format(v, i)
+                self(item_i, v, create_columns=create_columns, **kwargs)
         df = self._df
         # new = item not in list(self.items)
         if item not in list(self.items):  # add item setting type columns appropriately
             self.add_item(item, value)
         elif value is not None:  # set value given we already know type
-            if any(df.loc[item, ['bool', 'int', 'float']]):
-                df.loc[item, 'value_num'] = value
-            elif df.loc[item, 'str']:
-                df.loc[item, 'value_str'] = value
-            else:
-                raise ValueError('Setting {} has no type!'.format(item))
+            col = self.get_value_column(self._df, item)
+            df.loc[item, col] = value
         for k, v in kwargs.items():
             if k in self.columns:
                 df.loc[item, k] = v
@@ -285,10 +291,14 @@ class Settings(object):
     def __getitem__(self, item):
         self.check_consistency()
 
+        # If item is a list, unpack it's values into a list
+        if self.list_items(item):
+            return self.list_items(item)
+        if self.get_func_name_args(item):
+            return self.get_func_name_args(item)
+
         df = self._df
         # Check if item is in df index or is the setting name
-        if self.state == 'modified':
-            self.save()
         if item in df.index:
             pass
         elif item in df['name']:
@@ -408,7 +418,8 @@ class Settings(object):
             self.create_file()
             return
         # Don't resave if already saved
-        if self.state.previous_state == 'saved':
+        if self.state.previous_state == 'saved' or self.state.previous_state == 'modifying':
+            self.state.reverse()
             return 
         meta = {'t_created': self.t_created, 't_modified': self.t_modified, 't_accessed': self.t_accessed}
         try:
@@ -510,8 +521,20 @@ class Settings(object):
         if not all(unique_type):
             raise ValueError('Inconsistent types:\n{}'.format(self.view('type').loc[~unique_type]))
         if True:
+            self._add_missing_columns()
+        if True:
             self._reset_column_types()
-
+    
+    def _add_missing_columns(self):
+        """Add empty collumns where missing from class defined column sets"""
+        null_types = {int: 0, str: '', float: 0.0, bool: False}
+        if not is_subset(self.ordered_column_names, self.columns):
+            for tup in self.column_sets.values():
+                for col, type in tup:
+                    if col not in self.columns:
+                        self._df[col] = null_types[type]
+                        logger.warning('Added missing column "{}" to {}'.format(col, repr(self)))
+    
     def _reset_column_types(self):
         """Set datatypes of dataframe columns"""
         # TODO: remove nans, etc
@@ -553,9 +576,30 @@ class Settings(object):
     def existing_settings(cls, application):
         """Get list of all saved settings names for given application"""
         return SettingsLogFile(application).names
-    
+
+    def list_items(self, item):
+        """Return df items that are part of the item list. Return False if not a list."""
+        r = re.compile(r'^{}:\d'.format(item))
+        newlist = list(filter(r.match, self.items))
+        if len(newlist) > 0:
+            return [self[i] for i in newlist]
+        else:
+            return False
+
+    def item_is_func_arg(self, item):
+        raise NotImplementedError
+
     def set_func_args(self, func, func_name=None, kwargs=None):
         raise NotImplementedError
+
+    def get_func_name_args(self, func_name):
+        """Return df items that are arguments for function with func_name. Return False if not a list."""
+        r = re.compile(r'^{}::.*'.format(func_name))
+        newlist = list(filter(r.match, self.items))
+        if len(newlist) > 0:
+            return {key: self[key] for key in newlist}
+        else:
+            return False
 
     def get_func_args(self, func, func_name=None, **kwargs):
         """Get arguments for function from settings object"""
@@ -571,6 +615,32 @@ class Settings(object):
             if setting in kwargs:
                 kws[name] = kwargs[name]
         return kws
+
+    @classmethod
+    def get_value_column(cls, df, item):
+        """Return name of column item value is in"""
+        if any(df.loc[item, ['bool', 'int', 'float']]):
+            col = 'value_num'
+        elif df.loc[item, 'str']:
+            col = 'value_str'
+        else:
+            raise ValueError('Setting {} has no type!'.format(item))
+        return col
+
+    def update_from_dataframe(self, df):
+        for item, values in df.iterrows():
+            if 'value' in values:
+                value = values['value']
+            else:
+                col = self.get_value_column(df, item)
+                value = values[col]
+
+            kwargs = {}
+            for col, col_value in values.items():
+                if col in self.columns:
+                    kwargs[col] = col_value
+            self(item, col_value, **kwargs)
+
     
     def _block_protected(self):
         """Block modificaton of a protected file"""
@@ -813,6 +883,11 @@ class SettingsLogFile(object):
 
     def __repr__(self):
         return '<SettingsLogFile: {app}({l})>'.format(app=self.application, l=len(self._df))
+
+    def toggle_protected(self, name):
+        assert name in self.names
+        self._df.loc[name, 'protected'] = ~self._df.loc[name, 'protected']
+        logger.info('Set protected state of {} to {}'.format(name, self._df.loc[name, 'protected']))
 
     def __str__(self):
         # tmp = copy(self.df)

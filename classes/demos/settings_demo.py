@@ -24,4 +24,7 @@ if __name__ == '__main__':
 
     settings.delete_file(force=True)
 
+    s = Settings.get('Enhancer', 'default')
+    rn = s['reduce_noise']
+
     pass
