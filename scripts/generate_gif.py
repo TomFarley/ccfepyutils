@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+"""Script for generating .gif files from sets of images
+NOTE: requires imageio package"""
+
 import imageio
 import re
 import os
@@ -35,7 +39,7 @@ def regexp_range(lo, hi, compile=False):
     else:
         return '(%s)' % '|'.join('{:d}'.format(i) for i in range(lo, hi + 1))
 
-def gen_gif(path_in, pattern='.*', fn_out='movie.gif', duration=0.5, file_range=None, repeat={}, path_out=None,
+def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', duration=0.5, file_range=None, repeat={}, path_out=None,
             user_confirm=True):
     """Generate a gif from a collection of images in a given directory.
     path_in:        path of input images
@@ -89,23 +93,26 @@ def gen_gif(path_in, pattern='.*', fn_out='movie.gif', duration=0.5, file_range=
     print('Wrote gif containing {} frames to: {}'.format(nframes, os.path.join(path_in, fn_out)))
 
 if __name__ == '__main__':
-    # path of images to be compiled into a gif (also the output dir)
-    # path = '/home/tfarley/elzar/results/experimental/C001H001S0001-02/Rtor/geo_mean2_exp/'
-    # path_in = '/home/tfarley/elzar/results/synthetic/Nfil_1_scan-nR_15-nphi_8/Rtor/geo2/'
-    # path_in = '/home/tfarley/elzar/images/frames/elm_no_bgsub/'
-    # path_in = '/home/tfarley/elzar/images/frames/elm_bgsub/'
-    path_in = '/home/tfarley/elzar/results/synthetic/grid_set-dr_0.05_dtor_0.05_amp_1-01_17_errors_3/Rtor/geo_mean2_err_grid2/'
-    # fn_out = '{range}.gif'  # Output file name
+    # Path of images to be compiled into a gif (also the output dir)
+    path_in = '/home/tfarley/elzar/images/frames/elm_bgsub/'
+
+    # Name of output gif file (produced in same directory as input images)
     fn_out = 'movie.gif'  # Output file name
+    # fn_out = '{range}.gif'  # Output file name
 
-    # pattern = '.*f{number}.png'
-    # pattern = '.*{}.png'.format(regexp_range(*file_number_range) if file_number_range else '')
+    # Regex pattern describing files to include in gif. Use {number} to filter files by numbering.
     pattern = '.*.png'
+    # pattern = '.*f{number}.png'
 
-    # file_number_range = [350, 469]  # range of numbers permitted in filename filter
+    # Range of numbers to be substituted into {number} in regex filename pattern
     file_number_range = None  # No number filter
+    # file_number_range = [350, 469]  # range of numbers permitted in filename filter
 
-    repeat = {0: 3, -1: 0}  # Number of aditional times to repeat each frame number
-    duration = 0.3  # Frame duration in seconds
+    # Number of additional times to repeat each frame number. Useful for creating pause and beginning and end of gif
+    repeat = {0: 3, -1: 0}
 
-    gen_gif(path_in, pattern, duration=duration, fn_out=fn_out, file_range=file_number_range, repeat=repeat)
+    # Frame duration in seconds
+    duration = 0.3
+
+    # Only path of input images is a required arg - by default will take all image files (jpeg, jpg, png) in directory
+    gen_gif(path_in, pattern=pattern, duration=duration, fn_out=fn_out, file_range=file_number_range, repeat=repeat)
