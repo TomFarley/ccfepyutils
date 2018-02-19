@@ -10,7 +10,7 @@ from collections import defaultdict, OrderedDict
 from copy import deepcopy
 
 from ccfepyutils.utils import isclose_within, make_itterable, class_name
-from ccfepyutils.data_processing import find_nearest
+from ccfepyutilsdata_processing import find_nearest
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, none_filter
 
@@ -185,8 +185,26 @@ class Stack(object):
 
     @property
     def shape(self):
+        """Shape of 3D data stack xarray"""
         if self.coord_obj_values_set:
             return tuple((len(i['values']) for i in self.coord_objs.values()))
+        else:
+            return None
+        
+    @property
+    def slice_shape(self):
+        """"""
+        if self.coord_obj_values_set:
+            slice_shape = tup(len(values) for values in self.slice_axes_values)
+            return slice_shape
+        else:
+            return None
+
+    @property
+    def stack_axis_length(self):
+        """"""
+        if self.coord_obj_values_set:
+            return len(self.stack_axis_values)
         else:
             return None
 
@@ -211,11 +229,13 @@ class Stack(object):
                                                               (values, x, y, z))
         self._fill_values()
         self._data = xr.DataArray(self._values, coords=self.coords.values(), dims=self.dims, name=self.quantity)
+        logger.debug('Initialised xarray values for {}'.format(repr(self)))
 
     def _fill_values(self):
         """Called by Stack when data is accessed to ensure self._values is not empty"""
         if self._values is None:
             self._values = np.empty(self.shape) * np.nan
+            logger.debug('Generated zeroed data to fill xarray for {}'.format(repr(self)))
 
     def set_dimensions(self, x=None, y=None, z=None):
         """Set xarray coordinate dimensions"""

@@ -114,13 +114,19 @@ class Movie(Stack):
         ))
     slice_class = Frame
     time_format = '{:0.5f}s'
-    def __init__(self, pulse=None, machine=None, camera=None, fn=None, source='repeat', **kwargs):
+    def __init__(self, pulse=None, machine=None, camera=None, fn=None, settings='repeat', source=None, range=None, 
+                 enhancer=None, **kwargs):
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
         self._reset_stack_attributes()  # Initialise attributes to None
         self._reset_movie_attributes()  # Initialise attributes to None
-        self._source_settings = Settings.get('Movie_source', source)
-        s = self._source_settings
+        self.settings = Settings.get('Movie', settings)
+        self.settings.set('Movie_source', source, ignore=[None])
+        self.settings.set('Movie_range', range, ignore=[None])
+        self.settings.set('Enhancer_settings', enhancer, ignore=[None])
+        self.source_settings = Settings.get('Movie_source', self.settings['Movie_source'])
+        self.range_settings = Settings.get('Movie_range', self.settings['Movie_range'])
+        s = self.source_settings
         s.set('pulse', pulse, ignore=[None])
         s.set('machine', machine, ignore=[None])
         s.set('camera', camera, ignore=[None])
@@ -139,11 +145,13 @@ class Movie(Stack):
         # Initialise data xarray
         kws = args_for(super(Movie, self).__init__, kwargs)
         super(Movie, self).__init__(x, y, z, quantity=quantity, stack_axis='x', **kws)
+
+        self.set_frames(**self.range_settings.get_func_args(self.set_frames))
         logger.debug('Initialised {}'.format(repr(self)))
 
     def _reset_movie_attributes(self):
         """Set all Stack class attributes to None"""
-        self._source_settings = None
+        self.source_settings = None
         self._frame_range = None  # Dict of info detailing which frames to read from movie file
         self._transforms = None  # Transformations applied to frames when they are read eg rotate
         self._movie_meta = None  # meta data for movie format etc
@@ -241,8 +249,8 @@ class Movie(Stack):
         
     
     def get_frame_range(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
-                   nframes=None, duration=None, stride=1):
-        if all:
+                   nframes=None, duration=None, stride=1, all_=False):
+        if all_:
             # Read whole movie
             raise NotImplementedError
         elif frames is None:
@@ -368,6 +376,9 @@ class Movie(Stack):
         for key, value, in kwargs.items():
             if key not in self._meta.columns:
                 raise ValueError('inp={} is not a valid meta data type. Options: {}'.format(key, self._meta.columns))
+            # Allow negative indexing with 'i'
+            if key == 'i' and value < 0:
+                value = self._meta[key].values[value]
             values = self._meta[key].values
             if value not in values.astype(type(value)):
                 raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, self._meta[key]))
@@ -463,11 +474,26 @@ class Movie(Stack):
         """Reset enhanced movie if enhancements are to change"""
         if not self.is_enhanced or self._enhancements != enhancements:
             # Update attributes of self
-            self._enhancer = Enhancer(setting='default')  # TODO: specify enhancement settings
+            self._enhancer = Enhancer(setting=self.settings['Enhancer_settings'])  # TODO: specify enhancement settings
             self._enhancements = []  # Enhancements applied to _ENHANCED_movie
             self._meta.loc[:, 'enhanced'] = False
             # Set fresh enhanced movie to copy of self
-            self._enhanced_movie = deepcopy(self)
+            # Settings objects don't like being deep coppied, so set all settings to None and reassign them afterwares
+            # TODO: Fix deepcopy of Settings objects
+            movie_copy = copy(self)
+            movie_copy._enhanced_movie = None
+            movie_copy._raw_movie = None
+            movie_copy.settings = None
+            movie_copy.source_settings = None
+            movie_copy.range_settings = None
+            movie_copy._enhancer = None
+
+            self._enhanced_movie = deepcopy(movie_copy)
+            # Reassign settings objects after deepcopy - temporary fix...
+            movie_copy.settings = self.settings
+            movie_copy.source_settings = self.source_settings
+            movie_copy.range_settings = self.range_settings
+
             enhanced_movie = self._enhanced_movie
             enhanced_movie._enhancer = None
             enhanced_movie._enhancements = None
@@ -509,6 +535,7 @@ class Movie(Stack):
     def enhance(self, enhancements, frames='all', keep_raw=False, **kwargs):
         """Apply mutiple enhancements to a set of frames in order"""
         # TODO: make t ect valid input
+        self._init_xarray()
         if frames == 'all':
             frames = self.stack_axis_values
         enhancements = make_itterable(enhancements)
@@ -567,17 +594,17 @@ class Movie(Stack):
 
     @property
     def pulse(self):
-        return self._source_settings['pulse']
+        return self.source_settings['pulse']
 
     @pulse.setter
     def pulse(self, value):
         if value is not None:
             assert isinstance(value, numbers.Number)
-            self._source_settings['pulse'] = value
+            self.source_settings['pulse'] = value
 
     @property
     def machine(self):
-        return self._source_settings['machine']
+        return self.source_settings['machine']
 
     @machine.setter
     def machine(self, value):
@@ -585,11 +612,11 @@ class Movie(Stack):
             if value not in self.compatibities:
                 raise ValueError('Movie class is not compatible with machine "{}". Options: {}'.format(
                         value, self.compatibities.keys()))
-            self._source_settings['machine'] = value
+            self.source_settings['machine'] = value
 
     @property
     def camera(self):
-        return self._source_settings['camera']
+        return self.source_settings['camera']
 
     @camera.setter
     def camera(self, value):
@@ -598,7 +625,7 @@ class Movie(Stack):
             if value not in self.compatibities[self.machine]:
                 raise ValueError('Movie class is not compatible with camera "{}". Options: {}'.format(
                         value, self.compatibities[self.machine].keys()))
-            self._source_settings['camera'] = value
+            self.source_settings['camera'] = value
 
     @property
     def movie_frame_range(self):
@@ -613,6 +640,16 @@ class Movie(Stack):
             return len(self._meta)
         else:
             return None
+        
+    @property
+    def frame_numbers(self):
+        if self._meta is not None:
+            return self._meta['n'].values
+
+    @property
+    def frame_times(self):
+        if self._meta is not None:
+            return self._meta['t'].values
 
     @property
     def image_resolution(self):

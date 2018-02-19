@@ -45,9 +45,11 @@ class Plot(object):
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
     instances = []  # List of all Plot instances
-    state_table = {'init': ['ready', 'plotting'],
-                   'ready': ['plotting'],
-                   'plotting': ['ready'],
+    state_table = {'core': {
+                        'init': ['ready', 'plotting'],
+                        'ready': ['plotting']},
+                    'transient': {
+                        'plotting': ['ready']},
                    }
     plot_args = ['ls', 'lw', 'c', 'color', 'marker', 'label']  # TODO: extend plot_args
     scatter_args = ['s', 'c', 'color', 'marker', 'label']  # TODO: extend plot_args
@@ -72,6 +74,7 @@ class Plot(object):
         :param kwargs:
         """
         self.call_table = {'ready': {'enter': self.set_ready}}
+        self._reset_attributes()
 
         self.state = State(self, self.state_table, 'init', call_table=self.call_table)
 
@@ -91,6 +94,18 @@ class Plot(object):
         self.plot(x, y, z, mode=mode, **kwargs)
         self.show(show)
         self.save(save)
+
+    def _reset_attributes(self):
+        self._num = None  # Name of figure window
+        self._ax_shape = ()  # Shape of axes grid
+        self._default_ax = None # Default axis for actions when no axis is specified
+        self._current_ax = None
+        self._data = OrderedDict()  # Data used in plots stored for provenance
+        self._log = []  # Log of method calls for provenance
+        self._legend = None
+
+        self.fig = None
+        self.axes = None
 
     def set_figure_variables(self, ax=None, num=None, axes=None, **kwargs):
         """Set figure attributes"""
@@ -387,7 +402,7 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
     if (x is not None) and (y is None) and (z is None):  # if 2d data passed to x treat x as z data
         x, y, z = y, z, x
     if x is None and y is None:
-        ax.set_axis_off()
+        ax.set_axis_off()  # Don't display axes and labels
         if len(ax.figure.axes) == 1:
             ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
     else:

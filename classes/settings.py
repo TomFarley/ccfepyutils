@@ -34,12 +34,17 @@ from logging.config import fileConfig
 
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 ## TODO: Load from config file
 # TODO: Create base .ccfetools/settings/ directory structure if doesn't exist
 settings_dir = os.path.expanduser('~/.ccfetools/settings/')
 
+
+# TODO: Fix deepcopy of Setting objects
 class Setting(ABC):
+    type = None
+    
     def __init__(self, settings, item):
         self._settings = settings
         self._item = item
@@ -83,6 +88,13 @@ class SettingStr(Setting, str):
         str.__init__(self)
         Setting.__init__(self, settings, item)
 
+    @property
+    def value(self):
+        val = super().value
+        if val == '*None*':
+            val = None
+        return val
+
 class SettingInt(Setting, int):
     type = int
     value_column = 'value_num'
@@ -118,6 +130,19 @@ class SettingBool(Setting, int):
 
     def __bool__(self):
         return bool(self._settings._df.loc[self._item, 'value_num'])
+
+# TODO: Move new and init into Setting base class
+
+class SettingList(Setting, list):  # TODO: implement SettingsList  !
+    type = list
+    # value_column = 'value_num'
+    def __new__(cls, settings, item):
+        value = list(settings._df.loc[item, cls.value_column])
+        return int.__new__(cls, value)
+
+    def __init__(self, settings, item):
+        list.__init__(self)
+        Setting.__init__(self, settings, item)
 
 
 class Settings(object):
@@ -156,29 +181,33 @@ class Settings(object):
     t_formats = {'compressed': "%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S".format(dl=''),
                  'natural': "%H:%M:%S %d/%m/%y".format(dl='')}
 
-    state_table = {'init': ['modified', 'saved'],
-                   'loading': ['loaded', 'modifying', 'accessing'],
-                   'loaded': ['accessing', 'modifying'],
-                   'modifying': ['modified', 'accessing'],
-                   'modified': ['modifying', 'accessing', 'saving'],
-                   'saving': ['saved'],
-                   'saved': ['accessing', 'modifying'],
-                   'accessing': ['modified', 'saving']
+    state_table = {'core': {
+                       'init': ['modified', 'loading'],
+                       'loaded': ['accessing', 'modifying'],
+                       'modified': ['modifying', 'accessing', 'saving'],
+                       'saved': ['accessing', 'modifying']},
+                   'transient': {
+                       'loading': ['loaded', 'modifying', 'accessing'],
+                       'modifying': ['modified', 'accessing'],
+                       'saving': ['saved', 'modifying'],
+                       'accessing': ['saving', 'modifying', 'modified', 'saved']}
                    }
-    column_sets = {'value': [('value_str', str), ('value_num', float)],
+    column_sets = {'value': [('value', str), ('value_str', str), ('value_num', float)],
                    'info': [('name', str), ('description', str), ('symbol', str), ('unit', str)],
                    'type': [('float', bool), ('int', bool), ('bool', bool), ('str', bool)],
                    'io': [('fn_str', str), ('priority', float)],
-                   'meta': [('runtime', bool), ('order', int)],
-                   'repr': [('value_str', str), ('value_num', float), ('name', str), ('description', str)]}  # plotting?
+                   'meta': [('setting', bool), ('runtime', bool), ('order', int)],
+                   'repr': [('name', str), ('value', str), ('description', str)]}  # plotting?
 
     def __init__(self, application, name):
         """Settings must have an 'application' and a 'name'
         - The application is the context in which the settings are used e.g. my_code
         - The name is a label for a particular set of settings for the application e.g. my_default_settings
         """
+        # TODO: Fix deepcopy of Settings objects
         self._reset_settings_attributes()
-        self.call_table = {'modifying': {'enter': [self._block_protected]}, 'modified': {'accessing': [self.save]}}
+        self.call_table = {'modifying': {'enter': [self._block_protected, self.check_consistency]},
+                           'modified': {'accessing': [self.save]}}
         self.state = State(self, self.state_table, 'init', call_table=self.call_table)
         assert isinstance(application, str)
         assert isinstance(name, str)
@@ -202,7 +231,6 @@ class Settings(object):
         self.call_table = None
         self._application = None
         self._name = None
-        self._name = None
         self.log_file = None
         self._column_sets = None
         self._column_sets_names = None
@@ -221,6 +249,7 @@ class Settings(object):
         else:
             return Settings(application, name)
 
+    @in_state('init', 'modified')
     def init(self):
         columns = self.ordered_column_names
         types = self.column_sets_types
@@ -230,10 +259,9 @@ class Settings(object):
         type_dict = {k: v for d in type_dict for k, v in d.items()}
         self._df.loc[:, :] = self._df.astype(type_dict)
         # self.df.loc[:, [self.column_sets_names['type']]] = False
-        self.state('modified')
 
     def view(self, cols='repr', order=None, ascending=True):
-        """Return dataframe containing a subst of columns, with items ordered as reburied"""
+        """Return dataframe containing a subst of columns, with items ordered as requried"""
         if cols == 'all':
             col_set = self.ordered_column_names
         else:
@@ -251,8 +279,18 @@ class Settings(object):
             df = self._df.sort_index(ascending=ascending)
         elif order == 'custom':
             df = self._df.sort_values('order', ascending=ascending)
-        
-        return df.loc[:, col_set]
+        out = df.loc[:, col_set]
+        return out
+
+    def view_str(self, cols='repr', order=None, ascending=True):
+        """Return string containing a subst of columns, with items ordered as requried and index replaced with name"""
+        df = self.view(cols=cols, order=order, ascending=ascending)
+        if 'name' in df.columns:
+            columns = list(df.columns)
+            out = df.reset_index().loc[:, columns].to_string(index=False, justify='left')
+        else:
+            out = df.to_string(index=True, justify='left')
+        return out
 
     @in_state('modifying', 'modified')
     def __call__(self, item, value=None, create_columns=False, **kwargs):
@@ -263,8 +301,9 @@ class Settings(object):
         # Store a list as an enumerated set of items
         if isinstance(value, (list, tuple)):
             for i, v in enumerate(value):
-                item_i = '{}:{}'.format(v, i)
+                item_i = '{}:{}'.format(item, i)
                 self(item_i, v, create_columns=create_columns, **kwargs)
+            return
         df = self._df
         # new = item not in list(self.items)
         if item not in list(self.items):  # add item setting type columns appropriately
@@ -272,6 +311,8 @@ class Settings(object):
         elif value is not None:  # set value given we already know type
             col = self.get_value_column(self._df, item)
             df.loc[item, col] = value
+            df.loc['item', 'value'] = str(value)
+            logger.debug('Existing item of {} set {}={}'.format(repr(self), col, value))
         for k, v in kwargs.items():
             if k in self.columns:
                 df.loc[item, k] = v
@@ -283,14 +324,12 @@ class Settings(object):
         cols = self.column_sets_names['type']
         df.loc[:, cols] = df.loc[:, cols].fillna(False)
         # df.loc[nan_types, cols] = False
-        self.state('modified')
+        # self.state('modified')
         # self.log_file.updated(self.name)
         # self.save()
 
     @in_state('accessing')
     def __getitem__(self, item):
-        self.check_consistency()
-
         # If item is a list, unpack it's values into a list
         if self.list_items(item):
             return self.list_items(item)
@@ -350,15 +389,21 @@ class Settings(object):
             dtype = 'float'
         elif isinstance(value, str):
             dtype = 'str'
+        elif value is None:
+            value = '*None*'
+            dtype = 'str'
         else:
             raise TypeError('Setting {}={} of type {} is not supported.'.format(item, value, type(value)))
-        self._df.loc[item, [type_to_col[dtype], dtype]] = value, True
+        df = self._df
+        df.loc[item, [type_to_col[dtype], dtype]] = value, True
         other_types = list(set([k for k in type_to_col if k != dtype]))
-        self._df.loc[item, other_types] = False
-        self._df.loc[item, 'order'] = len(self._df) - 1
-        self._df.loc[item, 'runtime'] = False  # default to False
+        df.loc[item, other_types] = False
+        df.loc[item, 'order'] = len(df) - 1
+        df.loc[item, 'runtime'] = False  # default to False
+        df.loc[item, 'setting'] = False  # default to False
+        df.loc[item, 'value'] = str(value)
+        df.loc[item, 'name'] = item  # Default name to item key
 
-        self.check_consistency()
         logger.info('Added new item to settings: {} = {}'.format(item, value))
 
     @in_state('modifying', 'modified')
@@ -378,7 +423,7 @@ class Settings(object):
         assert items in self.items, 'Items {} not in {}'.format(items, repr(self))
         items = make_itterable(items)
         self._df = self._df.drop(items)
-        logger.info('Deleted items {} from settings: {} = {}'.format(items, repr(self)))
+        logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
 
     @in_state('modifying', 'modified')
     def append_item(self, name, values={'value': []}, categories=[], create_cols=True):
@@ -388,20 +433,22 @@ class Settings(object):
         # TODO: implement settings append
         raise NotImplementedError
 
+    @in_state('loading', 'loaded')
     def load(self):
         assert self.file_exists
         with Dataset(self.fn_path) as root:
             # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
             self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
         self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
-        self.state('saved')
         self.log_file.loaded(self.name)
+        self.check_consistency()
  
-    @in_state('modifying', 'modified')
+    @in_state('modifying')
     def from_config(self, fn):
         assert os.path.isfile(os.path.expanduser(fn)), 'Config file does not exist: {}'.format(fn)
         config = configparser.ConfigParser()
         config.read(fn)
+        modified = False
         for section, item in config.items():
             if len(item) == 0:
                 continue
@@ -411,6 +458,9 @@ class Settings(object):
                 if name in self and self[name] == value:
                     continue
                 self[name] = value
+                modified = True
+        if modified:
+            self.state('modified')
     
     @in_state('saving', 'saved')
     def save(self, state_transition=None):
@@ -464,8 +514,8 @@ class Settings(object):
             logger.exception('Failed to create Settings File for application "{app}": {path}'.format(
                 app=self.application, path=self.fn_path))
         else:
-            logger.info('Created Settings File for application "{app}": {path}'.format(
-                        app=self.application, path=self.fn_path))
+            logger.info('Created SettingsFile for application "{app}", name {name}: {path}'.format(
+                        app=self.application, name=self.name, path=self.fn_path))
         self.state('saved')
 
     def delete_file(self, force=False):
@@ -520,21 +570,23 @@ class Settings(object):
         unique_type = self.view('type').astype(int).sum(axis=1) == 1
         if not all(unique_type):
             raise ValueError('Inconsistent types:\n{}'.format(self.view('type').loc[~unique_type]))
-        if True:
+        # If columns in the class column_sets are missing from the dataframe, add them
+        if is_subset(self.columns, self.ordered_column_names):
             self._add_missing_columns()
         if True:
             self._reset_column_types()
-    
+
+    @in_state('modifying', 'modified')
     def _add_missing_columns(self):
         """Add empty collumns where missing from class defined column sets"""
         null_types = {int: 0, str: '', float: 0.0, bool: False}
-        if not is_subset(self.ordered_column_names, self.columns):
+        if is_subset(self.columns, self.ordered_column_names):
             for tup in self.column_sets.values():
                 for col, type in tup:
                     if col not in self.columns:
-                        self._df[col] = null_types[type]
+                        self._df.loc[:, col] = null_types[type]
                         logger.warning('Added missing column "{}" to {}'.format(col, repr(self)))
-    
+
     def _reset_column_types(self):
         """Set datatypes of dataframe columns"""
         # TODO: remove nans, etc
@@ -582,7 +634,7 @@ class Settings(object):
         r = re.compile(r'^{}:\d'.format(item))
         newlist = list(filter(r.match, self.items))
         if len(newlist) > 0:
-            return [self[i] for i in newlist]
+            return [self[i].value for i in newlist]
         else:
             return False
 
@@ -597,7 +649,7 @@ class Settings(object):
         r = re.compile(r'^{}::.*'.format(func_name))
         newlist = list(filter(r.match, self.items))
         if len(newlist) > 0:
-            return {key: self[key] for key in newlist}
+            return {key: self[key].value for key in newlist}
         else:
             return False
 
@@ -704,7 +756,7 @@ class Settings(object):
 
     @property
     def columns(self):
-        return self._df.columns.values
+        return list(self._df.columns.values)
 
     @property
     def column_sets_names(self):
@@ -777,7 +829,7 @@ class SettingsLogFile(object):
             cols = make_itterable(cols)
             return self._df.loc[name, cols]
 
-    def create(self):
+    def init(self):
         # TODO: add safety checks
         self._df = pd.DataFrame({'modified': [], 'loaded': [], 'created': [],
                                 'mod_count': [], 'load_count': [], 'load_count_total': [],
@@ -797,18 +849,22 @@ class SettingsLogFile(object):
             if not exists:
                 logger.info('Created SettingsLogFile for application "{app}": {path}'.format(
                         app=self.application, path=self.fn_path))
+            else:
+                logger.debug('Updated SettingsLogFile for application "{app}": {path}'.format(
+                        app=self.application, path=self.fn_path))
         except PermissionError as e:
             logger.warning('Trouble updating {}. Deleting and refreshing file'.format(repr(self)))
             try:
                 self.delete_file(True)
                 self._df.to_xarray().to_netcdf(self.fn_path, mode='w')
+                logger.warning('Successfully updated {} after refresh'.format(repr(self)))
             except PermissionError as e:
-                logger.exception('Unable to write to file')
+                logger.exception('Unable to write to file!')
 
     def load(self):
         """Load settings logfile for current application"""
         if not self.file_exists:
-            self.create()
+            self.init()
             return False
         self._df = xr.open_dataset(self.fn_path).to_dataframe()
         return True
