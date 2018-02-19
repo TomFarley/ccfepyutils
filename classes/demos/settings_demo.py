@@ -7,7 +7,7 @@ from ccfepyutils.classes.settings import Settings
 
 if __name__ == '__main__':
     # Settings.get_logfile('test').delete_file(force=True)
-    settings = Settings('Settings_demo', 'default')
+    settings = Settings.get('Settings_demo', 'default')
     print()
     print(settings)
     print()
@@ -24,7 +24,11 @@ if __name__ == '__main__':
 
     settings.delete_file(force=True)
 
-    s = Settings.get('Enhancer', 'default')
-    rn = s['reduce_noise']
+    # s = Settings.get('Movie', 'repeat')
+    # s = Settings.get('Elzar_checkpoints', 'repeat')
+    s = Settings.get('Movie_range', 'repeat')
+    # s = Settings.get('Elzar', 'config')
+    s['set_frames']
+    print(s.view_str())
 
     pass
