@@ -670,7 +670,12 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
     keep = []
     name_args = []
     for f in func:
-        keep += inspect.getargspec(f)[0]  # Add arguments for each function to list of arguments to keep
+        # Add arguments for each function to list of arguments to keep
+        if isinstance(f, type):
+            # If a class look at it's __init__ method
+            keep += inspect.getargspec(f.__init__)[0]
+        else:
+            keep += inspect.getargspec(f)[0]
         name_args += ['{name}_args'.format(name=f.__name__)]
     if match_signature:
         matches = {k: v for k, v in kwargs.items() if (((k in keep) and (k not in exclude)) or (k in include))}
@@ -687,6 +692,22 @@ def caller_details(level=1):
     """Return (func_name, args, kwargs) of function that called this function"""
     inspect
     raise NotImplementedError
+
+def get_methods_class(meth):
+    """Get class that defined method
+    Taken from:
+    stackoverflow.com/questions/3589311/get-defining-class-of-unbound-method-object-in-python-3/25959545#25959545"""
+    if inspect.ismethod(meth):
+        for cls in inspect.getmro(meth.__self__.__class__):
+            if cls.__dict__.get(meth.__name__) is meth:
+                return cls
+        meth = meth.__func__  # fallback to __qualname__ parsing
+    if inspect.isfunction(meth):
+        cls = getattr(inspect.getmodule(meth),
+                      meth.__qualname__.split('.<locals>', 1)[0].rsplit('.', 1)[0])
+        if isinstance(cls, type):
+            return cls
+    return getattr(meth, '__objclass__', None)  # handle special descriptor objects
 
 def call_with_kwargs(func, kwargs, exclude=[], match_signature=True, named_dict=True, remove=True, *args):
     """Return output of func called with dict of args from kwargs that match input for func.

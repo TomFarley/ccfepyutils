@@ -557,6 +557,9 @@ class Movie(Stack):
     def to_hdf5(self, fn=None):
         raise NotImplementedError
 
+    def from_hdf5(self, fn=None):
+        raise NotImplementedError
+
     @property
     def data(self):
         """Return self._data if not enha
@@ -664,6 +667,13 @@ class Movie(Stack):
         mask = self._meta['enhanced'] == True
         return self._meta.loc[mask, 'n'].values
 
+    @property
+    def fn_path_0(self):
+        if self.fn_path is not None:
+            return self.fn_path.format(n=0)
+        else:
+            return None
+
 class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""
     desciptions = {'bgsub': {'requires_window': True}}
@@ -705,7 +715,7 @@ class Enhancer(object):
         funcs = self.functions
         enhancements = make_itterable(enhancements)
         if np.max(data) == 0:
-            logging.warning('Enhancements {} are being applied to an empty frame'.format(enhancements))
+            logging.warning('Enhancement(s) {} is being applied to an empty frame'.format(enhancements))
         for enhancement in enhancements:
             if enhancement not in funcs:
                 raise ValueError('Enhancement {} not recognised'.format(enhancement))

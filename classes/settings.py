@@ -1,27 +1,19 @@
 #!/usr/bin/env python
-import itertools
-from abc import ABC
-import gc
-import re
-import inspect
-import configparser
+ 
+import os, itertools, gc, re, inspect, configparser, types, abc, numbers, time, shutil
+from collections import defaultdict, OrderedDict
+from nested_dict import nested_dict
+from datetime import datetime
+from copy import copy, deepcopy
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from collections import defaultdict, OrderedDict
-import numbers
-from nested_dict import nested_dict
-from datetime import datetime
-import time
-from copy import copy, deepcopy
-import os
-import shutil
-from pathlib import Path
 from netCDF4 import Dataset
 
 from ccfepyutils.classes.state import State, in_state
-from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset
+from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class
 from ccfepyutils.io_tools import mkdir
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
 
@@ -42,7 +34,7 @@ settings_dir = os.path.expanduser('~/.ccfetools/settings/')
 
 
 # TODO: Fix deepcopy of Setting objects
-class Setting(ABC):
+class Setting(abc.ABC):
     type = None
     
     def __init__(self, settings, item):
@@ -197,7 +189,7 @@ class Settings(object):
                    'type': [('float', bool), ('int', bool), ('bool', bool), ('str', bool)],
                    'io': [('fn_str', str), ('priority', float)],
                    'meta': [('setting', bool), ('runtime', bool), ('order', int)],
-                   'repr': [('name', str), ('value', str), ('description', str)]}  # plotting?
+                   'repr': [('value', str), ('name', str), ('description', str)]}  # plotting?
 
     def __init__(self, application, name):
         """Settings must have an 'application' and a 'name'
@@ -305,14 +297,16 @@ class Settings(object):
                 self(item_i, v, create_columns=create_columns, **kwargs)
             return
         df = self._df
+        item = self.name_to_item(item)
+        assert isinstance(item, str), 'Settings must be indexed with string, not "{}"'.format(item)
         # new = item not in list(self.items)
         if item not in list(self.items):  # add item setting type columns appropriately
             self.add_item(item, value)
         elif value is not None:  # set value given we already know type
             col = self.get_value_column(self._df, item)
             df.loc[item, col] = value
-            df.loc['item', 'value'] = str(value)
-            logger.debug('Existing item of {} set {}={}'.format(repr(self), col, value))
+            df.loc[item, 'value'] = str(value)
+            logger.debug('Existing item of {} set: {}={}'.format(repr(self), col, value))
         for k, v in kwargs.items():
             if k in self.columns:
                 df.loc[item, k] = v
@@ -338,15 +332,8 @@ class Settings(object):
 
         df = self._df
         # Check if item is in df index or is the setting name
-        if item in df.index:
-            pass
-        elif item in df['name']:
-            mask = df['name'] == item  # boolian mask where name == 'item'
-            if np.sum(mask) == 1:
-                item = df.index[mask]
-            else:
-                raise ValueError('Setting item name {} is not unique: {}'.format(item, df.loc[mask, 'value']))
-        else:
+        item = self.name_to_item(item)
+        if item not in df.index:
             raise AttributeError('Item "{}" is not in {}'.format(item, repr(self)))
         # Save data if it has been modified before access
         if self.state == 'modified':
@@ -555,7 +542,9 @@ class Settings(object):
         return t_now_str(format=format_str)
 
     def set(self, item, value, ignore=[None]):
-        """Set setting provided it is not an ignore value"""
+        """Set existing setting provided it is not an ignore value"""
+        if item not in self.items:
+            raise ValueError('Item "{}" is not in {}'.format(item, repr(self)))
         if value in ignore:
             return
         # No change, so do nothing
@@ -571,7 +560,7 @@ class Settings(object):
         if not all(unique_type):
             raise ValueError('Inconsistent types:\n{}'.format(self.view('type').loc[~unique_type]))
         # If columns in the class column_sets are missing from the dataframe, add them
-        if is_subset(self.columns, self.ordered_column_names):
+        if not is_subset(self.columns, self.ordered_column_names):
             self._add_missing_columns()
         if True:
             self._reset_column_types()
@@ -656,7 +645,11 @@ class Settings(object):
     def get_func_args(self, func, func_name=None, **kwargs):
         """Get arguments for function from settings object"""
         if func_name is None:
+            # Get name of function/method/class
             func_name = func.__name__
+            if func_name == '__init__':
+                # If func is an __init__ method, get the name of the corresponding class
+                func_name = get_methods_class(func).__name__
         args, kws = [], {}
         sig = inspect.signature(func)
         for i, kw in enumerate(sig.parameters.values()):
@@ -692,6 +685,22 @@ class Settings(object):
                 if col in self.columns:
                     kwargs[col] = col_value
             self(item, col_value, **kwargs)
+
+    def name_to_item(self, name):
+        """Lookup item key given name"""
+        df = self._df
+        if name in df['name'].values:
+            mask = df['name'] == name  # boolian mask where name == 'item'
+            if np.sum(mask) == 1:
+                item = df.index[mask].values[0]
+            else:
+                raise ValueError('Setting item name {} is not unique so cannot be used to index {}'.format(
+                        name, repr(self)))
+            return item
+        elif name in self.items:
+            return name
+        else:
+            return False
 
     
     def _block_protected(self):
@@ -994,6 +1003,14 @@ class SettingsLogFile(object):
     def file_exists(self):
         """Return True if this log file already exists"""
         return os.path.isfile(self.fn_path)
+    
+    @property
+    def dict(self):
+        """Return dict of item: value pairs"""
+        out = {}
+        for item in self.items:
+            out[item] = self[item]
+        return out
 
 def datetime2str(time, format="%y%m%d%H%M%S"):
     string = time.strftime(format)

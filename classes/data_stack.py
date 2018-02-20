@@ -10,7 +10,7 @@ from collections import defaultdict, OrderedDict
 from copy import deepcopy
 
 from ccfepyutils.utils import isclose_within, make_itterable, class_name
-from ccfepyutilsdata_processing import find_nearest
+from ccfepyutils.data_processing import find_nearest
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, none_filter
 
@@ -551,6 +551,10 @@ class Stack(object):
     @property
     def coord_obj_values_set(self):
         return all((self._x['values'] is not None, self._y['values'] is not None, self._z['values'] is not None))
+    
+    @property
+    def meta(self):
+        return self._meta
 
 if __name__ == '__main__':
     coords = {'y': defaultdict(return_none, name='R'),

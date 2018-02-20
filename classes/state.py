@@ -166,7 +166,7 @@ class State(object):
 
     @property
     def history(self):
-        return ' -> '.join(self._history)
+        return ': '.join(' -> '.join(value for value in self._history[group].values()) for group in self.state_groups)
     
     @property
     def previous_state(self):

@@ -34,7 +34,7 @@ class TestSettings(unittest.TestCase):
     def test_get_logfile(self):
         logger.info('** Running test_get_logfile')
         log = Settings.get_logfile('settings_test')
-        self.assertIsInstance(log, SettingsLogFile)
+        self.assertIsInstance(log, (SettingsLogFile, type(None)))
         pass
 
     def test_call(self):

@@ -28,7 +28,7 @@ if __name__ == '__main__':
     # s = Settings.get('Elzar_checkpoints', 'repeat')
     s = Settings.get('Movie_range', 'repeat')
     # s = Settings.get('Elzar', 'config')
-    s['set_frames']
+    s['end frame']
     print(s.view_str())
 
     pass
