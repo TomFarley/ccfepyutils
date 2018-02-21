@@ -701,7 +701,18 @@ class Settings(object):
             return name
         else:
             return False
-
+    
+    def to_dict(self, remove_func_name=True):
+        out = OrderedDict()
+        for item in self.items:
+            if re.match(r'^.*:\d+', item):
+                key = item.split(':')[-1]
+                value = self[key]
+            elif re.match(r'^.*::.*', item):
+                key = item.split('::')[-1] if remove_func_name else item
+                value = self[item]
+            out[key] = value
+        return out
     
     def _block_protected(self):
         """Block modificaton of a protected file"""
