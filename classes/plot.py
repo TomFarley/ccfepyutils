@@ -245,22 +245,20 @@ class Plot(object):
         self.call_if_args(kwargs)
         return self
 
-    def set_axis_labels(self, xlabel=None, ylabel=None, ax=None):
+    def set_axis_labels(self, xlabel=None, ylabel=None, ax=None, tight_layout=True):
         assert isinstance(xlabel, (string_types, type(None)))
         assert isinstance(ylabel, (string_types, type(None)))
         if ax == 'all':
             for ax in self.axes:
-                if xlabel is not None:
-                    ax.set_xlabel(xlabel)
-                    if ylabel is not None:
-                        ax.set_ylabel(ylabel)
-        else:
-            ax = self.ax(ax)
-            if xlabel is not None:
-                ax.set_xlabel(xlabel)
-            if ylabel is not None:
-                ax.set_ylabel(ylabel)
-
+                self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, ax=ax)
+                return
+        ax = self.ax(ax)
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+        if tight_layout:
+            plt.tight_layout()
 
     def legend(self):
         """Finalise legends of each axes"""
@@ -371,6 +369,10 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
         v = z.flatten()[0]
         levels = [v, 0.1]
 
+    # if (x is not None) and (y is not None):
+    #     if (np.array(x).ndim == 1) and (np.array(y).ndim == 1):
+    #         x, y = np.meshgrid(y, x)
+
     try:
         if not any(v is None  for v in (x, y, z)):
             im = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
@@ -394,11 +396,13 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
         cbar.set_label(cbar_label)
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
-           **kwargs):
+           show_axes=False, fil_canvas=False, transpose=False, **kwargs):
     """Plot data as 2d image
 
     Note:
-    - aspect = 'auto' useful for extreeme aspect ratio data"""
+    - aspect = 'auto' useful for extreeme aspect ratio data
+    - transpose = True useful since imshow and contourf expect arrays ordered (y, x)
+"""
     if (x is not None) and (y is None) and (z is None):  # if 2d data passed to x treat x as z data
         x, y, z = y, z, x
     if x is None and y is None:
@@ -407,7 +411,10 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
             ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
     else:
         kwargs.update({'extent': (np.min(x), np.max(x), np.min(y), np.max(y))})
-    ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
+    if transpose:
+        z = np.array(z).T
+    if fil_canvas:
+        ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
     if set_axis_limits:
         if x is None and y is None:
             ax.set_xlim(-0.5, z.shape[1] - 0.5)
@@ -415,6 +422,8 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
         else:
             ax.set_xlim(np.min(x), np.max(x))  # TODO: Handle half pixel offset properly...
             ax.set_ylim(np.min(y), np.max(y))
+    if not show_axes:
+        ax.set_axis_off()
     # if aspect:
     #     ax.set_aspect(aspect)
     img = ax.imshow(z, cmap=cmap, interpolation=interpolation, origin=origin, **kwargs)

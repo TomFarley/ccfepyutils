@@ -4,8 +4,10 @@ import os
 import numpy as np
 
 from ccfepyutils.classes.settings import Settings
+from ccfepyutils.classes.composite_settings import CompositeSettings
 
-if __name__ == '__main__':
+
+def settings():
     # Settings.get_logfile('test').delete_file(force=True)
     settings = Settings.get('Settings_demo', 'default')
     print()
@@ -30,5 +32,18 @@ if __name__ == '__main__':
     # s = Settings.get('Elzar', 'config')
     s['end frame']
     print(s.view_str())
+
+def composite_settings():
+    cs = CompositeSettings('Elzar', 'config')
+    print(cs.view())
+    s = cs.get_settings_for_item('gfile')
+    s.set_column('function', 'Invertor')
+
+    print(cs.view())
+    pass
+
+if __name__ == '__main__':
+    composite_settings()
+    # settings()
 
     pass

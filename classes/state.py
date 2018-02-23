@@ -36,6 +36,11 @@ def in_state(transition_state, end_state=None):
     """Decorator to change state of object method belongs to for duration of method call"""
     def in_state_wrapper(func):
         def func_wrapper(*args, **kwargs):
+            if 'ignore_state' in kwargs:
+                # Don't perform state transition
+                kwargs.pop('ignore_state')
+                return func(*args, **kwargs)
+                
             self = args[0]
             self.state(transition_state, call=(func, args, kwargs))
             # TODO: log function call and args in state object

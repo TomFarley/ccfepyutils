@@ -46,7 +46,8 @@ def get_mast_camera_data_path(camera, pulse):
 def get_mast_movie_transforms(camera, pulse):
     if camera == 'SA1.1':
         # transforms = ['transpose', 'reverse_y']
-        transforms = ['transpose']#, 'reverse_y']
+        # transforms = ['transpose']#, 'reverse_y']
+        transforms = []
     return transforms
 
 class Frame(Slice):
@@ -131,10 +132,6 @@ class Movie(Stack):
         s.set('machine', machine, ignore=[None])
         s.set('camera', camera, ignore=[None])
 
-        # Locate source of movie data
-        kws = args_for(self.set_movie_file, kwargs)
-        # TODO: change to set movie source
-        self.set_movie_file(pulse, machine, camera, fn=fn, **kws)
 
         x = defaultdict(return_none, name='n')
         y = defaultdict(return_none, name='x_pix')
@@ -146,6 +143,11 @@ class Movie(Stack):
         kws = args_for(super(Movie, self).__init__, kwargs)
         super(Movie, self).__init__(x, y, z, quantity=quantity, stack_axis='x', **kws)
 
+        # Locate source of movie data
+        kws = args_for(self.set_movie_file, kwargs)
+        # TODO: change to set movie source
+        self.set_movie_file(pulse, machine, camera, fn=fn, **kws)
+        
         self.set_frames(**self.range_settings.get_func_args(self.set_frames))
         logger.debug('Initialised {}'.format(repr(self)))
 
@@ -199,6 +201,8 @@ class Movie(Stack):
             self._movie_meta.update(self.get_mraw_file_info(self.fn_path))
         else:
             raise NotImplementedError('set_movie_file for format "{}" not implemented'.format(self.movie_format))
+        self._y['values'] = np.arange(self._movie_meta['frame_shape'][0])
+        self._z['values'] = np.arange(self._movie_meta['frame_shape'][1])
         logger.debug('{} movie file set to: {}'.format(repr(self), self.fn_path))
 
     @classmethod
@@ -233,13 +237,14 @@ class Movie(Stack):
 
         fps = self._movie_meta['fps']
         t_range = self._movie_meta['t_range'][0] + frame_range / fps
-        t = np.arange(t_range[0], t_range[1]+1.0/fps, 1.0/fps)
+        t = np.linspace(t_range[0], t_range[1], nframes)
         self._frame_range['t_range'] = t_range
         self._frame_range['t'] = t
-        x_dim = {'name': 'x_pix', 'values': np.arange(self._movie_meta['frame_shape'][1])}
-        y_dim = {'name': 'y_pix', 'values': np.arange(self._movie_meta['frame_shape'][0])}
-        t_dim = {'name': 'n', 'values': frames}
-        self.set_dimensions(x=t_dim, y=y_dim, z=x_dim)
+        # x_dim = {'name': 'x_pix', 'values': np.arange(self._movie_meta['frame_shape'][1])}
+        # y_dim = {'name': 'y_pix', 'values': np.arange(self._movie_meta['frame_shape'][0])}
+        # t_dim = {'name': 'n', 'values': frames}
+        # self.set_dimensions(x=t_dim, y=x_dim, z=y_dim)
+        self._x['values'] = frames
 
         self._meta = pd.DataFrame({'t': t, 'n': frames, 'i': np.arange(0, nframes),
                                   'enhanced': np.zeros(nframes).astype(bool)})
@@ -265,7 +270,6 @@ class Movie(Stack):
             else:
                 raise ValueError('Insufficient input information to build frame range, {}-{} ({})'.format(
                         start_frame, end_frame, nframes))
-            start_frame, end_frame = start_frame, end_frame
             assert isinstance(stride, (int, float))
             stride = int(stride)
             frames = np.arange(start_frame, end_frame+1, stride)
@@ -297,29 +301,41 @@ class Movie(Stack):
             mraw_files.loc[n, 'StartFrame'] = start_frame
             for key in ['TotalFrame', 'StartFrame']:  # 'OriginalTotalFrame', 'CorrectTriggerFrame', 'ZeroFrame']:
                 mraw_files.loc[n, key] = int(header[key].strip())
+            # Get time ranges for each file
+            mraw_files.loc[n, 'StartTime'] = vid.set_frame_number(0).read()[2]['time_stamp']
+            mraw_files.loc[n, 'EndTime'] = vid.set_frame_number(int(header['TotalFrame'].strip())).read()[2]['time_stamp']
             vid.release()
             n += 1
         assert n > 0, 'No mraw files read'
+        # Calcuate time interval stored in each file
+        mraw_files.loc[:, 'TotalTime'] = mraw_files.loc[:, 'EndTime'] - mraw_files.loc[:, 'StartTime']
         # Mraw movie frames don't start at zero so record start frame and offset by it so start at 0
         movie_meta['frame0'] = int(mraw_files.loc[0, 'StartFrame'])
         mraw_files.loc[:, 'StartFrame'] -= movie_meta['frame0']
         mraw_files.loc[:, 'EndFrame'] = mraw_files.loc[:, 'StartFrame'] + mraw_files.loc[:, 'TotalFrame'] - 1
+        # Reset column types and order
+        mraw_files = mraw_files.astype({'StartFrame': int, 'EndFrame': int, 'TotalFrame': int})
+        mraw_files = mraw_files[['StartFrame', 'EndFrame', 'TotalFrame', 'StartTime', 'EndTime', 'TotalTime']]
         # Get additional meta data eg frame shape
         movie_meta['mraw_files'] = mraw_files
         movie_meta['mraw_header'] = header
         movie_meta['frame_range'] = [int(mraw_files.loc[0, 'StartFrame']), int(mraw_files.loc[n-1, 'EndFrame'])]
-        movie_meta['frame_shape'] = (int(header['ImageWidth'].strip()), int(header['ImageHeight'].strip()))
+        movie_meta['t_range'] = [mraw_files.loc[0, 'StartTime'], mraw_files.loc[n-1, 'EndTime']]
+        movie_meta['frame_shape'] = (int(header['ImageHeight'].strip()), int(header['ImageWidth'].strip()))
         movie_meta['fps'] = int(header['RecordRate(fps)'].strip())
-        # Get time information from 1st and last frames
-        vid = mrawReader(filename=fn.format(n=0))
-        t_start = vid.set_frame_number(0).read()[2]['time_stamp']
-        vid.release()
-        end_index = int(mraw_files.loc[n - 1, 'TotalFrame']) - 1
-        vid = mrawReader(filename=fn.format(n=n-1))
-        t_end = vid.set_frame_number(end_index).read()[2]['time_stamp']
-        vid.release()
-        movie_meta['t_range'] = np.array([t_start, t_end])
         return movie_meta
+    
+    def get_mraw_file_number(self, **kwargs):
+        assert self._movie_meta is not None
+        mraw_files = self._movie_meta['mraw_files']
+        frame_range = self._movie_meta['frame_range']
+        n = self.lookup('n', **kwargs)
+        mask = (mraw_files['StartFrame'] <=  n) & (n <= mraw_files['EndFrame'])
+        if np.sum(mask) != 1:
+            raise ValueError('Frame number {} is outside of mraw file frame range {}'.format(n, frame_range))
+        file_number = mraw_files.loc[mask].index.values[0]
+        file_info = mraw_files.loc[file_number, :].to_dict()
+        return file_number, file_info
 
     def _fill_values(self):
         """Called by Stack when data is accessed to ensure self._values is not empty"""
@@ -338,16 +354,29 @@ class Movie(Stack):
         # Initialise array for data to be read into
         data = np.zeros((self._frame_range['n'], *self._movie_meta['frame_shape']))
         if self.movie_format == '.mraw':
+            # TODO: Movie to read mraw file method?
             i = 0
             n = self._frame_range['frame_range'][0]
             end = self._frame_range['frame_range'][1]
             frames = self._frame_range['frames']
-            vid = mrawReader(filename=self.fn_path.format(n=0))
-            vid.set_frame_number(n)
+            file_number, file_info = self.get_mraw_file_number(n=n)
+            vid = mrawReader(filename=self.fn_path.format(n=file_number))
+            vid.set_frame_number(n-file_info['StartFrame'])
             while n <= end:
-                ret, frame, header = vid.read(transforms=self._transforms)  # frames are read with 16 bit dynamic range, but values are 10 bit!
+                # If reached end of current file, switch to next file
+                if n > file_info['EndFrame']:
+                    vid.release()
+                    file_number, file_info = self.get_mraw_file_number(n=n)
+                    vid = mrawReader(filename=self.fn_path.format(n=file_number))
+                    vid.set_frame_number(n-file_info['StartFrame'])
                 if n in frames:
+                    # frames are read with 16 bit dynamic range, but values are 10 bit!
+                    ret, frame, header = vid.read(transforms=self._transforms)
                     data[i] = frame
+                else:
+                    # TODO: Increment vid frame number without reading data
+                    # vid._current_index += 1
+                    ret, frame, header = vid.read(transforms=self._transforms)
                 i += 1
                 n += 1
             vid.release()
@@ -357,36 +386,6 @@ class Movie(Stack):
             raise ValueError('Movie class does not currently support "{}" format movies'.format(self.movie_format))
         self.set_data(data, reset=True)
         logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
-
-    def lookup(self, output='frame_coord', **kwargs):
-        """Return meta data value corresponding to supplied meta data input
-        :param value: value of inp to look up corresponding out value for
-        :param inp: coordinate type of 'value'
-        :param out: output meta data type to look up
-        :return: out value"""
-        if len(kwargs) == 0 :
-            raise ValueError('No input meta data passed to lookup')
-        if output == 'frame_coord':
-            output = self.stack_dim
-        elif output not in self._meta.columns:
-            raise ValueError('out={} is not a valid meta data type. Options: {}'.format(output, self._meta.columns))
-
-        # TODO: Loop for multiple values per key
-        mask = np.ones(len(self._meta)).astype(bool)
-        for key, value, in kwargs.items():
-            if key not in self._meta.columns:
-                raise ValueError('inp={} is not a valid meta data type. Options: {}'.format(key, self._meta.columns))
-            # Allow negative indexing with 'i'
-            if key == 'i' and value < 0:
-                value = self._meta[key].values[value]
-            values = self._meta[key].values
-            if value not in values.astype(type(value)):
-                raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, self._meta[key]))
-            mask *= self._meta[key] == value
-        new_value = self._meta.loc[mask, output].values
-        if len(new_value) == 1:
-            new_value = new_value[0]
-        return new_value
 
     def __getitem__(self, item, raw=False):
         """Return data slices from the stack of data"""
@@ -401,7 +400,7 @@ class Movie(Stack):
         return movie.get_slice(item)
 
     def __call__(self, raw=False, **kwargs):
-        assert len(kwargs) > 0, 'Movie.__call__ requires keyword arg meta data to select frame'
+        assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
         item = self.lookup(self.stack_dim, **kwargs)
         return self.__getitem__(item, raw=raw)
 
@@ -439,6 +438,9 @@ class Movie(Stack):
         if limits is not None:
             frame_nos = frame_nos.clip(limits[0], limits[1])
         # frameMarks = frameNos + self.frameNumbers[0]
+        unique_frames = list(set(frame_nos))
+        if len(unique_frames) < len(frame_nos):
+            logger.warning('Frame list contains duplicates')
         if unique:  # remove duplicates
             frame_nos = list(set(frame_nos))
         logger.debug('Frames in frame_list:  {}'.format(str(frame_nos)))

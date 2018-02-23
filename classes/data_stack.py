@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict
 
 from copy import deepcopy
 
-from ccfepyutils.utils import isclose_within, make_itterable, class_name
+from ccfepyutils.utils import isclose_within, make_itterable, class_name, args_for
 from ccfepyutils.data_processing import find_nearest
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, none_filter
@@ -83,7 +83,18 @@ class Slice(object):
 
     def plot(self, ax=None, **kwargs):
         # TODO: Add automatic axis labeling once parameter class is complete
-        plot = Plot(self.data.values, ax=ax, num=repr(self), **kwargs)
+        # NOTE: data is stored in format x, y whereas imshow and contourf expect arrays ordered (y, x)
+        kws = {'mode': 'contourf', 'cmap': 'viridis', 'show': False, 'transpose': True}
+        kws.update(kwargs)
+        show = args_for(Plot.show, kws)
+        axes = self.stack.slice_axes_names
+        values = self.stack.slice_axes_values
+        x = values[0]
+        y = values[1]
+        z = self.data.values
+        plot = Plot(x, y, z, ax=ax, num=repr(self), show=False, **kws)
+        plot.set_axis_labels(axes[0], axes[1])
+        plot.show(**show)
         return plot
 
 
@@ -107,7 +118,6 @@ class Stack(object):
         # If not initialised here, the xarray will be initialised when it is first accessed
         if values is not None:
             self.set_data()
-
 
         self._slices = {}  # Cache of slice objects
 
@@ -163,61 +173,6 @@ class Stack(object):
         assert key in xyz2obj.keys()
         return xyz2obj[key]
 
-    @property
-    def data(self):
-        """Main data xarray"""
-        return self._data
-
-    @data.setter
-    def data(self, value):
-        assert isinstance(value, xr.DataArray)
-        self._data = value
-
-    @property
-    def dims(self):
-        """Names of coordinate dimensions"""
-        return [i['name'] for i in self.coord_objs.values()]
-
-    @property
-    def coords(self):
-        """Coordinate values"""
-        return OrderedDict(((i['name'], i['values']) for i in self.coord_objs.values()))
-
-    @property
-    def shape(self):
-        """Shape of 3D data stack xarray"""
-        if self.coord_obj_values_set:
-            return tuple((len(i['values']) for i in self.coord_objs.values()))
-        else:
-            return None
-        
-    @property
-    def slice_shape(self):
-        """"""
-        if self.coord_obj_values_set:
-            slice_shape = tup(len(values) for values in self.slice_axes_values)
-            return slice_shape
-        else:
-            return None
-
-    @property
-    def stack_axis_length(self):
-        """"""
-        if self.coord_obj_values_set:
-            return len(self.stack_axis_values)
-        else:
-            return None
-
-    @property
-    def dim_to_xyz(self):
-        """Dict linking dimension names to x, y, z equivalent"""
-        return OrderedDict(((d['name'], x) for (d, x) in zip(self.coord_objs, ('x', 'y', 'z'))))
-
-    @property
-    def xyz_to_dim(self):
-        """Dict linking x, y, z to dimension name"""
-        return OrderedDict(((x, d['name']) for (d, x) in zip(self.coord_objs.values(), ('x', 'y', 'z'))))
-
     def _init_xarray(self, values=None, x=None, y=None, z=None, refresh=False):
         """Set up xarray for main Movie (not enhanced Movie)"""
         # If already set up and not needing refreshing, skip
@@ -234,6 +189,7 @@ class Stack(object):
     def _fill_values(self):
         """Called by Stack when data is accessed to ensure self._values is not empty"""
         if self._values is None:
+            logger.debug('Setting xarray data values for {}'.format(repr(self)))
             self._values = np.empty(self.shape) * np.nan
             logger.debug('Generated zeroed data to fill xarray for {}'.format(repr(self)))
 
@@ -307,8 +263,10 @@ class Stack(object):
         out = self.df.loc[{self.xyz2dim(xyz): values for xyz, values in zip(['x', 'y', 'z'], [ix, iy, iz])}]
         return out
 
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError
+    def __call__(self, **kwargs):
+        assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
+        item = self.lookup(self.stack_dim, **kwargs)
+        return self.__getitem__(item)
 
     def __getitem__(self, item):
         """Return data slices from the stack of data"""
@@ -323,7 +281,7 @@ class Stack(object):
             return '<Stack, {}>'.format(repr(self._data))
 
     def __str__(self):
-        raise NotImplementedError
+        return '{}\n{}'.format(repr(self), self._data)
 
     def xyz2dim(self, key):
         if key in self.dims:
@@ -389,6 +347,40 @@ class Stack(object):
         """Wibndow the data so return letterboxed subset of data perp to stack axis"""
         raise NotImplementedError
 
+    def lookup(self, output='slice_coord', **kwargs):
+        """Return meta data value corresponding to supplied meta data input
+        :param value: value of inp to look up corresponding out value for
+        :param inp: coordinate type of 'value'
+        :param out: output meta data type to look up
+        :return: out value"""
+        if len(kwargs) == 0:
+            raise ValueError('No input meta data passed to lookup')
+        if output == 'slice_coord':
+            output = self.stack_dim
+        elif output not in self._meta.columns:
+            raise ValueError('out={} is not a valid meta data type. Options: {}'.format(output, self._meta.columns))
+        # If input is same as required output type, just return input 
+        if list(kwargs.keys()) == [output]:
+            return kwargs[output]
+        elif self._meta is None:
+            raise ValueError('Cannot lookup {} for {}. No stack meta data set.'.format(output, kwargs))
+        # TODO: Loop for multiple values per key
+        mask = np.ones(len(self._meta)).astype(bool)
+        for key, value, in kwargs.items():
+            if key not in self._meta.columns:
+                raise ValueError('inp={} is not a valid meta data type. Options: {}'.format(key, self._meta.columns))
+            # Allow negative indexing with 'i'
+            if key == 'i' and value < 0:
+                value = self._meta[key].values[value]
+            values = self._meta[key].values
+            if value not in values.astype(type(value)):
+                raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, self._meta[key]))
+            mask *= self._meta[key] == value
+        new_value = self._meta.loc[mask, output].values
+        if len(new_value) == 1:
+            new_value = new_value[0]
+        return new_value
+
     def get(self, var, **kwargs):  # TODO: Need to extend to multiple kwargs
         """ Return value of var in self.frames_meta for which each keyword value is satisfied
         Example call signature
@@ -419,6 +411,61 @@ class Stack(object):
             return series.values
 
     @property
+    def data(self):
+        """Main data xarray"""
+        return self._data
+
+    @data.setter
+    def data(self, value):
+        assert isinstance(value, xr.DataArray)
+        self._data = value
+
+    @property
+    def dims(self):
+        """Names of coordinate dimensions"""
+        return [i['name'] for i in self.coord_objs.values()]
+
+    @property
+    def coords(self):
+        """Coordinate values"""
+        return OrderedDict(((i['name'], i['values']) for i in self.coord_objs.values()))
+
+    @property
+    def shape(self):
+        """Shape of 3D data stack xarray"""
+        if self.coord_obj_values_set:
+            return tuple((len(i['values']) for i in self.coord_objs.values()))
+        else:
+            return None
+
+    @property
+    def slice_shape(self):
+        """"""
+        if self.coord_obj_values_set:
+            slice_shape = tuple(len(values) for values in self.slice_axes_values)
+            return slice_shape
+        else:
+            return None
+
+    @property
+    def stack_axis_length(self):
+        """"""
+        if self.coord_obj_values_set:
+            return len(self.stack_axis_values)
+        else:
+            return None
+
+    @property
+    def dim_to_xyz(self):
+        """Dict linking dimension names to x, y, z equivalent"""
+        return OrderedDict(((d['name'], x) for (d, x) in zip(self.coord_objs, ('x', 'y', 'z'))))
+
+    @property
+    def xyz_to_dim(self):
+        """Dict linking x, y, z to dimension name"""
+        return OrderedDict(((x, d['name']) for (d, x) in zip(self.coord_objs.values(), ('x', 'y', 'z'))))
+
+    @property
     def x_obj(self):
         return self._x
 
@@ -438,7 +485,6 @@ class Stack(object):
         assert isinstance(value, (dict,))
         # TODO: assert contains relevent keys with appropriate formats ideally via param class
         self._y = value
-
 
     @property
     def z_obj(self):
@@ -528,7 +574,14 @@ class Stack(object):
     def slice_axes(self):
         """Names of coordinates in a slice ie perpendicular to the stack axis"""
         out = list(self.xyz_order)
-        out.pop(self.stack_axis)
+        out.pop(out.index(self.stack_axis))
+        return out
+
+    @property
+    def slice_dims(self):
+        """Names of coordinates in a slice ie perpendicular to the stack axis"""
+        out = self.dims
+        out.pop(out.index(self.stack_dim))
         return out
 
     @property
@@ -541,6 +594,12 @@ class Stack(object):
         """Coordinate values along slice axes"""
         axes = self.slice_axes
         return [self.coord_obj(coord)['values'] for coord in axes]
+
+    @property
+    def slice_axes_names(self):
+        """Coordinate values along slice axes"""
+        axes = self.slice_axes
+        return [self.coord_obj(coord)['name'] for coord in axes]
 
     @property
     def coord_objs(self):

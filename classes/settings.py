@@ -12,10 +12,10 @@ import pandas as pd
 import xarray as xr
 from netCDF4 import Dataset
 
-from ccfepyutils.classes.state import State, in_state
-from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class
-from ccfepyutils.io_tools import mkdir
-from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
+from .state import State, in_state
+from ..utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class
+from ..io_tools import mkdir
+from ..netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
 
 try:
     import cpickle as pickle
@@ -177,19 +177,19 @@ class Settings(object):
                        'init': ['modified', 'loading'],
                        'loaded': ['accessing', 'modifying'],
                        'modified': ['modifying', 'accessing', 'saving'],
-                       'saved': ['accessing', 'modifying']},
+                       'saved': ['accessing', 'modifying', 'saving']},
                    'transient': {
                        'loading': ['loaded', 'modifying', 'accessing'],
                        'modifying': ['modified', 'accessing'],
                        'saving': ['saved', 'modifying'],
                        'accessing': ['saving', 'modifying', 'modified', 'saved']}
                    }
-    column_sets = {'value': [('value', str), ('value_str', str), ('value_num', float)],
-                   'info': [('name', str), ('description', str), ('symbol', str), ('unit', str)],
-                   'type': [('float', bool), ('int', bool), ('bool', bool), ('str', bool)],
-                   'io': [('fn_str', str), ('priority', float)],
-                   'meta': [('setting', bool), ('runtime', bool), ('order', int)],
-                   'repr': [('value', str), ('name', str), ('description', str)]}  # plotting?
+    default_column_sets = {'value': [('value', str), ('value_str', str), ('value_num', float)],
+                           'info': [('name', str), ('description', str), ('symbol', str), ('unit', str)],
+                           'type': [('float', bool), ('int', bool), ('bool', bool), ('str', bool)],
+                           'io': [('fn_str', str), ('priority', float)],
+                           'meta': [('setting', bool), ('function', str), ('runtime', bool), ('order', int)],
+                           'repr': [('value', str), ('name', str), ('description', str)]}  # plotting?
 
     def __init__(self, application, name):
         """Settings must have an 'application' and a 'name'
@@ -208,7 +208,7 @@ class Settings(object):
                 application, name))
         self.application = application  # property sets logfile
         self.name = name
-        self._column_sets = Settings.column_sets   # Groups of columns with similar purposes
+        self._column_sets = Settings.default_column_sets   # Groups of columns with similar purposes
         self._column_sets_names = self.column_sets_names  # TODO: properly implement saving and loading of column sets
 
         self.instances[application][name] = self
@@ -223,6 +223,7 @@ class Settings(object):
         self.call_table = None
         self._application = None
         self._name = None
+        self._df = None
         self.log_file = None
         self._column_sets = None
         self._column_sets_names = None
@@ -247,7 +248,7 @@ class Settings(object):
         types = self.column_sets_types
         self._df = pd.DataFrame({key: [] for key in columns})#, dtype=types)  # Initialise empty dataframe
         # Set the types of each column
-        type_dict = [dict(v) for k,v in self.column_sets.items()]
+        type_dict = [dict(v) for k,v in self.default_column_sets.items()]
         type_dict = {k: v for d in type_dict for k, v in d.items()}
         self._df.loc[:, :] = self._df.astype(type_dict)
         # self.df.loc[:, [self.column_sets_names['type']]] = False
@@ -285,7 +286,7 @@ class Settings(object):
         return out
 
     @in_state('modifying', 'modified')
-    def __call__(self, item, value=None, create_columns=False, **kwargs):
+    def __call__(self, item, value=None, create_columns=False, _save=False, **kwargs):
         """Set value of setting
         :item: name of setting to change
         :value: value to set the item to
@@ -296,9 +297,11 @@ class Settings(object):
                 item_i = '{}:{}'.format(item, i)
                 self(item_i, v, create_columns=create_columns, **kwargs)
             return
+        assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
         df = self._df
-        item = self.name_to_item(item)
-        assert isinstance(item, str), 'Settings must be indexed with string, not "{}"'.format(item)
+        item_from_name = self.name_to_item(item)
+        if item_from_name is not False:
+            item = item_from_name
         # new = item not in list(self.items)
         if item not in list(self.items):  # add item setting type columns appropriately
             self.add_item(item, value)
@@ -317,10 +320,8 @@ class Settings(object):
                 raise IndexError('{} is not a valid Settings column. Possible values: {}'.format(k, self.columns))
         cols = self.column_sets_names['type']
         df.loc[:, cols] = df.loc[:, cols].fillna(False)
-        # df.loc[nan_types, cols] = False
-        # self.state('modified')
-        # self.log_file.updated(self.name)
-        # self.save()
+        if _save:
+            self.save()
 
     @in_state('accessing')
     def __getitem__(self, item):
@@ -332,9 +333,10 @@ class Settings(object):
 
         df = self._df
         # Check if item is in df index or is the setting name
+        original_item = item
         item = self.name_to_item(item)
         if item not in df.index:
-            raise AttributeError('Item "{}" is not in {}'.format(item, repr(self)))
+            raise AttributeError('Item "{}" is not in {}'.format(original_item, repr(self)))
         # Save data if it has been modified before access
         if self.state == 'modified':
             pass  # TODO: save on access
@@ -398,11 +400,40 @@ class Settings(object):
         for item, value in items.items():
             self.add_item(item, value)
 
+    def set_column(self, col, value, items='all', regex=False):
+        if regex:
+            raise NotImplementedError
+        elif items == 'all':
+            items = self.items
+
+        assert isinstance(value, self.column_types[col]), 'Trying to set {}={}, {}!={}'.format(
+                                                col, value, self.column_types[col], type(value))
+        kwargs = {col: value}
+        for item in items:
+            self(item, **kwargs)
+
+
     @in_state('modifying', 'modified')
     def rename_item(self, old_name, new_name):
         """Rename setting key"""
         assert old_name in self._df.index
         self._df = self._df.rename({old_name: new_name}, axis='index')
+
+    def rename_items_with_pattern(self, pattern, replacement_string, force=False):
+        """Replace all occurences of regex pattern in indices with 'replacement_string'"""
+        p = re.compile(pattern)
+        for item in self.items:
+            if p.search(item):
+                new_name = p.sub(replacement_string, item)
+                if not force:
+                    out = input('Rename item {} -> {}? (Y)/n: '.format(item, new_name))
+                    if out.lower() not in ('', 'y'):
+                        continue
+                self._df = self._df.rename({item: new_name}, axis='index')
+                self.state('modifying')
+                logger.info('Renamed item {} -> {}'.format(item, new_name))
+        if self.state == 'modifying':
+            self.state('modified')
 
     @in_state('modifying', 'modified')
     def delete_items(self, items):
@@ -430,7 +461,6 @@ class Settings(object):
         self.log_file.loaded(self.name)
         self.check_consistency()
  
-    @in_state('modifying')
     def from_config(self, fn):
         assert os.path.isfile(os.path.expanduser(fn)), 'Config file does not exist: {}'.format(fn)
         config = configparser.ConfigParser()
@@ -445,9 +475,11 @@ class Settings(object):
                 if name in self and self[name] == value:
                     continue
                 self[name] = value
+                self.state('modifying')
                 modified = True
         if modified:
             self.state('modified')
+        pass
     
     @in_state('saving', 'saved')
     def save(self, state_transition=None):
@@ -478,6 +510,18 @@ class Settings(object):
             logger.info('Updated/saved Settings File for application "{app}": {path}'.format(
                     app=self.application, path=self.fn_path))
             self.log_file.updated(self.name)
+
+
+    def backup(self):
+        """Backup current settings to backup folder"""
+        self.save()
+        backup_path = os.path.join(self.path, 'backups')
+        mkdir(backup_path)
+        backup_fn = '{fn}-{time}.nc'.format(fn=str(Path(self.fn).stem), time=t_now_str())
+        fn_path = os.path.join(backup_path, backup_fn)
+        shutil.copyfile(self.fn_path, fn_path)
+        logger.info('Created backup of SettingsLogFile for application "{app}": {path}'.format(
+                app=self.application, path=fn_path))
 
     def create_file(self):
         assert not self.file_exists, 'Settings file already exists: {}'.format(self.fn_path)
@@ -560,7 +604,7 @@ class Settings(object):
         if not all(unique_type):
             raise ValueError('Inconsistent types:\n{}'.format(self.view('type').loc[~unique_type]))
         # If columns in the class column_sets are missing from the dataframe, add them
-        if not is_subset(self.columns, self.ordered_column_names):
+        if not is_subset(self.ordered_column_names, self.columns):
             self._add_missing_columns()
         if True:
             self._reset_column_types()
@@ -570,7 +614,7 @@ class Settings(object):
         """Add empty collumns where missing from class defined column sets"""
         null_types = {int: 0, str: '', float: 0.0, bool: False}
         if is_subset(self.columns, self.ordered_column_names):
-            for tup in self.column_sets.values():
+            for tup in self.default_column_sets.values():
                 for col, type in tup:
                     if col not in self.columns:
                         self._df.loc[:, col] = null_types[type]
@@ -579,7 +623,7 @@ class Settings(object):
     def _reset_column_types(self):
         """Set datatypes of dataframe columns"""
         # TODO: remove nans, etc
-        type_dict = [dict(v) for k, v in self.column_sets.items()]
+        type_dict = [dict(v) for k, v in self.default_column_sets.items()]
         type_dict = {k: v for d in type_dict for k, v in d.items()}
         self._df.loc[:, :] = self._df.astype(type_dict)
         pass
@@ -684,6 +728,7 @@ class Settings(object):
             for col, col_value in values.items():
                 if col in self.columns:
                     kwargs[col] = col_value
+            kwargs.pop('value')
             self(item, col_value, **kwargs)
 
     def name_to_item(self, name):
@@ -697,7 +742,7 @@ class Settings(object):
                 raise ValueError('Setting item name {} is not unique so cannot be used to index {}'.format(
                         name, repr(self)))
             return item
-        elif name in self.items:
+        elif (name in self.items):
             return name
         else:
             return False
@@ -707,10 +752,11 @@ class Settings(object):
         for item in self.items:
             if re.match(r'^.*:\d+', item):
                 key = item.split(':')[-1]
-                value = self[key]
             elif re.match(r'^.*::.*', item):
                 key = item.split('::')[-1] if remove_func_name else item
-                value = self[item]
+            else:
+                key = item
+            value = self[item]
             out[key] = value
         return out
     
@@ -725,7 +771,8 @@ class Settings(object):
         return '{}:\n{}'.format(repr(self)[1:-1], str(df))
 
     def __repr__(self):
-        return '<Settings: {app};{name}, {state}>'.format(app=self._application, name=self.name, state=self.state)
+        return '<Settings: {app};{name}[{len}], {state}>'.format(app=self._application, name=self.name, 
+                                                                 len=len(self.items), state=self.state)
 
     def __del__(self):
         self.instances[self.application].pop(self.name)
@@ -772,7 +819,10 @@ class Settings(object):
 
     @property
     def items(self):
-        return self._df.index.values
+        if self._df is not None:
+            return self._df.index.values
+        else:
+            return []
 
     @property
     def columns(self):
@@ -800,6 +850,11 @@ class Settings(object):
         return types
 
     @property
+    def column_types(self):
+        types = {k: v for key, value in self._column_sets.items() for k, v in value}
+        return types
+
+    @property
     def path(self):
         """Path to settings files"""
         ## TODO: Load from config file
@@ -811,7 +866,6 @@ class Settings(object):
         """Filename of current settings file"""
         assert self.name is not None
         return 'settings-{app}-{name}.nc'.format(app=self.application, name=self.name)
-
 
     @property
     def fn_path(self):
