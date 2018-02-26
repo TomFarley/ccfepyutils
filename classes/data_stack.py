@@ -92,8 +92,8 @@ class Slice(object):
         x = values[0]
         y = values[1]
         z = self.data.values
-        plot = Plot(x, y, z, ax=ax, num=repr(self), show=False, **kws)
-        plot.set_axis_labels(axes[0], axes[1])
+        plot = Plot(x, y, z, ax=ax, num=repr(self), show=False, xlabel=axes[0], ylabel=axes[1], **kws)
+        # plot.set_axis_labels(axes[0], axes[1])
         plot.show(**show)
         return plot
 

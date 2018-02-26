@@ -197,6 +197,9 @@ class State(object):
         """Call function from call_table during state transition"""
         if self._call_table is None:
             return
+        if old is None:
+            # Don't perform transition when initialising
+            return 
         kwargs.update(dict((
                 ('state_transition', dict((
                     ('old', old), ('new', new))
@@ -243,10 +246,10 @@ class State(object):
                     self._current[group] = None
                     self._history[group] = [None]
                 elif self.state_in_group(new_state, group):
+                    self.call_transition(old_state, new_state, call=call, *args, **kwargs)
                     self._current[group] = new_state
                     self._history[group].append(new_state)
                     self._history_all.append({'state': new_state})
-                    self.call_transition(old_state, new_state, call=call, *args, **kwargs)
                     located = True
             if not located:
                 raise ValueError('"{}" is not a valid state. \nOptions: {}'.format(new_state, self.possible_states))

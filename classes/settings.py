@@ -182,7 +182,7 @@ class Settings(object):
                        'loading': ['loaded', 'modifying', 'accessing'],
                        'modifying': ['modified', 'accessing'],
                        'saving': ['saved', 'modifying'],
-                       'accessing': ['saving', 'modifying', 'modified', 'saved']}
+                       'accessing': ['loading', 'saving', 'modifying', 'modified', 'saved']}
                    }
     default_column_sets = {'value': [('value', str), ('value_str', str), ('value_num', float)],
                            'info': [('name', str), ('description', str), ('symbol', str), ('unit', str)],
@@ -196,16 +196,16 @@ class Settings(object):
         - The application is the context in which the settings are used e.g. my_code
         - The name is a label for a particular set of settings for the application e.g. my_default_settings
         """
-        # TODO: Fix deepcopy of Settings objects
-        self._reset_settings_attributes()
-        self.call_table = {'modifying': {'enter': [self._block_protected, self.check_consistency]},
-                           'modified': {'accessing': [self.save]}}
-        self.state = State(self, self.state_table, 'init', call_table=self.call_table)
         assert isinstance(application, str)
         assert isinstance(name, str)
         assert (application, name) not in self.instances.keys_flat(), ('Setting object {}:{} already exists.\n'
                 'Use Settings.get(application, name) to ensure there is only one instance'.format(
                 application, name))
+        # TODO: Fix deepcopy of Settings objects
+        self._reset_settings_attributes()
+        self.call_table = {'modifying': {'enter': [self._block_protected]},
+                           'modified': {'accessing': [self.save]}}
+        self.state = State(self, self.state_table, 'init', call_table=self.call_table)
         self.application = application  # property sets logfile
         self.name = name
         self._column_sets = Settings.default_column_sets   # Groups of columns with similar purposes
@@ -229,11 +229,12 @@ class Settings(object):
         self._column_sets_names = None
 
     @classmethod
-    def get(cls, application=None, name=None):
+    def get(cls, application=None, name=None, default_repeat=False):
         if application is None:
             raise ValueError('No application supplied to Settings.get().\nExisting applications settings: {}'.format(
                             cls.existing_applications()))
         if name is None:
+            # ToDo: lookup most recently accessed setting name from log file
             raise ValueError('No settings set name supplied to Settings,get().\n'
                              'Existing settings for application "{}": {}'.format(
                             application, cls.existing_settings(application)))
@@ -241,6 +242,17 @@ class Settings(object):
             return cls.instances[application][name]
         else:
             return Settings(application, name)
+        
+    @classmethod
+    def collect(cls, application=None, name=None, values={}, **kwargs):
+        from .composite_settings import CompositeSettings
+        settings = Settings.get(application, name)
+        for item, value in values.items():
+            settings.set(item, value, ignore=[None])
+        composite_settings = CompositeSettings(application, name)
+        composite_settings.set(**kwargs)
+        composite_settings.save()
+        return composite_settings
 
     @in_state('init', 'modified')
     def init(self):
@@ -253,7 +265,7 @@ class Settings(object):
         self._df.loc[:, :] = self._df.astype(type_dict)
         # self.df.loc[:, [self.column_sets_names['type']]] = False
 
-    def view(self, cols='repr', order=None, ascending=True):
+    def view(self, items='all', cols='repr', order=None, ascending=True):
         """Return dataframe containing a subst of columns, with items ordered as requried"""
         if cols == 'all':
             col_set = self.ordered_column_names
@@ -266,13 +278,17 @@ class Settings(object):
                 else:
                     assert col in self.columns, 'Column not found: {}'.format(col)
                     col_set += [col]
+        if items == 'all':
+            items = self.items
+        elif isinstance(items, str):
+            items = self.search(items)
         if order is None:
             df = self._df
         elif order == 'alphabetical':
             df = self._df.sort_index(ascending=ascending)
         elif order == 'custom':
             df = self._df.sort_values('order', ascending=ascending)
-        out = df.loc[:, col_set]
+        out = df.loc[items, col_set]
         return out
 
     def view_str(self, cols='repr', order=None, ascending=True):
@@ -325,24 +341,16 @@ class Settings(object):
 
     @in_state('accessing')
     def __getitem__(self, item):
-        # If item is a list, unpack it's values into a list
-        if self.list_items(item):
-            return self.list_items(item)
-        if self.get_func_name_args(item):
+        # Check input is valid
+        item, category = self.get_item_index(self, item)
+        if category == 'list':
+            # If item is a list, unpack it's values into a list
+            return Settings.list_items(self, item)
+        if category == 'function':
             return self.get_func_name_args(item)
 
-        df = self._df
-        # Check if item is in df index or is the setting name
-        original_item = item
-        item = self.name_to_item(item)
-        if item not in df.index:
-            raise AttributeError('Item "{}" is not in {}'.format(original_item, repr(self)))
-        # Save data if it has been modified before access
-        if self.state == 'modified':
-            pass  # TODO: save on access
-            # self.save()
-
         # Isolate settings values
+        df = self._df
         setting = df.loc[item]
         np_true = np.bool_(True)  # np bool array does not use python True/False instances
         # Return appropriate type of settings object
@@ -391,7 +399,7 @@ class Settings(object):
         df.loc[item, 'runtime'] = False  # default to False
         df.loc[item, 'setting'] = False  # default to False
         df.loc[item, 'value'] = str(value)
-        df.loc[item, 'name'] = item  # Default name to item key
+        df.loc[item, 'name'] = item.split(':')[0].replace('_', ' ')  # Default name to item key without underscores
 
         logger.info('Added new item to settings: {} = {}'.format(item, value))
 
@@ -426,7 +434,7 @@ class Settings(object):
             if p.search(item):
                 new_name = p.sub(replacement_string, item)
                 if not force:
-                    out = input('Rename item {} -> {}? (Y)/n: '.format(item, new_name))
+                    out = input('Rename item "{}" -> "{}"? (Y)/n: '.format(item, new_name))
                     if out.lower() not in ('', 'y'):
                         continue
                 self._df = self._df.rename({item: new_name}, axis='index')
@@ -438,7 +446,7 @@ class Settings(object):
     @in_state('modifying', 'modified')
     def delete_items(self, items):
         """Remove item(s) from settings"""
-        assert items in self.items, 'Items {} not in {}'.format(items, repr(self))
+        assert all(i in self.items for i in items), 'Items {} not in {}'.format(items, repr(self))
         items = make_itterable(items)
         self._df = self._df.drop(items)
         logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
@@ -483,6 +491,7 @@ class Settings(object):
     
     @in_state('saving', 'saved')
     def save(self, state_transition=None):
+        self.check_consistency()
         if not self.file_exists:
             self.create_file()
             return
@@ -514,14 +523,15 @@ class Settings(object):
 
     def backup(self):
         """Backup current settings to backup folder"""
-        self.save()
+        if self.state == 'modified':
+            self.save()
         backup_path = os.path.join(self.path, 'backups')
         mkdir(backup_path)
         backup_fn = '{fn}-{time}.nc'.format(fn=str(Path(self.fn).stem), time=t_now_str())
         fn_path = os.path.join(backup_path, backup_fn)
         shutil.copyfile(self.fn_path, fn_path)
-        logger.info('Created backup of SettingsLogFile for application "{app}": {path}'.format(
-                app=self.application, path=fn_path))
+        logger.info('Created backup of SettingsLogFile for "{app}, {name}": {path}'.format(
+                app=self.application, name=self.name, path=fn_path))
 
     def create_file(self):
         assert not self.file_exists, 'Settings file already exists: {}'.format(self.fn_path)
@@ -570,9 +580,15 @@ class Settings(object):
 
     def copy(self, new_name):
         """Copy internal values to new settings set name"""
+        if new_name in self.log_file.names:
+            out = input('New name "{}" already exists. Overwrite it (Y)/n? '.format(new_name))
+            if out.lower() not in ('y', ''):
+                return
         new_settings = Settings(self.application, new_name)
-        new_settings._df.loc[:, :] = self._df.loc[:, :]
+        new_settings.state('modifying')
+        new_settings._df = copy(self._df.loc[:, :])
         new_settings._column_sets_names = copy(self.column_sets_names)
+        new_settings.state('modified')
         new_settings.save()
         return new_settings
 
@@ -599,15 +615,17 @@ class Settings(object):
     def check_consistency(self):
         """Checks on consistency of dataframe"""
         # TODO: Check format of columns
-        # Make sure each item only has one type
-        unique_type = self.view('type').astype(int).sum(axis=1) == 1
-        if not all(unique_type):
-            raise ValueError('Inconsistent types:\n{}'.format(self.view('type').loc[~unique_type]))
         # If columns in the class column_sets are missing from the dataframe, add them
         if not is_subset(self.ordered_column_names, self.columns):
             self._add_missing_columns()
         if True:
             self._reset_column_types()
+        self._check_values()
+        # Make sure each item only has one type
+        unique_type = self.view(cols='type').astype(int).sum(axis=1) == 1
+        if not all(unique_type):
+            raise ValueError('Inconsistent types:\n{}'.format(self.view(cols='type').loc[~unique_type]))
+
 
     @in_state('modifying', 'modified')
     def _add_missing_columns(self):
@@ -625,9 +643,29 @@ class Settings(object):
         # TODO: remove nans, etc
         type_dict = [dict(v) for k, v in self.default_column_sets.items()]
         type_dict = {k: v for d in type_dict for k, v in d.items()}
-        self._df.loc[:, :] = self._df.astype(type_dict)
+        try:
+            self._df.loc[:, :] = self._df.astype(type_dict)
+        except ValueError as e:
+            # Values cannot be converted to new type safely, so need to reset their values
+            init_values = {str: '', bool: False, int: 0, float: 0.0}
+            for col, type in type_dict.items():
+                try:
+                    self._df.loc[:, col] = self._df[col].astype(type)
+                except:
+                    logger.warning('Column {} has wrong type ({}). Resetting all values to {}.'.format(
+                            col, self._df[col].dtype, init_values[type]))
+                    self._df.loc[:, col] = init_values[type]
         pass
-        # raise NotImplementedError
+    
+    def _check_values(self):
+        """Check values conform to standards"""
+        # Make sure value column is not empty
+        mask = (self._df['value'] == '') & (self._df['value_str'] != '')
+        for item in self._df.loc[mask, 'value'].index.values:
+            col = self.get_value_column(self._df, item)
+            value = self._df.loc[item, col]
+            self(item, value=value)
+            logger.debug('Set missing "value" entry for {}={}'.format(item, value))
 
     # def add_column(self, value):
     #     if value in self.columns:
@@ -662,12 +700,22 @@ class Settings(object):
         """Get list of all saved settings names for given application"""
         return SettingsLogFile(application).names
 
-    def list_items(self, item):
+    @staticmethod
+    def is_list_item(settings, item):
+        r = re.compile(r'^{}:\d'.format(item))
+        newlist = list(filter(r.match, settings.items))
+        if len(newlist) > 0:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def list_items(settings, item):
         """Return df items that are part of the item list. Return False if not a list."""
         r = re.compile(r'^{}:\d'.format(item))
-        newlist = list(filter(r.match, self.items))
+        newlist = list(filter(r.match, settings.items))
         if len(newlist) > 0:
-            return [self[i].value for i in newlist]
+            return [settings[i].value for i in newlist]
         else:
             return False
 
@@ -679,30 +727,34 @@ class Settings(object):
 
     def get_func_name_args(self, func_name):
         """Return df items that are arguments for function with func_name. Return False if not a list."""
-        r = re.compile(r'^{}::.*'.format(func_name))
-        newlist = list(filter(r.match, self.items))
-        if len(newlist) > 0:
-            return {key: self[key].value for key in newlist}
-        else:
-            return False
+        mask = self._df.loc[:, 'function'] == func_name
+        items = self._df.loc[mask, :].index.values
+        out = {key: self(key) for key in items}
+        return out
 
-    def get_func_args(self, func, func_name=None, **kwargs):
-        """Get arguments for function from settings object"""
-        if func_name is None:
-            # Get name of function/method/class
-            func_name = func.__name__
-            if func_name == '__init__':
-                # If func is an __init__ method, get the name of the corresponding class
-                func_name = get_methods_class(func).__name__
+    def get_func_args(self, funcs, func_names=None):
+        """Get arguments for function from settings object
+        :param: funcs - function instances or strings describing the function name"""
+        funcs = make_itterable(funcs)
+        if func_names is not None:
+            func_names = make_itterable(func_names)
+        else:
+            func_names = [None]*len(funcs)
         args, kws = [], {}
-        sig = inspect.signature(func)
-        for i, kw in enumerate(sig.parameters.values()):
-            name = kw.name
-            setting = '{func}::{arg}'.format(func=func_name, arg=name)
-            if setting in self:
-                kws[name] = self[setting].value
-            if setting in kwargs:
-                kws[name] = kwargs[name]
+        for func, func_name in zip(funcs, func_names):
+            if func_name is not None:
+                # Get name of function/method/class
+                func_name = func.__name__
+                if func_name == '__init__':
+                    # If func is an __init__ method, get the name of the corresponding class
+                    func_name = get_methods_class(func).__name__
+            sig = inspect.signature(func)
+            for i, kw in enumerate(sig.parameters.values()):
+                name = kw.name
+                if (name in self) and (self._df.loc[name, 'function'] == func_name):
+                    kws[name] = self[name].value
+                # if setting in kwargs:
+                #     kws[name] = kwargs[name]
         return kws
 
     @classmethod
@@ -730,6 +782,37 @@ class Settings(object):
                     kwargs[col] = col_value
             kwargs.pop('value')
             self(item, col_value, **kwargs)
+
+    @staticmethod
+    def get_item_index(settings, item, _raise=True):
+        """Lookup item key given name"""
+        df = settings._df
+        if item in settings.items:
+            # item is already an item key
+            category = 'index'
+        elif Settings.is_list_item(settings, item):
+            # Item is a list item name with item format <name>:0, <name>:1, <name>:2
+            category = 'list'
+        elif item in df['name'].values:
+            # Item is name of item
+            mask = df['name'] == item  # boolian mask where name == 'item'
+            n_match = np.sum(mask)
+            if n_match == 1:
+                item = df.index[mask].values[0]
+                category = 'name'
+            elif n_match > 1:
+                raise ValueError('Setting item name {} is not unique so cannot be used to index {}'.format(
+                        item, repr(settings)))
+        elif item in df['function'].values:
+            # TODO: look is split list of functions
+            # item is the name of function to return args for
+            category = 'function'
+        else:
+            if _raise:
+                raise ValueError('Cannot locate item/name in {} with "{}"'.format(repr(settings), item))
+            else:
+                return item, None
+        return item, category
 
     def name_to_item(self, name):
         """Lookup item key given name"""

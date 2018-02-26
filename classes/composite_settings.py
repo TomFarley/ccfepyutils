@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from copy import copy
 import logging
+import inspect
 
 import numpy as np
 import re
@@ -76,7 +77,7 @@ class CompositeSettings(object):
         self.build_composite_df()
         logger.info('Rebuilt composite settings {}'.format(repr(self)))
 
-    def view(self, cols='repr', order=None, ascending=True):
+    def view(self, cols='repr', items='all', order=None, ascending=True):
         """Return dataframe containing a subst of columns, with items ordered as requried"""
         if cols == 'all':
             raise NotImplementedError
@@ -90,14 +91,23 @@ class CompositeSettings(object):
                 else:
                     assert col in self.columns, 'Column not found: {}'.format(col)
                     col_set += [col]
+        if items == 'all':
+            items = self.items
+        elif isinstance(items, str):
+            items = self.search(items)
         if order is None:
             df = self._df
         elif order == 'alphabetical':
             df = self._df.sort_index(ascending=ascending)
         elif order == 'custom':
             df = self._df.sort_values('order', ascending=ascending)
-        out = df.loc[:, col_set]
+        out = df.loc[items, col_set]
         return out
+
+    def search(self, pattern):
+        r = re.compile(pattern)
+        newlist = list(filter(r.match, self.items))
+        return newlist
 
     def __str__(self):
         # TODO: set ordering
@@ -125,9 +135,67 @@ class CompositeSettings(object):
         self._df.loc[item, :] = settings._df.loc[item, :]
         return out
     
+    def __contains__(self, item):
+        if item in self._df.index:
+            return True
+        else:
+            return False
+
+    def get_func_args(self, funcs, func_names=None, ignore_func_name=False):
+        """Get arguments for function from settings object
+        :param: funcs - function instances or strings describing the function name"""
+        funcs = make_itterable(funcs)
+        if func_names is not None:
+            func_names = make_itterable(func_names)
+        else:
+            func_names = [None]*len(funcs)
+        args, kws = [], {}
+        for func, func_name in zip(funcs, func_names):
+            if func_name is None:
+                # Get name of function/method/class
+                func_name = func.__name__
+                if func_name == '__init__':
+                    # If func is an __init__ method, get the name of the corresponding class
+                    func_name = get_methods_class(func).__name__
+            sig = inspect.signature(func)
+            for i, kw in enumerate(sig.parameters.values()):
+                name = kw.name
+                if name not in self.items:
+                    continue
+                compatible_functions = self._df.loc[name, 'function'].strip().split(',')
+                if (name in self) and ((func_name in compatible_functions) or ignore_func_name):
+                    kws[name] = self[name].value
+                # if setting in kwargs:
+                #     kws[name] = kwargs[name]
+        return kws
+    
+    def call_with_args(self, func):
+        """ Call supplied function with arguments from settings
+        :param func: function to call with arguments
+        :return: output of func.__call__(**kwargs)
+        """
+        kwargs = self.get_func_args(func)
+        out = func(**kwargs)
+        return out
+        
+    
+    def set(self, **kwargs):
+        """Set values of multiple items using keyword arguments"""
+        for item, value, in copy(kwargs).items():
+            if (item in self.items) and (value is not None):
+                self(item, kwargs.pop(item))
+                logger.debug('Set {}={} from kwargs'.format(item, value))
+    
     def get_settings_for_item(self, item):
-        if item not in self.items:
-            raise ValueError('Item "{}" not in {}'.format(item, repr(self)))
+        """Return Settings object instance that item belongs to"""
+        # Check input is valid
+        item, category = Settings.get_item_index(self, item)
+        if category == 'list':
+            item = '{}:0'.format(item)
+        if category == 'function':
+            raise NotImplementedError
+            return self.get_func_name_args(item)
+
         if len(self._items[item]) == 1:
             # Item is only in one collection of settings
             settings = self._items[item][0]
@@ -172,4 +240,8 @@ class CompositeSettings(object):
     @property
     def items(self):
         return list(self._df.index)
+
+    @property
+    def columns(self):
+        return list(self._df.columns.values)
 

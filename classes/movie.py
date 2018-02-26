@@ -116,44 +116,34 @@ class Movie(Stack):
     slice_class = Frame
     time_format = '{:0.5f}s'
     def __init__(self, pulse=None, machine=None, camera=None, fn=None, settings='repeat', source=None, range=None, 
-                 enhancer=None, **kwargs):
+                 enhancer=None, name=None, **kwargs):
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
         self._reset_stack_attributes()  # Initialise attributes to None
         self._reset_movie_attributes()  # Initialise attributes to None
-        self.settings = Settings.get('Movie', settings)
-        self.settings.set('Movie_source', source, ignore=[None])
-        self.settings.set('Movie_range', range, ignore=[None])
-        self.settings.set('Enhancer_settings', enhancer, ignore=[None])
-        self.source_settings = Settings.get('Movie_source', self.settings['Movie_source'])
-        self.range_settings = Settings.get('Movie_range', self.settings['Movie_range'])
-        s = self.source_settings
-        s.set('pulse', pulse, ignore=[None])
-        s.set('machine', machine, ignore=[None])
-        s.set('camera', camera, ignore=[None])
-
-
+        kwargs.update({key: value for key, value in zip(('pulse', 'machine', 'camera'), (pulse, machine, camera))
+                       if value is not None})
+        self.settings = Settings.collect('Movie', settings, {'Movie_source': source, 'Movie_range': range,
+                                                             'Enhancer_settings': enhancer}, **kwargs)
+        # TODO: lookup parameter objects
         x = defaultdict(return_none, name='n')
         y = defaultdict(return_none, name='x_pix')
         z = defaultdict(return_none, name='y_pix')
-        # quantity = defaultdict(return_none, name='pix_intensity')
         quantity = 'pix_intensity'
         
         # Initialise data xarray
-        kws = args_for(super(Movie, self).__init__, kwargs)
-        super(Movie, self).__init__(x, y, z, quantity=quantity, stack_axis='x', **kws)
+        super(Movie, self).__init__(x, y, z, quantity=quantity, stack_axis='x', name=name)
 
-        # Locate source of movie data
-        kws = args_for(self.set_movie_file, kwargs)
-        # TODO: change to set movie source
-        self.set_movie_file(pulse, machine, camera, fn=fn, **kws)
-        
-        self.set_frames(**self.range_settings.get_func_args(self.set_frames))
+        kws = self.settings.get_func_args(self.set_movie_source)
+        self.set_movie_source(**kws)
+                
+        kws = self.settings.get_func_args(self.set_frames)
+        self.set_frames(**kws)
         logger.debug('Initialised {}'.format(repr(self)))
 
     def _reset_movie_attributes(self):
         """Set all Stack class attributes to None"""
-        self.source_settings = None
+        self.source_info = {}
         self._frame_range = None  # Dict of info detailing which frames to read from movie file
         self._transforms = None  # Transformations applied to frames when they are read eg rotate
         self._movie_meta = None  # meta data for movie format etc
@@ -176,8 +166,9 @@ class Movie(Stack):
                                                                 res=self.image_resolution, enh=enhanced)
         return out
 
-    def set_movie_file(self, pulse=None, machine=None, camera=None, fn=None, **kwargs):
+    def set_movie_source(self, pulse, machine, camera, fn=None, **kwargs):
         """Locate movie file to load data from"""
+        # TODO: remove duplication?
         self.pulse = pulse
         self.machine = machine
         self.camera = camera
@@ -486,15 +477,14 @@ class Movie(Stack):
             movie_copy._enhanced_movie = None
             movie_copy._raw_movie = None
             movie_copy.settings = None
-            movie_copy.source_settings = None
+            movie_copy.source_info = None
             movie_copy.range_settings = None
             movie_copy._enhancer = None
 
             self._enhanced_movie = deepcopy(movie_copy)
             # Reassign settings objects after deepcopy - temporary fix...
             movie_copy.settings = self.settings
-            movie_copy.source_settings = self.source_settings
-            movie_copy.range_settings = self.range_settings
+            movie_copy.source_settings = self.source_info
 
             enhanced_movie = self._enhanced_movie
             enhanced_movie._enhancer = None
@@ -599,17 +589,17 @@ class Movie(Stack):
 
     @property
     def pulse(self):
-        return self.source_settings['pulse']
+        return self.source_info['pulse']
 
     @pulse.setter
     def pulse(self, value):
         if value is not None:
             assert isinstance(value, numbers.Number)
-            self.source_settings['pulse'] = value
+            self.source_info['pulse'] = value
 
     @property
     def machine(self):
-        return self.source_settings['machine']
+        return self.source_info['machine']
 
     @machine.setter
     def machine(self, value):
@@ -617,11 +607,11 @@ class Movie(Stack):
             if value not in self.compatibities:
                 raise ValueError('Movie class is not compatible with machine "{}". Options: {}'.format(
                         value, self.compatibities.keys()))
-            self.source_settings['machine'] = value
+            self.source_info['machine'] = value
 
     @property
     def camera(self):
-        return self.source_settings['camera']
+        return self.source_info['camera']
 
     @camera.setter
     def camera(self, value):
@@ -630,7 +620,7 @@ class Movie(Stack):
             if value not in self.compatibities[self.machine]:
                 raise ValueError('Movie class is not compatible with camera "{}". Options: {}'.format(
                         value, self.compatibities[self.machine].keys()))
-            self.source_settings['camera'] = value
+            self.source_info['camera'] = value
 
     @property
     def movie_frame_range(self):
@@ -734,7 +724,8 @@ class Enhancer(object):
         func = self.functions[enhancement]
         sig = inspect.signature(func).parameters.keys()
         if 'frame_stack' in sig:
-            kws = self.settings.get_func_args(movie.extract_frame_stack_window, func_name=enhancement)
+            # TODO: Add extract_frame_stack_window args to enhancer settings
+            kws = self.settings.get_func_args(movie.extract_frame_stack_window)
             frame_stack = movie._enhanced_movie.extract_frame_stack_window(n, raw=True, **kws)
             kwargs['frame_stack'] = frame_stack
 

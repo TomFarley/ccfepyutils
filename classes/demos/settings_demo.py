@@ -42,8 +42,13 @@ def composite_settings():
     print(cs.view())
     pass
 
+def debug():
+    s = Settings.get('Elzar', 'template')
+    pass
+
 if __name__ == '__main__':
-    composite_settings()
+    debug()
+    # composite_settings()
     # settings()
 
     pass
