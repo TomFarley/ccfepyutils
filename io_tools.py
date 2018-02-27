@@ -167,7 +167,7 @@ def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
     for d in dirs:
         if isinstance(d, Path):
             d = str(d)
-        d = os.path.abspath(d)
+        d = os.path.abspath(os.path.expanduser(d))
         if depth is not None:
             depth = np.abs(depth)
             d_up = d
