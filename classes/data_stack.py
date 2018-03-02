@@ -12,7 +12,7 @@ from copy import deepcopy
 from ccfepyutils.utils import isclose_within, make_itterable, class_name, args_for
 from ccfepyutils.data_processing import find_nearest
 from ccfepyutils.classes.plot import Plot
-from ccfepyutils.utils import return_none, none_filter
+from ccfepyutils.utils import return_none, none_filter, lookup_from_dataframe
 
 try:
     import cpickle as pickle
@@ -46,6 +46,13 @@ class Slice(object):
         # TODO: use roi
         if not self.roi:
             return self.stack._data.loc[{self.dim: self.value}]
+        else:
+            raise NotImplementedError
+
+    @data.setter
+    def data(self, value):
+        if not self.roi:
+            self.stack._data.loc[{self.dim: self.value}] = value
         else:
             raise NotImplementedError
 
@@ -353,32 +360,9 @@ class Stack(object):
         :param inp: coordinate type of 'value'
         :param out: output meta data type to look up
         :return: out value"""
-        if len(kwargs) == 0:
-            raise ValueError('No input meta data passed to lookup')
         if output == 'slice_coord':
             output = self.stack_dim
-        elif output not in self._meta.columns:
-            raise ValueError('out={} is not a valid meta data type. Options: {}'.format(output, self._meta.columns))
-        # If input is same as required output type, just return input 
-        if list(kwargs.keys()) == [output]:
-            return kwargs[output]
-        elif self._meta is None:
-            raise ValueError('Cannot lookup {} for {}. No stack meta data set.'.format(output, kwargs))
-        # TODO: Loop for multiple values per key
-        mask = np.ones(len(self._meta)).astype(bool)
-        for key, value, in kwargs.items():
-            if key not in self._meta.columns:
-                raise ValueError('inp={} is not a valid meta data type. Options: {}'.format(key, self._meta.columns))
-            # Allow negative indexing with 'i'
-            if key == 'i' and value < 0:
-                value = self._meta[key].values[value]
-            values = self._meta[key].values
-            if value not in values.astype(type(value)):
-                raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, self._meta[key]))
-            mask *= self._meta[key] == value
-        new_value = self._meta.loc[mask, output].values
-        if len(new_value) == 1:
-            new_value = new_value[0]
+        new_value = lookup_from_dataframe(self._meta, output, **kwargs)
         return new_value
 
     def get(self, var, **kwargs):  # TODO: Need to extend to multiple kwargs

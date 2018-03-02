@@ -688,6 +688,26 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
             kwargs.pop(key)
     return kws
 
+def positional_args(func):
+    """From https://stackoverflow.com/questions/196960/can-you-list-the-keyword-arguments-a-python-function-receives"""
+    args, varargs, varkw, defaults = inspect.getargspec(func)
+    if defaults:
+        args = args[:-len(defaults)]
+    return args   # *args and **kwargs are not required, so ignore them.
+
+def missing_args(func, argdict):
+    """Tell what you are missing from your particular dict"""
+    return set(positional_args(func)).difference(argdict)
+
+def invalid_args(func, argdict):
+    """Check for invalid args, use:"""
+    args, varargs, varkw, defaults = inspect.getargspec(func)
+    if varkw: return set()  # All accepted
+    return set(argdict) - set(args)
+
+def isCallableWithArgs(func, argdict):
+    return not missing_args(func, argdict) and not invalid_args(func, argdict)
+
 def caller_details(level=1):
     """Return (func_name, args, kwargs) of function that called this function"""
     inspect
@@ -757,6 +777,34 @@ def fwhm2sigma(values):
 def sigma2fwhm(values):
     fwhm = 2*np.sqrt(2*np.log(2))
     return values * fwhm
+
+def lookup_from_dataframe(df, col, **kwargs):
+    """Lookup/extract column value based on other column in a dataframe"""
+    if len(kwargs) == 0:
+        raise ValueError('No input column values passed to lookup')
+    # If requested column is same as input just return input
+    if list(kwargs.keys()) == [col]:
+        return kwargs[col]
+    elif not isinstance(df, pd.DataFrame):
+        raise ValueError('Cannot lookup {} for {}. No dataframe passed: df={}.'.format(output, kwargs, df))
+    assert col in df.columns
+    # Mask of values that satisfy input value criteria
+    mask = np.ones(len(df)).astype(bool)
+    # TODO: Loop for multiple values per key
+    for key, value, in kwargs.items():
+        if key not in df.columns:
+            raise ValueError('inp="{}" is not a valid column. Options: {}'.format(key, df.columns))
+        # Allow negative indexing with 'i'
+        if key == 'i' and value < 0:
+            value = df[key].values[value]
+        values = df[key].values
+        if value not in values.astype(type(value)):
+            raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, df[key]))
+        mask *= df[key] == value
+    new_value = df.loc[mask, col].values
+    if len(new_value) == 1:
+        new_value = new_value[0]
+    return new_value
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

@@ -2,6 +2,7 @@ from collections import OrderedDict
 from copy import copy
 import logging
 import inspect
+import hashlib
 
 import numpy as np
 import re
@@ -12,41 +13,62 @@ from .settings import Settings
 from .state import State
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 class CompositeSettings(object):
     instances = nested_dict()
-    def __init__(self, application, name):
+    def __init__(self, application, name, blacklist=[], whitelist=[], include_children=True):
         """Settings must have an 'application' and a 'name'
         - The application is the context in which the settings are used e.g. my_code
         - The name is a label for a particular set of settings for the application e.g. my_default_settings
         """
         # TODO: implement state?
         self._reset_settings_attributes()
+        # assert not (blacklist != [] and whilelist != []), 'Supply blacklist OR whitelist - NOT both'
         # self.state = State('init')
         self._application = application
         self._name = name
+        self._blacklist = blacklist
+        self._whitelist = whitelist
+        if (len(whitelist) > 0) and (application not in whitelist):
+            # Make sure core settings are in whitelist else CompositeSettings will be empty
+            self._whitelist = [application] + self._whitelist
         self.core = Settings.get(application, name)
-        self.build_composite_df()
+        self.build_composite_df(include_children=include_children)
 
 
     def _reset_settings_attributes(self):
         self.state = None
         self.core = None
 
-    def build_composite_df(self):
+    def build_composite_df(self, include_children=True):
         """Expand settings items into full Settings objects"""
         self._settings = OrderedDict()
         self._items = OrderedDict()
 
+        self.core._df.loc[:, 'parent'] = 'None'
         self._df = self.core._df[0:0]  # Get emtpy dataframe with same column structure
-        self._df = self.append_settings_file(self._application, self._name, self._df, self._settings, self._items)
+        self._df = self.append_settings_file(self._application, self._name, self._df, self._settings, self._items,
+                                             include_children=include_children)
 
         pass
 
-    def append_settings_file(self, application, name, df, settings, items):
+    def append_settings_file(self, application, name, df, settings, items,
+                             add_to_whitelist=False, include_children=True):
+        """ Add contents of settings file to CompositeSettings instance's dataframe
+        :param: add_to_whitelist - treat application as if it in whitelist
+        :param: include_children - include child settings even if they are not in the whitelist"""
+        if (len(self._blacklist) > 0) and (application in self._blacklist):
+            logger.debug('Skipping blacklist settings "{}:{}" from {}'.format(application, name, repr(self)))
+            return df
+        if (len(self._whitelist) > 0) and (application not in self._whitelist) and (not add_to_whitelist):
+            logger.debug('Skipping non whitelist settings "{}:{}" from {}'.format(application, name, repr(self)))
+            return df
         logger.debug('Adding "{}:{}" settings to {}'.format(application, name, repr(self)))
         s = Settings.get(application, name)
+        # Add parent column to note which Settings file each setting originates from
+        if len(s) > 0:
+            s._df.loc[:, 'parent'] = '{}:{}'.format(application, name)
         assert application not in settings.keys(), 'Application names must be unique: {}'.format(application)
         settings[application] = s
         df_nest = s._df
@@ -58,7 +80,10 @@ class CompositeSettings(object):
                 items[item].append(s)
             if df_nest.loc[item, 'setting']:
                 name = df_nest.loc[item, 'value']
-                df = self.append_settings_file(item, name, df, settings, items)
+                # If include_children pass to subsequent calls, but set False for calls from core Settings set
+                df = self.append_settings_file(item, name, df, settings, items,
+                                           add_to_whitelist=(include_children and (application != self._application)),
+                                           include_children=include_children)
         return df
 
     def save(self, force=False):
@@ -77,7 +102,7 @@ class CompositeSettings(object):
         self.build_composite_df()
         logger.info('Rebuilt composite settings {}'.format(repr(self)))
 
-    def view(self, cols='repr', items='all', order=None, ascending=True):
+    def view(self, items='all', cols='repr', order=None, ascending=True):
         """Return dataframe containing a subst of columns, with items ordered as requried"""
         if cols == 'all':
             raise NotImplementedError
@@ -91,6 +116,9 @@ class CompositeSettings(object):
                 else:
                     assert col in self.columns, 'Column not found: {}'.format(col)
                     col_set += [col]
+            if cols == ['repr']:
+                col_set.pop(col_set.index('name'))
+                col_set += ['parent']
         if items == 'all':
             items = self.items
         elif isinstance(items, str):
@@ -105,9 +133,15 @@ class CompositeSettings(object):
         return out
 
     def search(self, pattern):
-        r = re.compile(pattern)
-        newlist = list(filter(r.match, self.items))
+        r = re.compile(pattern, re.IGNORECASE)
+        newlist = list(filter(r.search, self.items))
         return newlist
+
+    def add_item(self, application, item, value, **kwargs):
+        assert application in self._settings, 'Application {} not recognised. Posibilities: {}'.format(
+                application, self._settings.keys())
+        settings = self._settings[application]
+        settings(item, value, **kwargs)
 
     def __str__(self):
         # TODO: set ordering
@@ -179,12 +213,30 @@ class CompositeSettings(object):
         return out
         
     
-    def set(self, **kwargs):
+    def set_value(self, **kwargs):
         """Set values of multiple items using keyword arguments"""
+
         for item, value, in copy(kwargs).items():
             if (item in self.items) and (value is not None):
                 self(item, kwargs.pop(item))
                 logger.debug('Set {}={} from kwargs'.format(item, value))
+
+    def set_column(self, col, value, items='all', apply_to_groups=False):
+        """Set value of column for a group of items"""
+        assert col in self.columns, 'Column "{}" invalid. Options: {}'.format(col, self.columns)
+        if items == 'all':
+            items = self.items
+        items = make_itterable(items)
+        if apply_to_groups:
+            # If item is the name of a settings file application modify its contents
+            for item in copy(items):
+                if item in self._settings.keys():
+                    items = np.concatenate((items, self._settings[item].items))
+                    items = np.delete(items, np.where(items==item))
+        kws = {col: value}
+        for item in items:
+            self(item, **kws)
+
     
     def get_settings_for_item(self, item):
         """Return Settings object instance that item belongs to"""
@@ -224,13 +276,34 @@ class CompositeSettings(object):
         elif (name in self.items):
             return name
         else:
-            return False
+            return name
 
     def rename_items_with_pattern(self, pattern, replacement_string, force=False):
         """Replace all occurences of regex pattern in indices with 'replacement_string'"""
         for settings in self._settings.values():
             settings.rename_items_with_pattern(pattern, replacement_string, force=force)
             self.df.loc[:,:] = settings._df
+
+    def to_dict(self):
+        """Return settings values as dict"""
+        out = OrderedDict()
+        for item in self.items:
+            if re.match(r'^.*:\d+', item):
+                key = item.split(':')[-1]
+            else:
+                key = item
+            value = self[item]
+            out[key] = value
+        return out
+
+    @property
+    def hash_id(self):
+        mask = ~self._df['runtime']
+        df = self._df.loc[mask, 'value']
+        h = hashlib.new('ripemd160')
+        h.update(bytes(str(df), 'utf-8'))
+        hash_id = h.hexdigest()
+        return hash_id
 
     @property
     def column_sets_names(self):

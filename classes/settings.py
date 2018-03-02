@@ -190,6 +190,8 @@ class Settings(object):
                            'io': [('fn_str', str), ('priority', float)],
                            'meta': [('setting', bool), ('function', str), ('runtime', bool), ('order', int)],
                            'repr': [('value', str), ('name', str), ('description', str)]}  # plotting?
+    # TODO: block reserved states being used
+    reserved_item_names = ['all', 'ignore_state']
 
     def __init__(self, application, name):
         """Settings must have an 'application' and a 'name'
@@ -244,13 +246,13 @@ class Settings(object):
             return Settings(application, name)
         
     @classmethod
-    def collect(cls, application=None, name=None, values={}, **kwargs):
+    def collect(cls, application=None, name=None, values={}, blacklist=[], whitelist=[], **kwargs):
         from .composite_settings import CompositeSettings
         settings = Settings.get(application, name)
         for item, value in values.items():
             settings.set(item, value, ignore=[None])
-        composite_settings = CompositeSettings(application, name)
-        composite_settings.set(**kwargs)
+        composite_settings = CompositeSettings(application, name, blacklist=blacklist, whitelist=whitelist)
+        composite_settings.set_value(**kwargs)
         composite_settings.save()
         return composite_settings
 
@@ -264,6 +266,11 @@ class Settings(object):
         type_dict = {k: v for d in type_dict for k, v in d.items()}
         self._df.loc[:, :] = self._df.astype(type_dict)
         # self.df.loc[:, [self.column_sets_names['type']]] = False
+
+    def search(self, pattern):
+        r = re.compile(pattern, re.IGNORECASE)
+        newlist = list(filter(r.search, self.items))
+        return newlist
 
     def view(self, items='all', cols='repr', order=None, ascending=True):
         """Return dataframe containing a subst of columns, with items ordered as requried"""
@@ -325,7 +332,7 @@ class Settings(object):
             col = self.get_value_column(self._df, item)
             df.loc[item, col] = value
             df.loc[item, 'value'] = str(value)
-            logger.debug('Existing item of {} set: {}={}'.format(repr(self), col, value))
+            logger.info('Existing item of {} set: {}={}'.format(repr(self), col, value))
         for k, v in kwargs.items():
             if k in self.columns:
                 df.loc[item, k] = v
@@ -373,6 +380,9 @@ class Settings(object):
     @in_state('modifying', 'modified')
     def __setitem__(self, item, value):
         self(item, value)
+
+    def __len__(self):
+        return len(self._df)
 
     @in_state('modifying', 'modified')
     def add_item(self, item, value):
@@ -438,6 +448,9 @@ class Settings(object):
                     if out.lower() not in ('', 'y'):
                         continue
                 self._df = self._df.rename({item: new_name}, axis='index')
+                # Default name to item key without underscores
+                self._df.loc[new_name, 'name'] = new_name.split(':')[0].replace('_', ' ')
+
                 self.state('modifying')
                 logger.info('Renamed item {} -> {}'.format(item, new_name))
         if self.state == 'modifying':
@@ -446,7 +459,8 @@ class Settings(object):
     @in_state('modifying', 'modified')
     def delete_items(self, items):
         """Remove item(s) from settings"""
-        assert all(i in self.items for i in items), 'Items {} not in {}'.format(items, repr(self))
+        items = make_itterable(items)
+        assert all(i in self.items for i in items), 'Items "{}" not in {}'.format(items, repr(self))
         items = make_itterable(items)
         self._df = self._df.drop(items)
         logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
@@ -633,6 +647,7 @@ class Settings(object):
         null_types = {int: 0, str: '', float: 0.0, bool: False}
         if is_subset(self.columns, self.ordered_column_names):
             for tup in self.default_column_sets.values():
+                # TODO: Use DataFrame.assign to remove loop
                 for col, type in tup:
                     if col not in self.columns:
                         self._df.loc[:, col] = null_types[type]
@@ -828,15 +843,13 @@ class Settings(object):
         elif (name in self.items):
             return name
         else:
-            return False
+            return name
     
-    def to_dict(self, remove_func_name=True):
+    def to_dict(self):
         out = OrderedDict()
         for item in self.items:
             if re.match(r'^.*:\d+', item):
                 key = item.split(':')[-1]
-            elif re.match(r'^.*::.*', item):
-                key = item.split('::')[-1] if remove_func_name else item
             else:
                 key = item
             value = self[item]

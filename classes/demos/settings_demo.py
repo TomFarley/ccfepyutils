@@ -43,7 +43,10 @@ def composite_settings():
     pass
 
 def debug():
-    s = Settings.get('Elzar', 'template')
+    s = Settings.collect('Elzar', 'template')
+    s.set_column('runtime', False, items=['Invertor_resolution'], apply_to_groups=True)
+    s.set_column('runtime', False, items=['gfile', 'calcam_calib', 'Movie_source', 'QuadMinEllipseDetector', 'FlMatrixInverter', 'FlMatrixInverter'], apply_to_groups=True)
+    s.set_column('runtime', False, items=['gfile', 'inversion_corrector_type', 'Enhancer_settings', 'invertor_type', 'detector_type'], apply_to_groups=True)
     pass
 
 if __name__ == '__main__':

@@ -51,8 +51,8 @@ def local_minima(arr, bg_thresh=0.0, neighborhood=(6, 6)):
     iminima = np.where(detected_minima)
     return np.array(iminima)
 
-def sorted_local_maxima(self, arr, bg_thresh=0.0, neighborhood=(7, 7), min_max=None):
-    ind = self.local_maxima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood)  # indices of maxima
+def sorted_local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7), min_max=None):
+    ind = local_maxima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood)  # indices of maxima
     ix = ind[1, :]
     iy = ind[0, :]
     z = arr[iy, ix]
@@ -63,8 +63,8 @@ def sorted_local_maxima(self, arr, bg_thresh=0.0, neighborhood=(7, 7), min_max=N
     maxima = {'ix': ix[isorted], 'iy': iy[isorted], 'z': z[isorted], 'N': len(isorted)}
     return maxima
 
-def sorted_local_minima(self, arr, bg_thresh=0.0, neighborhood=(7, 7), max_min=None):
-    ind = self.local_minima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood)  # indices of maxima
+def sorted_local_minima(arr, bg_thresh=0.0, neighborhood=(7, 7), max_min=None):
+    ind = local_minima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood)  # indices of maxima
     ix = ind[1, :]
     iy = ind[0, :]
     z = arr[iy, ix]
