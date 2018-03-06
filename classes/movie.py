@@ -2,37 +2,37 @@
 
 """Classes for working with fusion camera data"""
 
-import numbers
+import os, re, numbers, logging, inspect, glob, pickle
 from collections import defaultdict
 from pathlib import Path
 from copy import copy, deepcopy
-import logging
-import inspect
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+import natsort
 
-from pyIpx.movieReader import ipxReader,mrawReader,imstackReader
+from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
 from ccfepyutils.classes.data_stack import Stack, Slice
 from ccfepyutils.classes.settings import Settings
 from ccfepyutils.utils import return_none, is_number, none_filter, to_array, make_itterable, args_for, is_subset
+from ccfepyutils.io_tools import pickle_load
 from ccfepyutils.classes.plot import Plot
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-def get_mast_camera_data_path(camera, pulse):
+def get_mast_camera_data_path(machine, camera, pulse):
     """Return path to movie file"""
-    # TODO: get paths from config file
+    # TODO: get paths from settings/config file
     if camera == 'SA1.1':
-        path = '/home/tfarley/data/camera_data/SA1/'
+        path = '~/data/camera_data/SA1/'
         fn = 'C001H001S0001-{n:02d}.mraw'
     else:
         raise ValueError('Camera "{}" file lookup not yet supported'.format(camera))
     path = Path(path).expanduser().resolve()
-    assert path.is_dir()
+    assert path.is_dir(), 'Movie data path doesnt exist'
     if is_number(pulse):
         pulse = str(int(pulse))
     assert isinstance(pulse, str)
@@ -43,11 +43,38 @@ def get_mast_camera_data_path(camera, pulse):
         raise IOError('Cannot locate file "{}" in path {}'.format(fn, str(path)))
     return str(path)
 
-def get_mast_movie_transforms(camera, pulse):
+def get_synthcam_data_path(machine, camera, pulse):
+    """Return path to movie file"""
+    # TODO: get paths from settings/config file
+    if machine == 'MAST':
+        path = '~/data/synth_frames/'
+        fn = 'Frame_{n:d}.p'
+    else:
+        raise ValueError('Machine "{}" file lookup not yet supported'.format(machine))
+    path = Path(path).expanduser().resolve()
+    assert path.is_dir(), 'Movie data path doesnt exist'
+    if is_number(pulse):
+        pulse = str(int(pulse))
+    assert isinstance(pulse, str)
+    path = path / machine / pulse / fn
+    if not path.parent.is_dir():
+        raise IOError('Path "{}" does not exist'.format(str(path.parent)))
+    if not Path(str(path).format(n=0)).is_file():
+        raise IOError('Cannot locate file "{}" in path {}'.format(str(path).format(n=0), str(path)))
+    return str(path)
+
+def get_mast_movie_transforms(machine, camera, pulse):
+    """Get transforms to apply to each raw movie frame"""
     if camera == 'SA1.1':
         # transforms = ['transpose', 'reverse_y']
         # transforms = ['transpose']#, 'reverse_y']
         transforms = []
+    return transforms
+
+def get_synthcam_transforms(machine, camera, pulse):
+    """Get transforms to apply to each raw movie frame"""
+    if machine == 'MAST':
+        transforms = ['transpose', 'reverse_y']
     return transforms
 
 class Frame(Slice):
@@ -111,6 +138,9 @@ class Movie(Stack):
             ('SA1.1', dict((
                 ('get_path', get_mast_camera_data_path), ('transforms', get_mast_movie_transforms)
                 ))),
+            ('SynthCam', dict((
+                ('get_path', get_synthcam_data_path), ('transforms', get_synthcam_transforms)
+            ))),
             ),)),
         ))
     slice_class = Frame
@@ -185,11 +215,14 @@ class Movie(Stack):
         self.fn_path = str(fn)
         self.path = str(fn.parent)
         self.fn = str(fn.name)
+        # TODO: movie movie formnat to ._movie_meta?
         self.movie_format = str(fn.suffix)
 
         self._movie_meta = {'format': self.movie_format}
         if self.movie_format == '.mraw':
             self._movie_meta.update(self.get_mraw_file_info(self.fn_path))
+        elif self.movie_format == '.p':
+            self._movie_meta.update(self.get_pickle_movie_info(self.fn_path, transforms=self._transforms))
         else:
             raise NotImplementedError('set_movie_file for format "{}" not implemented'.format(self.movie_format))
         self._y['values'] = np.arange(self._movie_meta['frame_shape'][0])
@@ -205,9 +238,8 @@ class Movie(Stack):
         if camera not in cls.compatibities[machine]:
             raise ValueError('Movie class is not currently compatible with camera "{}". Compatibilties: {}'.format(
                     camera, cls.compatibities[machine].values()))
-        fn = cls.compatibities[machine][camera]['get_path'](camera, pulse, **kwargs)
-        transforms = cls.compatibities[machine][camera]['transforms'](camera, pulse)
-        # cls._transforms = transforms
+        fn = cls.compatibities[machine][camera]['get_path'](machine, camera, pulse, **kwargs)
+        transforms = cls.compatibities[machine][camera]['transforms'](machine, camera, pulse)
         return fn, transforms
 
     def set_frames(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
@@ -280,13 +312,15 @@ class Movie(Stack):
             raise ValueError('Frame range {} set outside of movie file frame range {}'.format(frame_range, movie_range))
 
     @classmethod
-    def get_mraw_file_info(cls, fn):
-        movie_meta = {}
+    def get_mraw_file_info(cls, fn_path, transforms=[]):
+        """Get meta data from mraw file"""
+        # TODO: unhardcode transforms info in frame_shape
+        movie_meta = {'movie_format': '.mraw'}
         mraw_files = pd.DataFrame({'StartFrame': []})
         # Get frame range in each mraw file
         n = 0
-        while Path(fn.format(n=n)).is_file():
-            vid = mrawReader(filename=fn.format(n=n))
+        while Path(fn_path.format(n=n)).is_file():
+            vid = mrawReader(filename=fn_path.format(n=n))
             header = vid.file_header
             start_frame = int(header['StartFrame'].strip())
             mraw_files.loc[n, 'StartFrame'] = start_frame
@@ -315,6 +349,39 @@ class Movie(Stack):
         movie_meta['frame_shape'] = (int(header['ImageHeight'].strip()), int(header['ImageWidth'].strip()))
         movie_meta['fps'] = int(header['RecordRate(fps)'].strip())
         return movie_meta
+
+    @classmethod
+    def get_pickle_movie_info(cls, fn_path, transforms=[]):
+        """Get meta data from pickled frame data"""
+        path, fn = os.path.split(fn_path)
+        # TODO: Get filename formats from settings file
+        fn_patterns = ['^Frame_(\d+)_?(.*).p$', '^(.*).p$']
+        files_all = [os.path.basename(p) for p in glob.glob(path + '/*')]
+
+        # Find filename format
+        for pattern in fn_patterns:
+            # Find pickled frame files (NOT 'filament_data')
+            frame_files = natsort.natsorted([f for f in files_all if re.match(pattern, f) and
+                                             not re.search('filament_data', f)])
+            if len(frame_files) > 0:
+                # If files don't have name format Frame_0.p etc take all pickle files without filament_data
+                fn_pattern = pattern
+                break
+        else:
+            raise IOError('No pickle frame files located in "{}" for fn_patterns {}'.format(path, fn_patterns))
+
+        # Dict linking frame numbers to filenames
+        frames_all = {int(re.match(fn_pattern, f).group(1)): f for f in frame_files}
+
+        pickle_files = {'path': path, 'fn_pattern': fn_pattern, 'frames_all': frames_all}
+        movie_meta = {'movie_format': '.p', 'pickle_files': pickle_files}
+        movie_meta['frame_range'] = [np.min(list(frames_all.keys())), np.max(list(frames_all.keys()))]
+        movie_meta['t_range'] = [np.nan, np.nan]
+        movie_meta['fps'] = np.nan
+        example_frame = pickle_load(os.path.join(path, frame_files[0]), encoding='latin1')
+        movie_meta['frame_shape'] = transform_image(example_frame, transforms).shape
+        movie_meta['frame0'] = 0
+        return movie_meta
     
     def get_mraw_file_number(self, **kwargs):
         assert self._movie_meta is not None
@@ -342,41 +409,67 @@ class Movie(Stack):
             raise ValueError('No movie file has been set for reading')
         if self._frame_range is None:
             raise ValueError('A frame range must be set before a movie can be read')
-        # Initialise array for data to be read into
-        data = np.zeros((self._frame_range['n'], *self._movie_meta['frame_shape']))
+
         if self.movie_format == '.mraw':
-            # TODO: Movie to read mraw file method?
-            i = 0
-            n = self._frame_range['frame_range'][0]
-            end = self._frame_range['frame_range'][1]
-            frames = self._frame_range['frames']
-            file_number, file_info = self.get_mraw_file_number(n=n)
-            vid = mrawReader(filename=self.fn_path.format(n=file_number))
-            vid.set_frame_number(n-file_info['StartFrame'])
-            while n <= end:
-                # If reached end of current file, switch to next file
-                if n > file_info['EndFrame']:
-                    vid.release()
-                    file_number, file_info = self.get_mraw_file_number(n=n)
-                    vid = mrawReader(filename=self.fn_path.format(n=file_number))
-                    vid.set_frame_number(n-file_info['StartFrame'])
-                if n in frames:
-                    # frames are read with 16 bit dynamic range, but values are 10 bit!
-                    ret, frame, header = vid.read(transforms=self._transforms)
-                    data[i] = frame
-                else:
-                    # TODO: Increment vid frame number without reading data
-                    # vid._current_index += 1
-                    ret, frame, header = vid.read(transforms=self._transforms)
-                i += 1
-                n += 1
-            vid.release()
+            data = self.read_mraw_movie()
+        elif self.movie_format == '.p':
+            data = self.read_pickle_movie()
         elif self.movie_format == '.ipx':
             raise NotImplementedError
         else:
             raise ValueError('Movie class does not currently support "{}" format movies'.format(self.movie_format))
         self.set_data(data, reset=True)
         logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
+
+    def read_mraw_movie(self):
+        # Initialise array for data to be read into
+        data = np.zeros((self._frame_range['n'], *self._movie_meta['frame_shape']))
+
+        frames = self._frame_range['frames']
+        logger.debug('Reading {} frames from mraw movie file'.format(len(frames)))
+
+        # Loop over frames from start frame, including those in the frame set
+        i = 0
+        n = self._frame_range['frame_range'][0]
+        end = self._frame_range['frame_range'][1]
+        file_number, file_info = self.get_mraw_file_number(n=n)
+        vid = mrawReader(filename=self.fn_path.format(n=file_number))
+        vid.set_frame_number(n - file_info['StartFrame'])
+        while n <= end:
+            # If reached end of current file, switch to next file
+            if n > file_info['EndFrame']:
+                vid.release()
+                file_number, file_info = self.get_mraw_file_number(n=n)
+                vid = mrawReader(filename=self.fn_path.format(n=file_number))
+                vid.set_frame_number(n - file_info['StartFrame'])
+            if n in frames:
+                # frames are read with 16 bit dynamic range, but values are 10 bit!
+                ret, frame, header = vid.read(transforms=self._transforms)
+                data[i] = frame
+            else:
+                # TODO: Increment vid frame number without reading data
+                # vid._current_index += 1
+                ret, frame, header = vid.read(transforms=self._transforms)
+            i += 1
+            n += 1
+        vid.release()
+        return data
+
+    def read_pickle_movie(self):
+        # Initialise array for data to be read into
+        data = np.zeros((self._frame_range['n'], *self._movie_meta['frame_shape']))
+        transforms = self._transforms
+        path = self._movie_meta['pickle_files']['path']
+        frames_all = self._movie_meta['pickle_files']['frames_all']
+        frames = self._frame_range['frames']
+        for i, n in enumerate(frames):
+            if n not in frames_all:
+                raise IOError('Cannot locate pickle file for frame n={}'.format(n))
+            fn = frames_all[n]
+            data_i = pickle_load(fn, path, encoding='latin1')
+            data_i = transform_image(data_i, transforms)
+            data[i] = data_i
+        return data
 
     def __getitem__(self, item, raw=False):
         """Return data slices from the stack of data"""
@@ -594,7 +687,7 @@ class Movie(Stack):
     @pulse.setter
     def pulse(self, value):
         if value is not None:
-            assert isinstance(value, numbers.Number)
+            assert isinstance(value, (numbers.Number, str))
             self.source_info['pulse'] = value
 
     @property
@@ -670,9 +763,9 @@ class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""
     desciptions = {'bgsub': {'requires_window': True}}
     default_settings = {}
-    from ccfepyutils.image import threshold, reduce_noise, sharpen, extract_bg, extract_fg
+    from ccfepyutils.image import threshold, reduce_noise, sharpen, extract_bg, extract_fg, add_abs_gauss_noise
     functions = {'threshold': threshold, 'reduce_noise': reduce_noise, 'sharpen': sharpen, 'extract_bg': extract_bg,
-                 'extract_fg': extract_fg}
+                 'extract_fg': extract_fg, 'add_abs_gauss_noise': add_abs_gauss_noise}
 
     def __init__(self, setting='default'):
         self.settings = Settings.get('Enhancer', setting)
@@ -761,3 +854,14 @@ class Enhancer(object):
     def get_foreground(cls):
         raise NotImplementedError
 
+def transform_image(image, transforms):
+    for trans in transforms:
+        if trans == 'reverse_x':
+            image = image[::-1]
+        elif trans == 'reverse_y':
+            image = image[..., ::-1]
+        elif trans == 'transpose':
+            image = image.T
+        else:
+            raise ValueError('Transform "{}" not recognised'.format(trans))
+    return image

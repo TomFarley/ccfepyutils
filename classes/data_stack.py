@@ -67,6 +67,10 @@ class Slice(object):
         df.index.name = coords[1]['name']
         df.columns.name = coords[0]['name']
         return df
+    
+    @property
+    def shape(self):
+        return self.stack.slice_shape
 
     def __str__(self):
         return str(self.df)

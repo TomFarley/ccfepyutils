@@ -263,6 +263,9 @@ def pickle_load(path, base=None, **kwargs):
             except EOFError as e:
                 logger.error('path "{}" is not a pickle file. {}'.format(path, e))
                 raise e
+            except UnicodeDecodeError as e:
+                logger.error('Failed to read pickle file "{}". Wrong pickle protocol? {}'.format(path, e))
+                raise e
     elif isinstance(path, file):
         out = pickle.load(path, **kwargs)
         path.close()

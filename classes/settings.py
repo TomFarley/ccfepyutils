@@ -332,7 +332,7 @@ class Settings(object):
             col = self.get_value_column(self._df, item)
             df.loc[item, col] = value
             df.loc[item, 'value'] = str(value)
-            logger.info('Existing item of {} set: {}={}'.format(repr(self), col, value))
+            logger.info('Existing item of {} set: "{}" = {}'.format(repr(self), col, value))
         for k, v in kwargs.items():
             if k in self.columns:
                 df.loc[item, k] = v
@@ -587,6 +587,7 @@ class Settings(object):
     def get_copy(cls, application=None, original=None, new_name=None):
         """Get new settings object based on an existing 'original' template"""
         old_settings = cls.get(application, original)
+        assert len(old_settings) > 0, 'Attempting to copy empty settings object'
         assert new_name is not None, 'Name required for new settings set'
         new_settings = old_settings.copy(new_name)
         del old_settings
@@ -598,7 +599,7 @@ class Settings(object):
             out = input('New name "{}" already exists. Overwrite it (Y)/n? '.format(new_name))
             if out.lower() not in ('y', ''):
                 return
-        new_settings = Settings(self.application, new_name)
+        new_settings = Settings.get(self.application, new_name)
         new_settings.state('modifying')
         new_settings._df = copy(self._df.loc[:, :])
         new_settings._column_sets_names = copy(self.column_sets_names)

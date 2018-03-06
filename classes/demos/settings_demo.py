@@ -42,11 +42,14 @@ def composite_settings():
     print(cs.view())
     pass
 
+def set_column():
+    s = Settings.collect('Elzar', 'template')
+    s.view(cols=['repr', 'runtime'])
+    s.set_column('runtime', False, items=['Invertor_resolution', 'gfile'], apply_to_groups=True)  # can mix groups/items
+    s.view(cols=['repr', 'runtime'])
+
 def debug():
     s = Settings.collect('Elzar', 'template')
-    s.set_column('runtime', False, items=['Invertor_resolution'], apply_to_groups=True)
-    s.set_column('runtime', False, items=['gfile', 'calcam_calib', 'Movie_source', 'QuadMinEllipseDetector', 'FlMatrixInverter', 'FlMatrixInverter'], apply_to_groups=True)
-    s.set_column('runtime', False, items=['gfile', 'inversion_corrector_type', 'Enhancer_settings', 'invertor_type', 'detector_type'], apply_to_groups=True)
     pass
 
 if __name__ == '__main__':

@@ -75,6 +75,22 @@ def extract_fg(image, frame_stack, method='min'):
     out = image - bg
     return out
 
+def add_abs_gauss_noise(image, sigma_frac=0.05, sigma_abs=None, mean=0.0, return_noise=False):
+    """ Add noise to frame to emulate experimental random noise. A positive definite gaussian distribution is used
+    so as to best model the noise in background subtracted frame data
+    """
+    if sigma_abs is not None:
+        scale = sigma_abs
+    else:
+        # Set gaussian width to fraction of image intensity range
+        scale = sigma_frac * np.ptp(image)
+    noise = np.abs(np.random.normal(loc=mean, scale=scale, size=image.shape))
+    if not return_noise:
+        image = image + noise
+        return image
+    else:
+        return noise
+
 # def extract_fg(movie, n, method='min', n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1,
 #                skip_backwards=0, skip_forwards=0, unique=True, **kwargs):
 #     """Extract rapidly varying forground from range of frames"""

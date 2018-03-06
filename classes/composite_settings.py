@@ -175,6 +175,12 @@ class CompositeSettings(object):
         else:
             return False
 
+    def __len__(self):
+        if self._df is not None:
+            return len(self._df)
+        else:
+            return 0
+
     def get_func_args(self, funcs, func_names=None, ignore_func_name=False):
         """Get arguments for function from settings object
         :param: funcs - function instances or strings describing the function name"""
