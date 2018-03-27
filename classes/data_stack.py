@@ -23,6 +23,7 @@ from logging.config import fileConfig
 
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 pool = cf.ThreadPoolExecutor(max_workers=None)
 
@@ -91,19 +92,21 @@ class Slice(object):
     def __setitem__(self, key, value):
         """Set slice data in Stack xarray"""
         self.data.values[key] = value
+        self.stack._meta.loc[self.value, 'set'] = True
+        
 
     def plot(self, ax=None, **kwargs):
         # TODO: Add automatic axis labeling once parameter class is complete
         # NOTE: data is stored in format x, y whereas imshow and contourf expect arrays ordered (y, x)
+        logger.debug('In Slice.plot')
         kws = {'mode': 'contourf', 'cmap': 'viridis', 'show': False, 'transpose': True}
         kws.update(kwargs)
         show = args_for(Plot.show, kws)
         axes = self.stack.slice_axes_names
-        values = self.stack.slice_axes_values
-        x = values[0]
-        y = values[1]
+        x, y = self.stack.slice_axes_values
         z = self.data.values
         plot = Plot(x, y, z, ax=ax, num=repr(self), show=False, xlabel=axes[0], ylabel=axes[1], **kws)
+        logger.debug('Returned to Slice.plot')
         # plot.set_axis_labels(axes[0], axes[1])
         plot.show(**show)
         return plot
@@ -130,8 +133,6 @@ class Stack(object):
         if values is not None:
             self.set_data()
 
-        self._slices = {}  # Cache of slice objects
-
         # self.set_stack_axis()
         self._check_types()  # Check consistency of input types etc
         self.initialise_meta()
@@ -151,7 +152,7 @@ class Stack(object):
         
         self._name = None
         self._stack_axis = None
-        self._slices = None
+        self._slices = {}  # Cache of slice objects
         self._x = None
         self._y = None
         self._z = None
@@ -169,7 +170,14 @@ class Stack(object):
     def initialise_meta(self, columns=()):
         """Initialise meta data dataframe with coordinate values"""
         if self.stack_axis_values is not None:
-            self._meta = pd.DataFrame({self.stack_axis: self.stack_axis_values})
+            self._meta = pd.DataFrame({self.stack_dim: self.stack_axis_values,
+                                       'i': np.arange(self.n_sclices).astype(int),
+                                       'set': np.zeros(self.n_sclices).astype(bool)},
+                                      index=self.stack_axis_values)
+            self._meta.index.name = self.stack_dim
+        else:
+            pass
+            # logger.warning('Cannot initialise_meta')
 
     def set_stack_axis(self, coord):
         """Change stack axis coordinate"""
@@ -184,20 +192,23 @@ class Stack(object):
         assert key in xyz2obj.keys()
         return xyz2obj[key]
 
-    def _init_xarray(self, values=None, x=None, y=None, z=None, refresh=False):
+    def _init_xarray(self, refresh=False, **kwargs):
         """Set up xarray for main Movie (not enhanced Movie)"""
-        # If already set up and not needing refreshing, skip
-        if self._data is not None and not refresh:
+        if (self._data is not None) and (not refresh):
             return
         if not self.coord_obj_values_set:
             raise ValueError('Cannot initialise xarray without coordinate values')
-        self._values, self._x, self._y, self._z = none_filter((self._values, self._x, self._y, self._z),
-                                                              (values, x, y, z))
-        self._fill_values()
-        self._data = xr.DataArray(self._values, coords=self.coords.values(), dims=self.dims, name=self.quantity)
+
+        # self._values, self._x, self._y, self._z = none_filter((self._values, self._x, self._y, self._z),
+        #                                                       (values, x, y, z))
+        # self._fill_values(**kwargs)
+        if self._values is None:
+            self._values = np.full(self.shape, np.nan)
+        if self._data is None or refresh:
+            self._data = xr.DataArray(self._values, coords=self.coords.values(), dims=self.dims, name=self.quantity)
         logger.debug('Initialised xarray values for {}'.format(repr(self)))
 
-    def _fill_values(self):
+    def _fill_values(self, **kwargs):
         """Called by Stack when data is accessed to ensure self._values is not empty"""
         if self._values is None:
             logger.debug('Setting xarray data values for {}'.format(repr(self)))
@@ -210,10 +221,30 @@ class Stack(object):
         self._check_types()  # Check consistency of input types etc
         return self
 
-    def set_data(self, values=None, reset=True):
+    def check_data(self, slice_value):
+        """Check data for slice has been loaded"""
+        self._init_xarray()
+        is_set = self._meta.loc[slice_value, 'set']
+        return is_set
+
+    def set_data(self, values=None, slice_values=None, reset=True):
         """Ready xarray for data access"""
-        self._values = none_filter(self._values, values)
-        assert self._values is not None, 'Cannot initialise xarray without data values'
+        if values is None:
+            # No data to set
+            return self
+        if slice_values is not None:
+            # Setting subset of frames
+            if self._values is None:
+                self._values = np.zeros(self.shape)
+            slice_values = make_itterable(slice_values)
+            for slice in slice_values:
+                i = self.lookup('i', {self.stack_dim: slice})
+                self._values[i, :, :] = values
+        else:
+            # Setting whole dataset
+            assert values.shape == self.shape
+            self._values = values
+
         if self.data is None or reset:
             self._init_xarray()
         return self
@@ -229,7 +260,7 @@ class Stack(object):
             if index in np.arange(len(values)):
                 index = values[index]
             else:
-                raise IndexError('Index "{}" is not a stack axis coordinate. Stack axis coords: {}'.format(item, values))
+                raise IndexError('Index "{}" is not a stack axis coordinate. Stack axis coords: {}'.format(index, values))
         return index
 
     def get_slice(self, item):
@@ -281,7 +312,9 @@ class Stack(object):
 
     def __getitem__(self, item):
         """Return data slices from the stack of data"""
-        self._init_xarray()
+        if item not in self.stack_axis_values:
+            raise IndexError('{} is not a stack axis value. Options: {}'.format(item, self.stack_axis_values))
+        is_set = self.check_data(item)
         item = self.lookup_slice_index(item)
         return self.get_slice(item)
 
@@ -576,6 +609,10 @@ class Stack(object):
     def stack_axis_values(self):
         """Coordinate values along stack axis"""
         return self.coord_objs[self.stack_axis]['values']
+        
+    @property
+    def n_sclices(self):
+        return len(self.stack_axis_values)
 
     @property
     def slice_axes_values(self):

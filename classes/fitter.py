@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from inference_tools.gp_tools import GpRegressor
 from ccfepyutils.ccfe_const import functions  # fix import path ****
 from ccfepyutils.utils import is_scalar, sub_range, args_for  # fix import path ****
-from ccfepyutils.plotUtils import repeat_color  # fix import path ****
+from ccfepyutils.mpl_tools import repeat_color  # fix import path ****
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

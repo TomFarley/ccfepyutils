@@ -1,5 +1,6 @@
 #!/usr/bin/env python
- 
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 import os, itertools, gc, re, inspect, configparser, types, abc, numbers, time, shutil
 from collections import defaultdict, OrderedDict
 from nested_dict import nested_dict
@@ -35,6 +36,7 @@ settings_dir = os.path.expanduser('~/.ccfetools/settings/')
 
 # TODO: Fix deepcopy of Setting objects
 class Setting(abc.ABC):
+    # __metaclass__ = abc.ABCMeta
     type = None
     
     def __init__(self, settings, item):
@@ -86,6 +88,9 @@ class SettingStr(Setting, str):
         if val == '*None*':
             val = None
         return val
+    
+    def format(self, *args, **kwargs):
+        return self.value.format(*args, **kwargs)
 
 class SettingInt(Setting, int):
     type = int
@@ -190,6 +195,7 @@ class Settings(object):
                            'io': [('fn_str', str), ('priority', float)],
                            'meta': [('setting', bool), ('function', str), ('runtime', bool), ('order', int)],
                            'repr': [('value', str), ('name', str), ('description', str)]}  # plotting?
+    # TODO: Add modified column in order to keep track of what's been modified since last save?
     # TODO: block reserved states being used
     reserved_item_names = ['all', 'ignore_state']
 

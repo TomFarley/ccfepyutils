@@ -800,7 +800,8 @@ def lookup_from_dataframe(df, col, **kwargs):
         values = df[key].values
         if value not in values.astype(type(value)):
             raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, df[key]))
-        mask *= df[key] == value
+        value = make_itterable(value)
+        mask *= df[key].isin(value)
     new_value = df.loc[mask, col].values
     if len(new_value) == 1:
         new_value = new_value[0]

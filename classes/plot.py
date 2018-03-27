@@ -3,6 +3,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.gridspec as gridspec
+import numbers
 from mpl_toolkits.mplot3d import Axes3D
 from collections import OrderedDict
 from copy import copy, deepcopy
@@ -14,6 +16,7 @@ import logging
 from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 from ccfepyutils.utils import make_itterable, make_itterables, args_for, to_array, pos_path, is_scalar
 from ccfepyutils.classes.state import State, in_state
@@ -56,7 +59,7 @@ class Plot(object):
     other_args = ['show', 'xlabel', 'ylabel', 'legend', 'ax']
     args = plot_args + scatter_args + other_args # List of all possible args for use with external kwargs
 
-    def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), default_ax=1, ax=None, mode=None,
+    def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), default_ax=0, ax=None, mode=None,
                  legend='each axis', save=False, show=False, fig_args={}, **kwargs):
         """
 
@@ -73,27 +76,26 @@ class Plot(object):
         :param fig_args:
         :param kwargs:
         """
+        logger.debug('In Plot.__init__')
+
         self.call_table = {'ready': {'enter': self.set_ready}}
         self._reset_attributes()
 
         self.state = State(self, self.state_table, 'init', call_table=self.call_table)
 
-        self._num = num  # Name of figure window
-        self._ax_shape = np.array(axes)  # Shape of axes grid
         self._default_ax = default_ax  # Default axis for actions when no axis is specified
         self._current_ax = ax
         self._data = OrderedDict()  # Data used in plots stored for provenance
         self._log = []  # Log of method calls for provenance
         self._legend = legend
 
-        self.fig = None
-        self.axes = None
         self.instances.append(self)
-        self.set_figure_variables(ax=ax, num=num, axes=axes, **fig_args)  # TODO: Add axis naming? .set_axis_names - replace defaults?
+        # TODO: find cleaner way of using existing plot instance!
+        self = self.set_figure_variables(ax=ax, num=num, axes=axes, **fig_args)  # TODO: Add axis naming? .set_axis_names - replace defaults?
         # kws = args_for(self.plot, kwargs, include=self.plot_args)
         self.plot(x, y, z, mode=mode, **kwargs)
-        self.show(show)
-        self.save(save)
+        self.show(show, **args_for(self.show, kwargs))
+        self.save(save, **args_for(self.save, kwargs))
 
     def _reset_attributes(self):
         self._num = None  # Name of figure window
@@ -104,27 +106,44 @@ class Plot(object):
         self._log = []  # Log of method calls for provenance
         self._legend = None
 
-        self.fig = None
-        self.axes = None
+        self.fig = None  # figure object
+        self.axes = None  # flat array of axes?
+        self.gs = None  # grid spec
+        self._gs_slices = None  # grid spec slices of existing axes
+        self._axes_dict = None  # dict linking grid spec slices to existing axes
+        self._axes_names = None  # dict linking string names for axes to their grid spec slices
 
     def set_figure_variables(self, ax=None, num=None, axes=None, **kwargs):
         """Set figure attributes"""
         if ax is None:
             self.make_figure(num, axes, **kwargs)
+        elif hasattr(ax, 'ccfe_plot'):
+            # Axis is from an exisiting ccfe_plot instance
+            self = ax.ccfe_plot
         else:
             self.fig = ax.figure
-            self.axes = self.fig.axes
+            self.axes = np.array(self.fig.axes)
             self._ax_shape = np.array(np.array(self.fig.axes).shape)  # TODO fix so 2 element shape, not len
+            self._default_ax = np.where(self.axes == ax)[0][0]
         self._num = self.fig.canvas.get_window_title()
+        return self
 
     def make_figure(self, num, axes, **kwargs):
         """Create new figure if no axis instance passed"""
         assert isinstance(num, (string_types, str, int, type(None)))
-        assert isinstance(axes, (tuple, list))
+        assert isinstance(axes, (tuple, list, np.ndarray))
         # if plt.fignum_exists(num):
         #     plt.figure(num).clear()  # unnessesary?
-        self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
-        self.axes = to_array(self.axes)
+        # self.fig, self.axes = plt.subplots(num=num, *axes, **kwargs)
+        kws = {'tight_layout': False}
+        kws.update(kwargs)
+        self.fig = plt.figure(num=num, **kws)
+        self.gs = gridspec.GridSpec(axes[0], axes[1])
+        self.axes = to_array(self.fig.axes)
+        self._gs_slices = OrderedDict()
+        self._axes_names = OrderedDict()
+        self._ax_shape = np.array(axes)  # Shape of axes grid
+        pass
 
     def set_ready(self):
         """Set plot object in 'ready' state by finalising/tidying up plot actions"""
@@ -145,24 +164,50 @@ class Plot(object):
             if data_requried:
                 raise ValueError('No data supplied to Plot object')
             else:
-                return None
+                return [None]
         if dim in self.dim_modes:
             return self.dim_modes[dim]
         else:
             raise ValueError('Dimensions of input data {} are not amongst those supported: {}'.format(dim, self.dim_modes))
 
-    def _name2ax(self, ax):
-        if isinstance(ax, int):
-            assert ax <= self.axes.size
-            ax = self.axes.flatten()[ax-1]  # TODO: Make compatible with 2d grid of axes
+    def _name2ax(self, ax, name=None):
+        """Return axis object given axis index, grid spec slice or string name"""
+        ax_names = self._axes_names
+        # Convert to gridspec slice
+        if isinstance(ax, numbers.Integral):
+            shape = self._ax_shape
+            assert ax <= np.prod(shape), 'axes {} is outside of axes shape {}'.format(ax, shape)
+            index = (ax//shape[1], ax%shape[1])
         elif isinstance(ax, string_types):
-            raise NotImplementedError
+            assert ax in ax_names
+            index = ax_names[ax]
+            # raise NotImplementedError
         elif isinstance(ax, (tuple, list)):
-            ax = self.axes[self._ax_shape-1]
+            assert np.array(ax).shape == self._ax_shape, 'Axis tuple selection of wrong shape: {} not {}'.format(
+                    np.array(ax).shape, self._ax_shape)
         elif isinstance(ax, matplotlib.axes.Axes):  # TODO: improve this!
-            ax = ax  # already an axis instance
+            return ax  # already an axis instance
         else:
             raise TypeError
+
+        # Convert grid spec slice to axis instance
+        if index in self._gs_slices:
+            # Axis instance already exists
+            ax = self._gs_slices[index]
+            if name is not None:
+                # Rename axis
+                ax_names[name] = index
+                old_name = ax_names.keys()[list(ax_names.values()).index(index)]
+                del ax_names[old_name]
+        else:
+            index = ax
+            logger.debug('Adding axis at {} to {}'.format(index, self))
+            ax = self.fig.add_subplot(self.gs[ax])
+            ax.ccfe_plot = self
+            self._gs_slices[index] = ax
+            if name is None:
+                name = str(index)
+            ax_names[name] = index
         return ax
 
     def _check_mode(self, x, y, z, mode):
@@ -175,9 +220,10 @@ class Plot(object):
         else:
             return False
 
-    def ax(self, ax=None):
+    def ax(self, ax=None, name=None):
         """Return axis instance."""
         if ax is None:
+            # If no information supplied use current/default axis
             if self._current_ax is not None:
                 ax = self._current_ax
             else:
@@ -186,10 +232,12 @@ class Plot(object):
             ax = ax
         elif isinstance(ax, string_types+(int, tuple, list)):
             ax = ax
-        ax = self._name2ax(ax)  # Convert axis name to axis instance
+        # Convert axis index/name to axis instance
+        ax = self._name2ax(ax, name=name)
         self._current_ax = ax
         try:
-            plt.sca(ax)  # Set as current axis for plt. calls
+            # Set as current axis for plt. calls
+            plt.sca(ax)
         except ValueError as e:
             logger.error('Failed to set current plotting axis! {}'.format(e))
         return ax
@@ -199,7 +247,7 @@ class Plot(object):
         raise NotImplementedError
 
     def call_if_args(self, kwargs, raise_on_exception=True):
-        for func in (self.set_axis_labels, self.show):
+        for func in (self.set_axis_labels, self.set_axis_limits, self.show):
             kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
                 func(**kws)
@@ -212,6 +260,9 @@ class Plot(object):
         """Common interface for plotting data, whether 1d, 2d or 3d. 
         
         Type of plotting is controlled by mode."""
+        if (x is None) and (y is None) and (z is None):
+            self.call_if_args(kwargs)
+            return  # No data to plot
         ax = self.ax(ax)
       
         if smooth is not None:
@@ -245,7 +296,7 @@ class Plot(object):
         self.call_if_args(kwargs)
         return self
 
-    def set_axis_labels(self, xlabel=None, ylabel=None, ax=None, tight_layout=True):
+    def set_axis_labels(self, xlabel=None, ylabel=None, ax=None, tight_layout=False):
         assert isinstance(xlabel, (string_types, type(None)))
         assert isinstance(ylabel, (string_types, type(None)))
         if ax == 'all':
@@ -260,15 +311,30 @@ class Plot(object):
         if tight_layout:
             plt.tight_layout()
 
+    def set_axis_limits(self, xlim=None, ylim=None, ax=None):
+        if ax == 'all':
+            for ax in self.axes:
+                self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, ax=ax)
+                return
+        ax = self.ax(ax)
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+
     def legend(self):
         """Finalise legends of each axes"""
         if self._legend == 'each axis':
             for ax in self.axes.flatten():
                 # TODO: check if more than one legend handels exist
-                handles, labels = ax.get_legend_handles_labels()
-                if len(handles) > 1:  # Only produce legend if more than one artist has a label
-                    leg = ax.legend()
-                    leg.draggable()
+                try:
+                    handles, labels = ax.get_legend_handles_labels()
+                    if len(handles) > 1:  # Only produce legend if more than one artist has a label
+                        leg = ax.legend()
+                        leg.draggable()
+                except ValueError as e:
+                    #  https: // github.com / matplotlib / matplotlib / issues / 10053
+                    logger.error('Not sure how to avoid this error: {}'.format(e))
 
     @in_state('plotting')
     def plot_ellipses(self, ax=None, obj=None, convention='ellipse_axes', **kwargs):
@@ -321,13 +387,12 @@ class Plot(object):
         logger  # TODO logger
 
     def show(self, show=True, tight_layout=True):
-        if self.fig is None:
+        if (not show) or (self.fig is None):
             return
         self.legend()
         if tight_layout:
             plt.tight_layout()
-        if show:
-            plt.show()
+        plt.show()
 
     def to_plotly(self):
         """Convert figure to plotly figure"""
@@ -422,7 +487,9 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
         else:
             ax.set_xlim(np.min(x), np.max(x))  # TODO: Handle half pixel offset properly...
             ax.set_ylim(np.min(y), np.max(y))
-    if not show_axes:
+    if show_axes:
+        ax.set_axes_on()
+    else:
         ax.set_axis_off()
     # if aspect:
     #     ax.set_aspect(aspect)

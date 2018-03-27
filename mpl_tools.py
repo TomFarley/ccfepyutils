@@ -361,7 +361,7 @@ def repeat_color(string, ax=None):
         c = color_shade(color, percentage)
     return c
 
-def show_if(show, clear_all=True):
+def show_if(show, clear_all=False):
     """If show is true show plot. If clear all is true clear all plot windows before showing."""
     if clear_all:
         nums = plt.get_fignums()

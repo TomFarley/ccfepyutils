@@ -161,7 +161,7 @@ class Ellipses(object):
             values = [self.params[k] for k in self.conventions[convention]]
         return values
 
-    def plot(self, ax=None, show=False, equal_aspect=False, deg=True, **kwargs):
+    def plot(self, ax=None, show=False, equal_aspect=False, deg=True, color='k', **kwargs):
         major, minor, angle = self.get('ellipse_axes', nested=True)
         x, y = self.position
         if ax is None:
@@ -186,7 +186,7 @@ class Ellipses(object):
             minor = minor * np.sqrt(1*cos - sin * aspect_ratio)
             # yy, y, dy = [v * aspect_ratio for v in (yy, y, dy)]
 
-        plot_ellipses(ax, major, minor, angle, x=x, y=y, **kwargs)
+        plot_ellipses(ax, major, minor, angle, x=x, y=y, color=color, **kwargs)
         if show:
             plt.show()
 

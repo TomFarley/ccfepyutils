@@ -3,7 +3,7 @@
 """Classes for working with fusion camera data"""
 
 import os, re, numbers, logging, inspect, glob, pickle
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from pathlib import Path
 from copy import copy, deepcopy
 
@@ -96,6 +96,14 @@ class Frame(Slice):
         return out
 
     @property
+    def data(self):
+        meta = self.stack._meta
+        if not meta.loc[self.value, 'set']:
+            self.stack.load_movie_data(n=self.value)
+        data = super(Frame, self).data
+        return data
+
+    @property
     def raw(self):
         if self.stack._raw_movie is not None:
             raw = self.stack._raw_movie
@@ -109,7 +117,8 @@ class Frame(Slice):
         # TODO: Add automatic axis labeling once parameter class is complete
         kws = {'mode': 'image', 'cmap': 'gray', 'show': False}
         kws.update(kwargs)
-        show = args_for(Plot.show, kws)
+        show = args_for(Plot.show, kws, exclude='tight_layout')
+        show.update(args_for(Plot.show, kws, remove=False))  # pass tight layout to show and plot
         plot = Slice.plot(self, ax=ax, show=False, **kws)
         if annotate:
             t = self.stack.lookup('t', **{self.stack.stack_dim: self.value}) if 't' in self.stack._meta.columns else None
@@ -269,9 +278,11 @@ class Movie(Stack):
         # self.set_dimensions(x=t_dim, y=x_dim, z=y_dim)
         self._x['values'] = frames
 
-        self._meta = pd.DataFrame({'t': t, 'n': frames, 'i': np.arange(0, nframes),
-                                  'enhanced': np.zeros(nframes).astype(bool)})
-        # self._meta.index.name = 'i'
+        falses = np.zeros(nframes).astype(bool)
+        self.initialise_meta()
+        self._meta['t'] = t
+        self._meta['enhanced'] = False
+
         assert len(frames) == len(t) == nframes
         pass
         
@@ -395,43 +406,56 @@ class Movie(Stack):
         file_info = mraw_files.loc[file_number, :].to_dict()
         return file_number, file_info
 
-    def _fill_values(self):
+    def _fill_values(self, **kwargs):
         """Called by Stack when data is accessed to ensure self._values is not empty"""
         if self._values is None:
             if self.fn_path is None:
                 Stack._fill_values(self)
             else:
-                self.load_movie_data()
+                self.load_movie_data(**kwargs)
 
-    def load_movie_data(self):  # , pulse=None, machine=None, camera=None):
+    def load_movie_data(self, n=None):  # , pulse=None, machine=None, camera=None):
         """Load movie data into xarray given previously loaded movie file information"""
+        self._init_xarray()
         if self.fn_path is None:
             raise ValueError('No movie file has been set for reading')
         if self._frame_range is None:
             raise ValueError('A frame range must be set before a movie can be read')
 
         if self.movie_format == '.mraw':
-            data = self.read_mraw_movie()
+            data = self.read_mraw_movie(n=n)
         elif self.movie_format == '.p':
-            data = self.read_pickle_movie()
+            data = self.read_pickle_movie(n=n)
         elif self.movie_format == '.ipx':
             raise NotImplementedError
         else:
             raise ValueError('Movie class does not currently support "{}" format movies'.format(self.movie_format))
-        self.set_data(data, reset=True)
-        logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
+        
+        if n is None:
+            self.set_data(data, reset=True)  # whole dataset
+        else:
+            n = make_itterable(n)
+            self._data.loc[{'n': n}] = data
+        # logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
 
-    def read_mraw_movie(self):
+    def read_mraw_movie(self, n=None):
         # Initialise array for data to be read into
-        data = np.zeros((self._frame_range['n'], *self._movie_meta['frame_shape']))
 
-        frames = self._frame_range['frames']
+        if n is None:
+            # Loop over frames from start frame, including those in the frame set
+            frames = self._frame_range['frames']
+            n = self._frame_range['frame_range'][0]
+            end = self._frame_range['frame_range'][1]
+            i_meta = 0
+            i_data = 0
+        else:
+            frames = make_itterable(n)
+            n = frames[0]
+            end = frames[-1]
+            i_data = 0
+        data = np.zeros((len(frames), *self._movie_meta['frame_shape']))
         logger.debug('Reading {} frames from mraw movie file'.format(len(frames)))
 
-        # Loop over frames from start frame, including those in the frame set
-        i = 0
-        n = self._frame_range['frame_range'][0]
-        end = self._frame_range['frame_range'][1]
         file_number, file_info = self.get_mraw_file_number(n=n)
         vid = mrawReader(filename=self.fn_path.format(n=file_number))
         vid.set_frame_number(n - file_info['StartFrame'])
@@ -445,19 +469,23 @@ class Movie(Stack):
             if n in frames:
                 # frames are read with 16 bit dynamic range, but values are 10 bit!
                 ret, frame, header = vid.read(transforms=self._transforms)
-                data[i] = frame
+                data[i_data, :, :] = frame
+                self._meta.loc[n, 'set'] = True
             else:
                 # TODO: Increment vid frame number without reading data
-                # vid._current_index += 1
-                ret, frame, header = vid.read(transforms=self._transforms)
-            i += 1
+                vid._current_frame += 1
+                # ret, frame, header = vid.read(transforms=self._transforms)
+            i_data += 1
             n += 1
         vid.release()
         return data
 
-    def read_pickle_movie(self):
+    def read_pickle_movie(self, n=None):
+        # Loop over frames from start frame, including those in the frame set
+        frames = self._frame_range['frames'] if n is None else make_itterable(n)
         # Initialise array for data to be read into
-        data = np.zeros((self._frame_range['n'], *self._movie_meta['frame_shape']))
+        data = np.zeros((len(frames), *self._movie_meta['frame_shape']))
+        
         transforms = self._transforms
         path = self._movie_meta['pickle_files']['path']
         frames_all = self._movie_meta['pickle_files']['frames_all']
@@ -471,22 +499,30 @@ class Movie(Stack):
             data[i] = data_i
         return data
 
-    def __getitem__(self, item, raw=False):
+    def __getitem__(self, n, raw=False, load=True):
         """Return data slices from the stack of data"""
         # If have enhaced data return that over raw data
+        if n not in self.frame_numbers:
+            raise IndexError('{} is not a valid frame number. Options: {}'.format(n, self.frame_numbers))
         if self._enhanced_movie is not None and not raw:
             movie = self._enhanced_movie
+            is_set = movie.check_data(n)
+            if not is_set:
+                enhancements = self.settings['enhancements']
+                self.enhance(enhancements=enhancements, frames=[n])
         else:
             movie = self
+            is_set = movie.check_data(n)
+            if (not is_set) and load:
+                self.load_movie_data(n)
 
-        movie._init_xarray()
-        item = movie.lookup_slice_index(item)
-        return movie.get_slice(item)
+        # item = movie.lookup_slice_index(item)
+        return movie.get_slice(n)
 
-    def __call__(self, raw=False, **kwargs):
+    def __call__(self, raw=False, load=True, **kwargs):
         assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
         item = self.lookup(self.stack_dim, **kwargs)
-        return self.__getitem__(item, raw=raw)
+        return self.__getitem__(item, raw=raw, load=load)
 
     @classmethod
     def get_frame_list(cls, n, current=True, n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1, skip_backwards=0,
@@ -533,7 +569,12 @@ class Movie(Stack):
     def extract_frame_stack(self, frames):
         """Extract array of frame data for set of frames"""
         # TODO: move functionality to Stack class
+        frames = np.array(frames)
         self._init_xarray()
+        # Make sure all frames in stack have been load - avoid nans!
+        frames_not_set = frames[~self._meta.loc[frames, 'set'].values]
+        if len(frames_not_set) > 0:
+            self.load_movie_data(n=frames_not_set)
         frame_stack = self._data.loc[{'n': frames}].values
         return frame_stack
 
@@ -545,7 +586,7 @@ class Movie(Stack):
                                     unique=unique, limits=self._frame_range['frame_range'])
         # If movie is enhanced, but some of the required frames are not enhanced, enhance those that have been missed
         #  -> return consistent enhanced output
-        if self.is_enhanced and not raw:
+        if self.is_enhanced and (not raw):
             # Make sure all the required frames have been enhanced
             mask = (self._raw_movie._meta['enhanced'] == True).values
             not_enhanced = np.array(list(set(frames) - set(self._raw_movie._meta['n'][mask].values)))
@@ -566,24 +607,23 @@ class Movie(Stack):
             # Set fresh enhanced movie to copy of self
             # Settings objects don't like being deep coppied, so set all settings to None and reassign them afterwares
             # TODO: Fix deepcopy of Settings objects
-            movie_copy = copy(self)
-            movie_copy._enhanced_movie = None
-            movie_copy._raw_movie = None
-            movie_copy.settings = None
-            movie_copy.source_info = None
-            movie_copy.range_settings = None
-            movie_copy._enhancer = None
-
-            self._enhanced_movie = deepcopy(movie_copy)
-            # Reassign settings objects after deepcopy - temporary fix...
-            movie_copy.settings = self.settings
-            movie_copy.source_settings = self.source_info
-
-            enhanced_movie = self._enhanced_movie
+            enhanced_movie = copy(self)
+            enhanced_movie._data = deepcopy(self._data)  # Separate data
+            enhanced_movie._raw_movie = self
+            enhanced_movie._enhanced_movie = None
+            enhanced_movie.settings = None
+            enhanced_movie.source_info = None
+            enhanced_movie.range_settings = None
+            enhanced_movie._enhancer = None
+            enhanced_movie._slices = {}
             enhanced_movie._enhancer = None
             enhanced_movie._enhancements = None
-            enhanced_movie._raw_movie = self
             enhanced_movie.name = self.name + '_enhanced'
+            enhanced_movie._meta = deepcopy(self._meta)
+            enhanced_movie._meta[['enhanced']] = False
+
+            self._enhanced_movie = enhanced_movie
+            enhanced_movie = self._enhanced_movie
             return True
         else:
             return False
@@ -603,19 +643,30 @@ class Movie(Stack):
         #     intensity, phase, contrast = zip(*results)
         args = []
         frame_arrays = []
+        # If this is the first enhancement to be applied make sure the enhanced data has been set to the raw data
+        frames = np.array(frames)
+        frames_not_set = frames[~self._meta.loc[frames, 'set'].values]
+        if len(frames_not_set) > 0:
+            # Make sure raw data has been loaded for all the relevant fames
+            self.load_movie_data(n=frames_not_set)
+            # Make sure enhanced movie starts out with all relevent frames set to raw data
+            frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
+            self._enhanced_movie._data.loc[{'n': frames_not_set}] = self._data.loc[{'n': frames_not_set}]
+            self._enhanced_movie._meta[frames_not_set, 'set'] = True
         # TODO: Make parallel - threading?
         for n in frames:
             args.append(self._enhancer.prepare_arguments(enhancement, self, n))
-            frame_arrays.append(self._enhanced_movie(n=n)[:])
+            frame_arrays.append(self(n=n, raw=True)[:])
 
         # TODO: Make parallel - processes
         for j, n in enumerate(frames):
-            i = self.lookup('i', n=n)
             # Skip frame if already enhanced
-            if self._meta.loc[i, 'enhanced'] == True:
+            if self._meta.loc[n, 'enhanced'] == True:
                 continue
             # NOTE: movie and n args only needed for fg and bg extraction
-            self._enhanced_movie(n=n)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
+            self._enhanced_movie(n=n, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
+            self._meta.loc[n, 'enhanced'] = True
+            pass
 
     def enhance(self, enhancements, frames='all', keep_raw=False, **kwargs):
         """Apply mutiple enhancements to a set of frames in order"""
@@ -631,10 +682,10 @@ class Movie(Stack):
         # TODO: check all frame values in stack axis
         for enhancement in enhancements:
             self._apply_enhancement(frames, enhancement)
-        # Set frames as having been enhanced
-        self._enhancements = enhancements
-        mask = self._meta['n'].isin(frames)
-        self._meta.loc[mask, 'enhanced'] = True
+        # # Set frames as having been enhanced
+        # self._enhancements = enhancements
+        # mask = self._meta['n'].isin(frames)
+        # self._meta.loc[mask, 'enhanced'] = True
         if not keep_raw:
             self._data = None
         # raise NotImplementedError
