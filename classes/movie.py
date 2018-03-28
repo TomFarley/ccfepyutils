@@ -26,8 +26,10 @@ logger.setLevel(logging.DEBUG)
 def get_mast_camera_data_path(machine, camera, pulse):
     """Return path to movie file"""
     # TODO: get paths from settings/config file
+    s = Settings.get('MAST_movie_paths', 'repeat')
     if camera == 'SA1.1':
-        path = '~/data/camera_data/SA1/'
+        # path = '~/data/camera_data/SA1/'
+        path = s['SA1_movie_path'].value
         fn = 'C001H001S0001-{n:02d}.mraw'
     else:
         raise ValueError('Camera "{}" file lookup not yet supported'.format(camera))
