@@ -13,10 +13,10 @@ import pandas as pd
 import xarray as xr
 from netCDF4 import Dataset
 
-from .state import State, in_state
-from ..utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class
-from ..io_tools import mkdir
-from ..netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
+from ccfepyutils.classes.state import State, in_state
+from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class
+from ccfepyutils.io_tools import mkdir
+from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
 
 try:
     import cpickle as pickle

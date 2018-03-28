@@ -53,8 +53,8 @@ def debug():
     pass
 
 if __name__ == '__main__':
-    debug()
+    # debug()
     # composite_settings()
-    # settings()
+    settings()
 
     pass
