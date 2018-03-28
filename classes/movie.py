@@ -654,7 +654,7 @@ class Movie(Stack):
             # Make sure enhanced movie starts out with all relevent frames set to raw data
             frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
             self._enhanced_movie._data.loc[{'n': frames_not_set}] = self._data.loc[{'n': frames_not_set}]
-            self._enhanced_movie._meta[frames_not_set, 'set'] = True
+            self._enhanced_movie._meta.loc[frames_not_set, 'set'] = True
         # TODO: Make parallel - threading?
         for n in frames:
             args.append(self._enhancer.prepare_arguments(enhancement, self, n))
