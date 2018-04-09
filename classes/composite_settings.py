@@ -2,7 +2,6 @@ from collections import OrderedDict
 from copy import copy
 import logging
 import inspect
-import hashlib
 
 import numpy as np
 import re
@@ -304,11 +303,10 @@ class CompositeSettings(object):
 
     @property
     def hash_id(self):
+        from ccfepyutils.io_tools import gen_hash_id
         mask = ~self._df['runtime']
         df = self._df.loc[mask, 'value']
-        h = hashlib.new('ripemd160')
-        h.update(bytes(str(df), 'utf-8'))
-        hash_id = h.hexdigest()
+        hash_id = gen_hash_id(df)
         return hash_id
 
     @property

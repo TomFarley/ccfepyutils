@@ -2,8 +2,12 @@ from copy import copy
 
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 import logging
+
+from ccfepyutils.classes.plot import Plot
+
 logger = logging.getLogger(__name__)
 
 def threshold(image, thresh, value=0):
@@ -90,6 +94,91 @@ def add_abs_gauss_noise(image, sigma_frac=0.05, sigma_abs=None, mean=0.0, return
         return image
     else:
         return noise
+
+def extract_numbered_contour(mask, number):
+    """Extract part of image mask equal to number"""
+    out = np.zeros_like(mask)
+    out[mask == number] = number
+    return out
+
+def contour_info(mask, image=None, extract_number=None, x_values=None, y_values=None):
+    """Return information about the contour
+
+    :param mask: 2d array where points outside the contour are zero and points inside are non-zero"""
+    if extract_number:
+        mask = extract_numbered_contour(mask, extract_number)
+
+    # Dict of information about the contour
+    info = {}
+
+    info['npoints'] = len(mask[mask > 0])
+    info['ipix'] = np.array(np.where(mask > 0)).T
+
+    # Get the points around the perimeter of the contour
+    im2, cont_points, hierarchy = cv2.findContours(mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    try:
+        cont_points = cont_points[0]
+    except IndexError as e:
+        raise e
+
+    # Pixel coords of perimeter of contour
+    ipix = np.array(cont_points)[:, 0]
+    ix = ipix[:, 0]
+    iy = ipix[:, 1]
+    info['ipix_perim'] = ipix
+    info['npoints_perim'] = len(ipix)
+
+    moments = cv2.moments(cont_points)
+    try:
+        cx = moments['m10'] / moments['m00']
+        cy = moments['m01'] / moments['m00']
+    except ZeroDivisionError:
+        cx = np.mean(cont_points[:, :, 0])
+        cy = np.mean(cont_points[:, :, 1])
+    info['centre_of_mass'] = (cx, cy)
+
+    ## Get total extent in x and y directions of contour (rectangle not rotated)
+    x, y, bounding_width, bounding_height = cv2.boundingRect(cont_points)
+    info['bound_width'] = bounding_width
+    info['bound_height'] = bounding_height
+
+    area = cv2.contourArea(cont_points)
+    info['area'] = area
+
+    perimeter = cv2.arcLength(cont_points, True)
+    info['perimeter'] = perimeter
+
+    hull = cv2.convexHull(cont_points)  # Area of elastic band stretched around point set
+    hull_area = cv2.contourArea(hull)
+    if area > 0 and hull_area > 0:
+        solidity = float(area) / hull_area  # Measure of how smooth the outer edge is
+    elif area == 0:  # only one point or line?
+        solidity = 1
+    else:
+        solidity = 0.0
+    info['solidity'] = solidity
+
+    logger.debug('COM: ({}, {}), area: {}, perimeter: {}, solidity: {},'.format(cx, cy, area, perimeter, solidity))
+
+    # Get data related to intensities in the image
+    if image is not None:  # bug: max_loc giving values outside of image! x,y reversed?
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(image, mask=mask)
+        info['amp_min'] = min_val  # min and max WITHIN contour (not relative to background)
+        info['amp_max'] = max_val
+        info['min_loc'] = min_loc
+        info['max_loc'] = max_loc
+
+        info['amp_mean'] = np.mean(image[mask.astype(bool)])
+
+    if x_values is not None:
+        # TODO: convert pixel values to coordinate values
+        raise NotImplementedError
+        for key in []:
+            info[key+''] =info[key] * x_values
+    if y_values is not None:
+        raise NotImplementedError
+
+    return info
 
 # def extract_fg(movie, n, method='min', n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1,
 #                skip_backwards=0, skip_forwards=0, unique=True, **kwargs):

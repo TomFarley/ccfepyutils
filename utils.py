@@ -193,6 +193,23 @@ def safe_zip(*args):
         args[i] = make_itterable(arg)
     return zip(*args)
 
+def safe_arange(start, stop, step):
+    """Return array of elements between start and stop, each separated by step.
+
+    Replacement for np.arange that always includes stop.
+    Normally np.arange should not include stop, but due to floating point precision sometimes it does, so output is
+    unpredictable"""
+    n = np.abs(stop - start) / step
+    if np.isclose(n, np.round(n)):
+        # If n only differs from an integer by floating point precision, round it
+        n = int(np.round(n))+1
+    else:
+        # If n is not approximately an integer, floor it
+        n = int(np.floor(n))+1
+        stop = start + (n-1)*step
+    out = np.linspace(start, stop, n)
+    return out
+
 def any_equal(object, list):
     """ Return true if object is equal to any of the elements of list
     """
@@ -809,6 +826,9 @@ def lookup_from_dataframe(df, col, **kwargs):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+
+    safe_arange(1.32, 1.46, 0.003)
+
 
     reference = [1, -345, 0, 23432.5]
     arr = [23432.234, -345.36, 0.0004, 4356256, -0.254, -344.9] #[345.45654, 6.4576, 0.0007562, 4.34534, 0.34534]

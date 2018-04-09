@@ -375,3 +375,10 @@ def locate_file(fn, paths, _raise=True):
         raise IOError('File "{}" is not present in any of the following direcgtories: {}'.format(fn, paths))
     else:
         return None
+
+def gen_hash_id(obj, mode='ripemd160'):
+    import hashlib
+    h = hashlib.new(mode)
+    h.update(bytes(str(obj), 'utf-8'))
+    hash_id = h.hexdigest()
+    return hash_id

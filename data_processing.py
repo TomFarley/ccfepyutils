@@ -12,7 +12,7 @@ import scipy as sp
 from scipy.signal import butter, filtfilt
 
 
-def local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7)):
+def local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7), elliptical=True):
     """ Return indices of elements in arr that are local maxima over a region the size of neighborhood
     NOTE: Adjacent points with the same local maximum value will all be returned ie there is not necessarily only
     one local maximum point per neighborhood region
@@ -21,7 +21,11 @@ def local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7)):
     import scipy.ndimage.morphology as morphology
     import scipy.ndimage.filters as filters
     # neighborhood = morphology.generate_binary_structure(len(arr.shape),2) # 3x3 matrix == True
-    neighborhood = np.ones(neighborhood, dtype=bool)
+    if elliptical:
+        import cv2
+        neighborhood = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, neighborhood)
+    else:
+        neighborhood = np.ones(neighborhood, dtype=bool)
     ## Maximum_filter sets each pixel to the maximum value of all the pixels in the surrounding footprint (eg immediate sides and diagonals)
     local_max = filters.maximum_filter(arr, footprint=neighborhood)
     ## Equality with arr gives boolian array with true where values are local maxima for their footprint region
@@ -36,13 +40,17 @@ def local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7)):
     imaxima = np.where(detected_maxima)
     return np.array(imaxima)  # return indices of maxima
 
-def local_minima(arr, bg_thresh=0.0, neighborhood=(6, 6)):
+def local_minima(arr, bg_thresh=0.0, neighborhood=(7, 7), elliptical=True):
     """ Detect local minima, see local_maxima for comments"""
     import scipy.ndimage.morphology as morphology
     import scipy.ndimage.filters as filters
     # ref: http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array/3689710#3689710
     # neighborhood = morphology.generate_binary_structure(len(arr.shape),2)
-    neighborhood = np.ones(neighborhood, dtype=bool)
+    if elliptical:
+        import cv2
+        neighborhood = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, neighborhood)
+    else:
+        neighborhood = np.ones(neighborhood, dtype=bool)
     local_min = (filters.minimum_filter(arr, footprint=neighborhood) == arr)
     background = (arr <= bg_thresh)
     eroded_background = morphology.binary_erosion(
@@ -51,8 +59,8 @@ def local_minima(arr, bg_thresh=0.0, neighborhood=(6, 6)):
     iminima = np.where(detected_minima)
     return np.array(iminima)
 
-def sorted_local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7), min_max=None):
-    ind = local_maxima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood)  # indices of maxima
+def sorted_local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7), min_max=None, elliptical=True):
+    ind = local_maxima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood, elliptical=elliptical)  # indices of maxima
     ix = ind[1, :]
     iy = ind[0, :]
     z = arr[iy, ix]
@@ -63,8 +71,8 @@ def sorted_local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7), min_max=None):
     maxima = {'ix': ix[isorted], 'iy': iy[isorted], 'z': z[isorted], 'N': len(isorted)}
     return maxima
 
-def sorted_local_minima(arr, bg_thresh=0.0, neighborhood=(7, 7), max_min=None):
-    ind = local_minima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood)  # indices of maxima
+def sorted_local_minima(arr, bg_thresh=0.0, neighborhood=(7, 7), max_min=None, elliptical=True):
+    ind = local_minima(arr, bg_thresh=bg_thresh, neighborhood=neighborhood, elliptical=elliptical)  # indices of maxima
     ix = ind[1, :]
     iy = ind[0, :]
     z = arr[iy, ix]

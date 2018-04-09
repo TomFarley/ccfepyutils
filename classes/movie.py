@@ -491,7 +491,7 @@ class Movie(Stack):
         transforms = self._transforms
         path = self._movie_meta['pickle_files']['path']
         frames_all = self._movie_meta['pickle_files']['frames_all']
-        frames = self._frame_range['frames']
+        # frames = self._frame_range['frames']
         for i, n in enumerate(frames):
             if n not in frames_all:
                 raise IOError('Cannot locate pickle file for frame n={}'.format(n))
@@ -499,6 +499,7 @@ class Movie(Stack):
             data_i = pickle_load(fn, path, encoding='latin1')
             data_i = transform_image(data_i, transforms)
             data[i] = data_i
+            self._meta.loc[n, 'set'] = True
         return data
 
     def __getitem__(self, n, raw=False, load=True):

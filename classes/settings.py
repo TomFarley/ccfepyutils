@@ -345,6 +345,7 @@ class Settings(object):
             elif create_columns:
                 df.loc[item, k] = v
                 logger.info('Added column {} to {}'.format(k, repr(self)))
+                # TODO: Made sure state modified appropriately for save when columns changed
             else:
                 raise IndexError('{} is not a valid Settings column. Possible values: {}'.format(k, self.columns))
         cols = self.column_sets_names['type']
@@ -577,6 +578,7 @@ class Settings(object):
         else:
             logger.info('Created SettingsFile for application "{app}", name {name}: {path}'.format(
                         app=self.application, name=self.name, path=self.fn_path))
+        # TODO: Create settings_log file if new application
         self.state('saved')
 
     def delete_file(self, force=False):
