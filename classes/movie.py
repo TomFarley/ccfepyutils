@@ -26,7 +26,12 @@ logger.setLevel(logging.DEBUG)
 def get_mast_camera_data_path(machine, camera, pulse):
     """Return path to movie file"""
     # TODO: get paths from settings/config file
-    s = Settings.get('MAST_movie_paths', 'repeat')
+    import socket
+    import string
+    host_name = socket.gethostname()
+    host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
+    # TODO: Raise warning message if need to create new settings file for this machine etc
+    s = Settings.get('MAST_movie_paths', host_name)
     if camera == 'SA1.1':
         # path = '~/data/camera_data/SA1/'
         path = s['SA1_movie_path'].value

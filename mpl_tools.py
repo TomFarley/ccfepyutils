@@ -11,10 +11,12 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def seg_line_plot(axes, x, y, z, z_out='color', in_range=None, out_range=None, fig=None, color='b', lw = 2, ls='-',
+def seg_line_plot(x, y, z, ax=None, z_out='color', in_range=None, out_range=None, fig=None, color='b', lw = 2, ls='-',
                   cmap='Spectral_r', label=None, alpha=1):
     """ Colour line plot. Plot 2D line with z value represented by colour of points on line
     """
+    if ax is None:
+        ax = plt.gca()
     points = np.array([x, y]).T.reshape(-1, 1, 2)
     segments = np.concatenate([points[:-1], points[1:]], axis=1)
     # Scale z values to [0,1] over z_range
@@ -61,7 +63,7 @@ def seg_line_plot(axes, x, y, z, z_out='color', in_range=None, out_range=None, f
     if 'color' not in z_out and 'linewidth' not in z_out and 'alpha' not in z_out:
         print('WARNING: {} not recognised. Aborting seg_line_plot.'.format(z_out))
 
-    axes.add_collection(lc)
+    ax.add_collection(lc)
 
     ## Colorbar for line
     if fig and 'color' in z_out:
