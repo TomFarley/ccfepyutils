@@ -382,3 +382,43 @@ def gen_hash_id(obj, mode='ripemd160'):
     h.update(bytes(str(obj), 'utf-8'))
     hash_id = h.hexdigest()
     return hash_id
+
+
+def fn_filter(path, fn_pattern, recursive=False, unique=False):
+    """ Filenames in a given directory that match the search pattern
+    TODO: add compatibility for non raw string file paths
+    """
+    fns = os.listdir(path)
+    p = re.compile(fn_pattern)
+    matches = []
+    for fn in fns:
+        if p.search(fn):
+            matches.append(fn)
+    if matches == []:
+        print('No files match the supplied pattern: "%s"' % fn_pattern)
+    if unique:  # expect unique match so return scalar string that matches
+        if len(matches) == 1:
+            return matches[0]
+        else:
+            raise ValueError('WARNING: fn_filter(unique=True): {} matches: {}'.format(len(matches), matches))
+    else:
+        return matches
+
+def fn_filter_numeric_range(path_in, fn_pattern, numeric_range, sort_output=True):
+    """Return sorted subset of filenames within a directory, within a numeric range
+
+    The fn_pattern must contain {number} which must contain an integer in the numeric range"""
+    assert '{number}' in fn_pattern, 'Include "{number}" in pattern when using file range'
+    fn_pattern = fn_pattern.format(number=regexp_int_range(*numeric_range))
+
+    filenames = fn_filter(path_in, fn_pattern)
+    if sort_output:
+        filenames = sorted(filenames)
+    return filenames
+
+def regexp_int_range(low, high, compile=False):
+    fmt = '%%0%dd' % len(str(high))
+    if compile:
+        return re.compile('(%s)' % '|'.join(fmt % i for i in range(low, high + 1)))
+    else:
+        return '(%s)' % '|'.join('{:d}'.format(i) for i in range(low, high + 1))

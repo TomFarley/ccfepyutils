@@ -3,41 +3,16 @@
 NOTE: requires imageio package"""
 
 import imageio
-import re
 import os
 import numpy as np
 from pprint import pprint
+
+from io_tools import fn_filter, regexp_int_range
+
 try:
     from natsort import natsorted as sorted
 except ImportError:
     pass
-
-def fn_filter(dir, pattern, recursive=False, unique=False):
-    """ Filenames in a given directory that match the search pattern
-    TODO: add compatibility for non raw string file paths
-    """
-    fns = os.listdir(dir)
-    p = re.compile(pattern)
-    matches = []
-    for fn in fns:
-        if p.search(fn):
-            matches.append(fn)
-    if matches == []:
-        print('No files match the supplied pattern: "%s"' % pattern)
-    if unique:  # expect unique match so return scalar string that matches
-        if len(matches) == 1:
-            return matches[0]
-        else:
-            raise ('WARNING: fn_filter(unique=True): {} matches: {}'.format(len(matches), matches))
-    else:
-        return matches
-
-def regexp_range(lo, hi, compile=False):
-    fmt = '%%0%dd' % len(str(hi))
-    if compile:
-        return re.compile('(%s)' % '|'.join(fmt % i for i in range(lo, hi + 1)))
-    else:
-        return '(%s)' % '|'.join('{:d}'.format(i) for i in range(lo, hi + 1))
 
 def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', duration=0.5, file_range=None, repeat={}, path_out=None,
             user_confirm=True):
@@ -60,7 +35,7 @@ def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', durati
 
     if file_range is not None:
         assert '{number}' in pattern, 'Include "{number}" in pattern when using file range'
-        pattern = pattern.format(number=regexp_range(*file_range))
+        pattern = pattern.format(number=regexp_int_range(*file_range))
 
     filenames = fn_filter(path_in, pattern)
     filenames = sorted(filenames)
