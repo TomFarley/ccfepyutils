@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
-import matplotlib.gridspec as gridspec
-import numbers
-from mpl_toolkits.mplot3d import Axes3D
+import os, numbers
 from collections import OrderedDict
 from copy import copy, deepcopy
+
+import numpy as np
+
 try:
     import cpickle as pickle
 except ImportError:
@@ -18,8 +16,21 @@ from logging.config import fileConfig, dictConfig
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+batch_mode = os.getenv('LOADL_ACTIVE', None)
+if batch_mode == 'yes':
+    import matplotlib
+    try:
+        matplotlib.use('Agg')
+        print('In batch mode')
+    except Exception:
+        logger.warning('Failed to switch matplotlib backend in batch mode')
+import matplotlib.pyplot as plt
+import matplotlib
+import matplotlib.gridspec as gridspec
+from mpl_toolkits.mplot3d import Axes3D
+
 from ccfepyutils.utils import make_itterable, make_itterables, args_for, to_array, is_scalar
-from io_tools import pos_path
+from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 try:
