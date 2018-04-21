@@ -792,6 +792,17 @@ class Settings(object):
             raise ValueError('Setting {} has no type!'.format(item))
         return col
 
+    def reorder_item(self, item, new_order_index, save=True):
+        """Reorder settings"""
+        df = self._df
+        self(item, order=new_order_index)
+        higher_indices = df.index.loc[(df['order'] >= new_order_index) & df.index != item]
+        for index in higher_indices:
+            df.loc[index, 'order'] = df.loc[index, 'order'] + 1
+        self._df = df.sort_values('order', axis='index')
+        if save:
+            self.save()
+
     def update_from_dataframe(self, df):
         for item, values in df.iterrows():
             if 'value' in values:
@@ -833,7 +844,7 @@ class Settings(object):
             category = 'function'
         else:
             if _raise:
-                raise ValueError('Cannot locate item/name in {} with "{}"'.format(repr(settings), item))
+                raise ValueError('Cannot locate item/name "{}" in {}'.format(item, repr(settings)))
             else:
                 return item, None
         return item, category
