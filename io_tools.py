@@ -9,6 +9,8 @@ from tkinter import Tk, filedialog as askopenfilename
 import numpy as np
 from nested_dict import nested_dict
 from past.types import basestring
+from utils import string_types
+
 from .utils import signal_abbreviations, logger, signal_sets, make_itterable, compare_dict
 
 logger = logging.getLogger(__name__)
@@ -422,3 +424,17 @@ def regexp_int_range(low, high, compile=False):
         return re.compile('(%s)' % '|'.join(fmt % i for i in range(low, high + 1)))
     else:
         return '(%s)' % '|'.join('{:d}'.format(i) for i in range(low, high + 1))
+
+
+def pos_path(value, require_dir_path=True):
+    """Return True if value is a potential file path else False"""
+    if not isinstance(value, string_types):
+        return False
+    value = os.path.expanduser(value)
+    path, fn = os.path.split(value)
+    if os.path.isdir(path):
+        return True
+    elif (not require_dir_path) and (path == ''):
+        return True
+    else:
+        return False

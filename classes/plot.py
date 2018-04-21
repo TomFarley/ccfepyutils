@@ -18,7 +18,8 @@ from logging.config import fileConfig, dictConfig
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-from ccfepyutils.utils import make_itterable, make_itterables, args_for, to_array, pos_path, is_scalar
+from ccfepyutils.utils import make_itterable, make_itterables, args_for, to_array, is_scalar
+from io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 try:

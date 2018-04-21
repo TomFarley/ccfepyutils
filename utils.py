@@ -20,7 +20,6 @@ import numpy as np
 import pandas as pd
 from copy import copy
 import sys
-import os
 import inspect
 from collections import Mapping, Container
 from sys import getsizeof
@@ -432,18 +431,6 @@ class ROISelector(object):
         
     def deactivate(self):
         self.selector.set_active(False)
-
-
-def pos_path(value):
-    """Return True if value is a potential file path else False"""
-    if not isinstance(value, string_types):
-        return False
-    value = os.path.expanduser(value)
-    path, fn = os.path.split(value)
-    if os.path.isdir(path):
-        return True
-    else:
-        return False
 
 
 def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
