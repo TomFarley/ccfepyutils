@@ -74,7 +74,7 @@ class CompositeSettings(object):
         for item in s.items:
             exclude = False
             for excl_col in exclude_if_col_true:
-                if df_nest.loc[item, excl_col] is True:
+                if df_nest.loc[item, excl_col] is np.True_:
                     exclude = True
             if exclude:
                 continue
