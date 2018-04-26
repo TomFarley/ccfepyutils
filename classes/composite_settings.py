@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 class CompositeSettings(object):
     instances = nested_dict()
-    def __init__(self, application, name, blacklist=[], whitelist=[], include_children=True):
+    def __init__(self, application, name, blacklist=[], whitelist=[], include_children=True, exclude_if_col_true=()):
         """Settings must have an 'application' and a 'name'
         - The application is the context in which the settings are used e.g. my_code
         - The name is a label for a particular set of settings for the application e.g. my_default_settings
@@ -29,18 +29,18 @@ class CompositeSettings(object):
         self._name = name
         self._blacklist = blacklist
         self._whitelist = whitelist
+        self._exclude_if_col_true = exclude_if_col_true
         if (len(whitelist) > 0) and (application not in whitelist):
             # Make sure core settings are in whitelist else CompositeSettings will be empty
             self._whitelist = [application] + self._whitelist
         self.core = Settings.get(application, name)
-        self.build_composite_df(include_children=include_children)
-
+        self.build_composite_df(include_children=include_children, exclude_if_col_true=exclude_if_col_true)
 
     def _reset_settings_attributes(self):
         self.state = None
         self.core = None
 
-    def build_composite_df(self, include_children=True):
+    def build_composite_df(self, include_children=True, exclude_if_col_true=()):
         """Expand settings items into full Settings objects"""
         self._settings = OrderedDict()
         self._items = OrderedDict()
@@ -48,12 +48,12 @@ class CompositeSettings(object):
         self.core._df.loc[:, 'parent'] = 'None'
         self._df = self.core._df[0:0]  # Get emtpy dataframe with same column structure
         self._df = self.append_settings_file(self._application, self._name, self._df, self._settings, self._items,
-                                             include_children=include_children)
+                                             include_children=include_children, exclude_if_col_true=exclude_if_col_true)
 
         pass
 
     def append_settings_file(self, application, name, df, settings, items,
-                             add_to_whitelist=False, include_children=True):
+                             add_to_whitelist=False, include_children=True, exclude_if_col_true=()):
         """ Add contents of settings file to CompositeSettings instance's dataframe
         :param: add_to_whitelist - treat application as if it in whitelist
         :param: include_children - include child settings even if they are not in the whitelist"""
@@ -72,6 +72,12 @@ class CompositeSettings(object):
         settings[application] = s
         df_nest = s._df
         for item in s.items:
+            exclude = False
+            for excl_col in exclude_if_col_true:
+                if df_nest.loc[item, excl_col] is True:
+                    exclude = True
+            if exclude:
+                continue
             df = df.append(df_nest.loc[item, :])
             if item not in items.keys():
                 items[item] = [s]

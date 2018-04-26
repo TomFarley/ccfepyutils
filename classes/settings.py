@@ -252,12 +252,14 @@ class Settings(object):
             return Settings(application, name)
         
     @classmethod
-    def collect(cls, application=None, name=None, values={}, blacklist=[], whitelist=[], **kwargs):
+    def collect(cls, application=None, name=None, values={}, blacklist=[], whitelist=[], exclude_runtime=False,
+                **kwargs):
         from .composite_settings import CompositeSettings
         settings = Settings.get(application, name)
         for item, value in values.items():
             settings.set(item, value, ignore=[None])
-        composite_settings = CompositeSettings(application, name, blacklist=blacklist, whitelist=whitelist)
+        composite_settings = CompositeSettings(application, name, blacklist=blacklist, whitelist=whitelist,
+                                               exclude_runtime=exclude_runtime)
         composite_settings.set_value(**kwargs)
         composite_settings.save()
         return composite_settings
