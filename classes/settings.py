@@ -259,7 +259,7 @@ class Settings(object):
         for item, value in values.items():
             settings.set(item, value, ignore=[None])
         composite_settings = CompositeSettings(application, name, blacklist=blacklist, whitelist=whitelist,
-                                               exclude_if_col_true=exclude_runtime)
+                                               exclude_if_col_true=exclude_if_col_true)
         composite_settings.set_value(**kwargs)
         composite_settings.save()
         return composite_settings
