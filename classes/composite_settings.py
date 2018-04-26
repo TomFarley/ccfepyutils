@@ -76,13 +76,12 @@ class CompositeSettings(object):
             for excl_col in exclude_if_col_true:
                 if df_nest.loc[item, excl_col] is np.True_:
                     exclude = True
-            if exclude:
-                continue
-            df = df.append(df_nest.loc[item, :])
-            if item not in items.keys():
-                items[item] = [s]
-            else:
-                items[item].append(s)
+            if not exclude:
+                df = df.append(df_nest.loc[item, :])
+                if item not in items.keys():
+                    items[item] = [s]
+                else:
+                    items[item].append(s)
             if df_nest.loc[item, 'setting']:
                 name = df_nest.loc[item, 'value']
                 # If include_children pass to subsequent calls, but set False for calls from core Settings set
