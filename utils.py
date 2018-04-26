@@ -15,12 +15,10 @@ try:
 except:
     from tkinter import Tk  # python3 freia
     from tkinter import filedialog as askopenfilename
-from matplotlib.widgets import RectangleSelector
 import numpy as np
 import pandas as pd
 from copy import copy
-import sys
-import inspect
+import sys, os, inspect
 from collections import Mapping, Container
 from sys import getsizeof
 
@@ -412,7 +410,7 @@ class DataCursor(object):
         
         
 class ROISelector(object):
-    
+    from matplotlib.widgets import RectangleSelector
     def __init__(self,artist):
             self.artist = artist
             self.selector = RectangleSelector(self.artist.axes,self.on_select,
@@ -716,6 +714,19 @@ def caller_details(level=1):
     """Return (func_name, args, kwargs) of function that called this function"""
     inspect
     raise NotImplementedError
+
+def in_freia_batch_mode():
+    """Return True if current python interpreter is being run as a batch job (ie no display for plotting etc)"""
+    batch_mode = os.getenv('LOADL_ACTIVE', None)
+    return batch_mode == 'yes'
+
+def set_windowless_matplotlib_backend():
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        logger.debug('Set matplotlib backend to "Agg" for batch mode')
+    except Exception:
+        logger.warning('Failed to switch matplotlib backend to Agg')
 
 def get_methods_class(meth):
     """Get class that defined method

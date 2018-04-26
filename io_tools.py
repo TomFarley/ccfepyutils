@@ -7,6 +7,7 @@ from pathlib import Path
 from tkinter import Tk, filedialog as askopenfilename
 
 import numpy as np
+import xarray as xr
 from nested_dict import nested_dict
 from past.types import basestring
 from .utils import string_types
@@ -438,3 +439,9 @@ def pos_path(value, require_dir_path=True):
         return True
     else:
         return False
+
+
+def read_netcdf_group(fn_path, group):
+    with xr.open_dataset(fn_path, group=group, autoclose=True) as match_data:
+            match_data = match_data.copy(deep=True)
+    return match_data

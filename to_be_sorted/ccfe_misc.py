@@ -5,8 +5,8 @@ Micelanious general purpose functions
 """
 
 import numbers
-from Tkinter import Tk
-from tkFileDialog import askopenfilename
+# from Tkinter import Tk
+# from tkFileDialog import askopenfilename
 from matplotlib.widgets import RectangleSelector
 import numpy as np
 import itertools
@@ -14,7 +14,7 @@ from scipy.signal import lfilter, lfilter_zi, filtfilt, butter
 from copy import copy, deepcopy
 import sys
 import os
-import inspect
+import inspect, logging
 from collections import Mapping, Container
 from sys import getsizeof
 from pathlib import Path
@@ -22,6 +22,8 @@ try:
     import cpickle as pickle
 except ImportError:
     import pickle
+
+logger = logging.getLogger(__name__)
 
 def nsigfig(values, sig_figs=1):
     """Round input values to given number of significant digits"""
@@ -619,9 +621,14 @@ def in_ellipse(point, centre, rx, ry, boundary=True, return_r=False):
         r[r == 1] = boundary
         return r[:].astype(bool)
 
-def geo_mean_w(x, weights=None, axis=None, **kwargs):
+def geo_mean_w(x, weights=None, axis=None, remove_nans=False, **kwargs):
     """ Return weighted geometric mean along given axis
     """
+    if remove_nans:
+        if x.ndim > 1:
+            logger.warning('Removing nans from multidimensional data will loose the data structure!')
+        x = x[~np.isnan(x)]
+
     if weights is None:
         from scipy.stats.mstats import gmean
         return gmean(x, axis=axis, **kwargs)

@@ -366,29 +366,37 @@ def smooth(x, window_len=10, window='hanning'):
     return y
 
 
-def pdf(x, min_data_per_bin=10, nbins_max=40, max_resolution=None, density=False, max_1=False):
+def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
+        max_resolution=None, density=False, max_1=False):
     """Return distribution in x of peaks in y nsigma above mean"""
     # Todo: add outlier detection to auto pdf
+    assert not ((nbins is not None) and (bin_edges is not None)), 'Only supply one bins argument'
     if len(x) < 2:
-        return np.array([]), np.array([])
-    nbins = np.floor(len(x) / min_data_per_bin)
-    nbins = int(np.round(np.max([8, nbins])))
-    nbins = np.min((nbins, nbins_max))
+        return np.array([]), np.array([]), np.array([])
+    if (nbins is None) and (bin_edges is None):
+        nbins = np.floor(len(x) / min_data_per_bin)
+        nbins = int(np.round(np.max([8, nbins])))
+        nbins = np.min((nbins, nbins_max))
 
-    # Check don't exceed max resolution for x data to avoid jagged beating of pdf
-    if max_resolution is None:  # may overestimate max_resolution for small sample sizes
-        diffs = np.abs(np.diff(x))
-        max_resolution = 2*np.min(diffs[diffs>0])  # twice minimum distance between values to avoid gaps
-    x_range = np.ptp(x)
-    if (max_resolution is not False) and (x_range/nbins < max_resolution):  # Reduce number of bins
-        nbins = int(np.floor(x_range/max_resolution))
-    if nbins < 3:
-        nbins = 3
+        x_range = np.ptp(x)
+        # Check don't exceed max resolution for x data to avoid jagged beating of pdf
+        if (max_resolution is None) and (x_range > 0):  # may overestimate max_resolution for small sample sizes
+            diffs = np.abs(np.diff(x))
+            max_resolution = 2*np.min(diffs[diffs>0])  # twice minimum distance between values to avoid gaps
 
-    counts, bins = np.histogram(x, bins=nbins, density=density)
+        if x_range == 0:
+            nbins = 1
+        elif (max_resolution is not False) and (x_range/nbins < max_resolution):  # Reduce number of bins
+            nbins = int(np.floor(x_range/max_resolution))
+        if nbins < nbins_min:
+            nbins = nbins_min
+
+    bins = bin_edges if (bin_edges is not None) else nbins
+    counts, bin_edges = np.histogram(x, bins=bins, density=density)
+
     counts = counts / np.max(counts) if max_1 else counts
-    return moving_average(bins, 2), counts
-
+    bin_centres = moving_average(bin_edges, 2)
+    return bin_edges, bin_centres, counts
 
 def _find_dist_extrema(arr, point, index=True, normalise=False, func=np.argmin):
     """ Find closest point to supplied point in either 1d array, 2d grid or 2xn array of coordinate pairs
