@@ -17,7 +17,7 @@ from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 from ccfepyutils.classes.data_stack import Stack, Slice
 from ccfepyutils.classes.settings import Settings
 from ccfepyutils.utils import return_none, is_number, none_filter, to_array, make_itterable, args_for, is_subset
-from ccfepyutils.io_tools import pickle_load
+from ccfepyutils.io_tools import pickle_load, locate_file
 from ccfepyutils.classes.plot import Plot
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def get_mast_camera_data_path(machine, camera, pulse):
         raise IOError('Path "{}" does not exist'.format(str(path)))
     if not Path(str(path).format(n=0)).is_file():
         raise IOError('Cannot locate file "{}" in path {}'.format(fn, str(path)))
-    return str(path)
+    return str(path), fn
 
 def get_synthcam_data_path(machine, camera, pulse):
     """Return path to movie file"""
@@ -58,35 +58,18 @@ def get_synthcam_data_path(machine, camera, pulse):
     if machine == 'MAST':
         # TODO: Get path format from settings file
         if host_name == 'freia':
-            path_root = '/home/nwalkden/python_tools/cySynthCam/error_analysis/'
-            path_root = Path(path_root).expanduser().resolve()
-            path_options = [path_root / pulse]
+            path_options = ['~nwalkden/python_tools/cySynthCam/error_analysis/{pulse}/',
+                            '~nwalkden/python_tools/elzar2/{pulse}/']
         else:
-            path_root = '~/data/synth_frames/'
-            path_root = Path(path_root).expanduser().resolve()
-            path_options = [path_root / machine / pulse, path_root / pulse]
-        fn_formats = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']
+            path_options = ['~/data/synth_frames/{machine}/{pulse}']
+        fn_options = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']
     else:
         raise ValueError('Machine "{}" file lookup not yet supported'.format(machine))
-    assert path_root.is_dir(), 'Movie data path doesnt exist'
-    assert isinstance(pulse, str)
-    fn_format = None
-    for path in path_options:
-        if not path.is_dir():
-            logger.debug('Path "{}" does not exist'.format(str(path.parent)))
-            continue
-        for fn in fn_formats:
-            if not Path(str(path/fn).format(n=0)).is_file():
-                continue
-            fn_format = fn
-            break
-        if fn_format is not None:
-            break
-    else:
-        fn_format = None
-    if fn_format is None:
-        raise IOError('Cannot locate file "{}" in path {}'.format(str(path).format(n=0), str(path)))
-    return str(path / fn_format)
+    path_kws = {'machine': machine, 'pulse': pulse}
+    fn_kws = {'n': 0}
+    path, fn_format = locate_file(path_options, fn_options, path_kws=path_kws, fn_kws=fn_kws,
+                          return_raw_path=False, return_raw_fn=True, _raise=True, verbose=True)
+    return path, fn_format
 
 def get_mast_movie_transforms(machine, camera, pulse):
     """Get transforms to apply to each raw movie frame"""
@@ -230,27 +213,27 @@ class Movie(Stack):
                                                                 res=self.image_resolution, enh=enhanced)
         return out
 
-    def set_movie_source(self, pulse, machine, camera, fn_format=None, **kwargs):
+    def set_movie_source(self, pulse, machine, camera, fn_path=None, **kwargs):
         """Locate movie file to load data from"""
         # TODO: remove duplication?
         self.pulse = pulse
         self.machine = machine
         self.camera = camera
-        if fn_format is None:
-            fn_format, self._transforms = self.locate_movie_file(self.pulse, self.machine, self.camera)
-        fn_format = Path(fn_format)
+        if fn_path is None:
+            path, fn_format, self._transforms = self.locate_movie_file(self.pulse, self.machine, self.camera)
+        fn_path = Path(path) / fn_format
 
         # Check file path exists
-        if not fn_format.parent.is_dir():
-            raise IOError('Path "{}" does not exist'.format(fn_format.parent))
-        if not Path(str(fn_format).format(n=0)).is_file():
-            raise IOError('Cannot locate file "{}" in path {}'.format(fn_format.name, fn_format.parent))
+        if not fn_path.parent.is_dir():
+            raise IOError('Path "{}" does not exist'.format(fn_path.parent))
+        if not Path(str(fn_path).format(n=0)).is_file():
+            raise IOError('Cannot locate file "{}" in path {}'.format(fn_path.name, fn_path.parent))
 
-        self.fn_path = str(fn_format)
-        self.path = str(fn_format.parent)
-        self.fn = str(fn_format.name)
+        self.fn_path = str(fn_path)
+        self.path = str(fn_path.parent)
+        self.fn = str(fn_path.name)
         # TODO: movie movie formnat to ._movie_meta?
-        self.movie_format = str(fn_format.suffix)
+        self.movie_format = str(fn_path.suffix)
 
         self._movie_meta = {'format': self.movie_format}
         if self.movie_format == '.mraw':
@@ -274,9 +257,9 @@ class Movie(Stack):
         if camera not in cls.compatibities[machine]:
             raise ValueError('Movie class is not currently compatible with camera "{}". Compatibilties: {}'.format(
                     camera, cls.compatibities[machine].values()))
-        fn = cls.compatibities[machine][camera]['get_path'](machine, camera, pulse, **kwargs)
+        path, fn_patern = cls.compatibities[machine][camera]['get_path'](machine, camera, pulse, **kwargs)
         transforms = cls.compatibities[machine][camera]['transforms'](machine, camera, pulse)
-        return fn, transforms
+        return path, fn_patern, transforms
 
     def set_frames(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
                    nframes=None, duration=None, stride=1, all=False, transforms=None):

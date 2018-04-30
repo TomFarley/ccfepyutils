@@ -367,17 +367,36 @@ def python_path(filter=None):
     return user_paths
 
 
-def locate_file(fn, paths, _raise=True):
+def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, return_raw_fn=False, _raise=True,
+                verbose=False):
     """Return path to file given number of possible paths"""
-    for path in paths:
-        path = os.path.expanduser(str(path))
-        out = os.path.join(path, fn)
-        if os.path.isfile(out):
-            return out
+    if path_kws is None:
+        path_kws = {}
+    if fn_kws is None:
+        fn_kws = {}
+
+    for path_raw in paths:
+        # Insert missing info in
+        path_raw = str(path_raw)
+        path = path_raw.format(**path_kws)
+        path = Path(path).expanduser().resolve()
+        if not path.is_dir():
+            continue
+        for fn_raw in fns:
+            fn = str(fn_raw).format(**fn_kws)
+            fn_path = path / fn
+            if fn_path.is_file():
+                path_out = path_raw if return_raw_path else path
+                fn_out = fn_raw if return_raw_fn else fn
+                if verbose >= 2:
+                    logging.info('Located "{}" in {}'.format(fn_out, path_out))
+                return path_out, fn_out
     if _raise:
-        raise IOError('File "{}" is not present in any of the following direcgtories: {}'.format(fn, paths))
+        raise IOError('Failed to locate file in paths "{}" with formats: {}'.format(paths, fns))
     else:
-        return None
+        if verbose:
+            logger.warning('Failed to locate file in paths "{}" with formats: {}'.format(paths, fns))
+        return None, None
 
 def gen_hash_id(obj, mode='ripemd160'):
     import hashlib
