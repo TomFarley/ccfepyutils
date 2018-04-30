@@ -59,7 +59,7 @@ def get_synthcam_data_path(machine, camera, pulse):
         # TODO: Get path format from settings file
         if host_name == 'freia':
             path_options = ['~nwalkden/python_tools/cySynthCam/error_analysis/{pulse}/',
-                            '~nwalkden/python_tools/elzar2/{pulse}/']
+                            '~nwalkden/python_tools/elzar/elzar2/synthetic_imaging/{pulse}/']
         else:
             path_options = ['~/data/synth_frames/{machine}/{pulse}']
         fn_options = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']

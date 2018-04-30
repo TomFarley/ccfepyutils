@@ -194,7 +194,7 @@ class Settings(object):
                            'type': [('float', bool), ('int', bool), ('bool', bool), ('str', bool)],
                            'io': [('fn_str', str), ('priority', float)],
                            'meta': [('setting', bool), ('function', str), ('runtime', bool), ('order', int)],
-                           'repr': [('value', str), ('name', str), ('description', str)]}  # plotting?
+                           'repr': [('value', str), ('description', str), ('setting', bool)]}  # plotting?
     # TODO: Add modified column in order to keep track of what's been modified since last save?
     # TODO: block reserved states being used
     reserved_item_names = ['all', 'ignore_state']
@@ -485,14 +485,20 @@ class Settings(object):
     @in_state('loading', 'loaded')
     def load(self):
         assert self.file_exists
-        try:
-            with Dataset(self.fn_path) as root:
-                # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
-                self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
-            self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
-        except Exception as e:
-            # TODO: restore backup if corrupted?
-            raise e
+        # Make two attempts - sometimes inexplicably fails on first attempt
+        for attempt in [1,2]:
+            try:
+                with Dataset(self.fn_path) as root:
+                    # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
+                    self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
+                self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
+            except Exception as e:
+                if attempt == 2:
+                    raise e
+                    # TODO: restore backup if corrupted?
+                time.sleep(0.5)
+            else:
+                break
         self.log_file.loaded(self.name)
         self.check_consistency()
  

@@ -380,9 +380,10 @@ def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, r
         # Insert missing info in
         path_raw = str(path_raw)
         path = path_raw.format(**path_kws)
-        path = Path(path).expanduser().resolve()
+        path = Path(path).expanduser()
         if not path.is_dir():
             continue
+        path = path.resolve()
         for fn_raw in fns:
             fn = str(fn_raw).format(**fn_kws)
             fn_path = path / fn
