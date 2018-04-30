@@ -27,5 +27,17 @@ def enhance_movie():
     #                          description='Spacial width for blur (overriden by diameter)')
     pass
 
+def read_npz_synthetic_movie():
+    pulse = 'for_tom'
+    machine = 'MAST'
+    camera = 'SynthCam'
+    start_frame = 0
+    end_frame = 1
+
+    movie = Movie(source='synth_for_tom', name='Movie_demo', start_frame=start_frame, end_frame=end_frame)
+    # movie.set_frames(start_frame=start_frame, end_frame=end_frame)
+    movie(i=1).plot(show=True)
+
 if __name__ == '__main__':
-    enhance_movie()
+    read_npz_synthetic_movie()
+    # enhance_movie()
