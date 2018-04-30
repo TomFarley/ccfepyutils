@@ -370,6 +370,7 @@ def python_path(filter=None):
 def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, return_raw_fn=False, _raise=True,
                 verbose=False):
     """Return path to file given number of possible paths"""
+    # TODO: detect multiple occurences/possible paths
     if path_kws is None:
         path_kws = {}
     if fn_kws is None:
