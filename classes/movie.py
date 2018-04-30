@@ -59,7 +59,6 @@ def get_synthcam_data_path(machine, camera, pulse):
             path = '/home/nwalkden/python_tools/cySynthCam/error_analysis/'
         else:
             path = '~/data/synth_frames/{}/'.format(machine)
-        fn = 'Frame_{n:d}.p'
         path = '~/data/synth_frames/'
         fn_formats = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']
     else:
@@ -69,19 +68,24 @@ def get_synthcam_data_path(machine, camera, pulse):
     if is_number(pulse):
         pulse = str(int(pulse))
     assert isinstance(pulse, str)
-    for fn in fn_formats:
-        path = path_root / pulse / fn
+    path_options = [path_root / machine / pulse, path_root / pulse]
+    fn_format = None
+    for path in path_options:
         if not path.parent.is_dir():
-            raise IOError('Path "{}" does not exist'.format(str(path.parent)))
-        if not Path(str(path).format(n=0)).is_file():
+            logger.debug('Path "{}" does not exist'.format(str(path.parent)))
             continue
-        fn_format = fn
-        break
+        for fn in fn_formats:
+            if not Path(str(path/fn).format(n=0)).is_file():
+                continue
+            fn_format = fn
+            break
+        if fn_format is not None:
+            break
     else:
         fn_format = None
     if fn_format is None:
         raise IOError('Cannot locate file "{}" in path {}'.format(str(path).format(n=0), str(path)))
-    return str(path)
+    return str(path / fn_format)
 
 def get_mast_movie_transforms(machine, camera, pulse):
     """Get transforms to apply to each raw movie frame"""
@@ -225,33 +229,35 @@ class Movie(Stack):
                                                                 res=self.image_resolution, enh=enhanced)
         return out
 
-    def set_movie_source(self, pulse, machine, camera, fn=None, **kwargs):
+    def set_movie_source(self, pulse, machine, camera, fn_format=None, **kwargs):
         """Locate movie file to load data from"""
         # TODO: remove duplication?
         self.pulse = pulse
         self.machine = machine
         self.camera = camera
-        if fn is None:
-            fn, self._transforms = self.locate_movie_file(self.pulse, self.machine, self.camera)
-        fn = Path(fn)
+        if fn_format is None:
+            fn_format, self._transforms = self.locate_movie_file(self.pulse, self.machine, self.camera)
+        fn_format = Path(fn_format)
 
         # Check file path exists
-        if not fn.parent.is_dir():
-            raise IOError('Path "{}" does not exist'.format(fn.parent))
-        if not Path(str(fn).format(n=0)).is_file():
-            raise IOError('Cannot locate file "{}" in path {}'.format(fn.name, fn.parent))
+        if not fn_format.parent.is_dir():
+            raise IOError('Path "{}" does not exist'.format(fn_format.parent))
+        if not Path(str(fn_format).format(n=0)).is_file():
+            raise IOError('Cannot locate file "{}" in path {}'.format(fn_format.name, fn_format.parent))
 
-        self.fn_path = str(fn)
-        self.path = str(fn.parent)
-        self.fn = str(fn.name)
+        self.fn_path = str(fn_format)
+        self.path = str(fn_format.parent)
+        self.fn = str(fn_format.name)
         # TODO: movie movie formnat to ._movie_meta?
-        self.movie_format = str(fn.suffix)
+        self.movie_format = str(fn_format.suffix)
 
         self._movie_meta = {'format': self.movie_format}
         if self.movie_format == '.mraw':
             self._movie_meta.update(self.get_mraw_file_info(self.fn_path))
         elif self.movie_format == '.p':
             self._movie_meta.update(self.get_pickle_movie_info(self.fn_path, transforms=self._transforms))
+        elif self.movie_format == '.npz':
+            self._movie_meta.update(self.get_npz_movie_info(self.fn_path, transforms=self._transforms))
         else:
             raise NotImplementedError('set_movie_file for format "{}" not implemented'.format(self.movie_format))
         self._y['values'] = np.arange(self._movie_meta['frame_shape'][0])
@@ -413,7 +419,39 @@ class Movie(Stack):
         movie_meta['frame_shape'] = transform_image(example_frame, transforms).shape
         movie_meta['frame0'] = 0
         return movie_meta
-    
+
+    @classmethod
+    def get_npz_movie_info(cls, fn_path, transforms=[]):
+        """Get meta data from pickled frame data"""
+        path, fn = os.path.split(fn_path)
+        # TODO: Get filename formats from settings file
+        fn_patterns = ['^Frame_data_(\d+).npz$']
+        files_all = [os.path.basename(p) for p in glob.glob(path + '/*')]
+
+        # Find filename format
+        for pattern in fn_patterns:
+            # Find pickled frame files (NOT 'filament_data')
+            frame_files = natsort.natsorted([f for f in files_all if re.match(pattern, f)])
+            if len(frame_files) > 0:
+                # If files don't have name format Frame_0.p etc take all pickle files without filament_data
+                fn_pattern = pattern
+                break
+        else:
+            raise IOError('No npz frame files located in "{}" for fn_patterns {}'.format(path, fn_patterns))
+
+        # Dict linking frame numbers to filenames
+        frames_all = {int(re.match(fn_pattern, f).group(1)): f for f in frame_files}
+
+        npz_files = {'path': path, 'fn_pattern': fn_pattern, 'frames_all': frames_all}
+        movie_meta = {'movie_format': '.npz', 'npz_files': npz_files}
+        movie_meta['frame_range'] = [np.min(list(frames_all.keys())), np.max(list(frames_all.keys()))]
+        movie_meta['t_range'] = [np.nan, np.nan]
+        movie_meta['fps'] = np.nan
+        example_frame = np.load(os.path.join(path, frame_files[0]))['frame']
+        movie_meta['frame_shape'] = transform_image(example_frame, transforms).shape
+        movie_meta['frame0'] = 0
+        return movie_meta
+
     def get_mraw_file_number(self, **kwargs):
         assert self._movie_meta is not None
         mraw_files = self._movie_meta['mraw_files']
@@ -446,6 +484,8 @@ class Movie(Stack):
             data = self.read_mraw_movie(n=n)
         elif self.movie_format == '.p':
             data = self.read_pickle_movie(n=n)
+        elif self.movie_format == '.npz':
+            data = self.read_npz_movie(n=n)
         elif self.movie_format == '.ipx':
             raise NotImplementedError
         else:
@@ -515,6 +555,27 @@ class Movie(Stack):
                 raise IOError('Cannot locate pickle file for frame n={}'.format(n))
             fn = frames_all[n]
             data_i = pickle_load(fn, path, encoding='latin1')
+            data_i = transform_image(data_i, transforms)
+            data[i] = data_i
+            self._meta.loc[n, 'set'] = True
+        return data
+
+    def read_npz_movie(self, n=None):
+        # raise NotImplementedError
+        # Loop over frames from start frame, including those in the frame set
+        frames = self._frame_range['frames'] if n is None else make_itterable(n)
+        # Initialise array for data to be read into
+        data = np.zeros((len(frames), *self._movie_meta['frame_shape']))
+
+        transforms = self._transforms
+        path = self._movie_meta['npz_files']['path']
+        frames_all = self._movie_meta['npz_files']['frames_all']
+        # frames = self._frame_range['frames']
+        for i, n in enumerate(frames):
+            if n not in frames_all:
+                raise IOError('Cannot locate npz file for frame n={}'.format(n))
+            fn = frames_all[n]
+            data_i = np.load(os.path.join(path, fn))['frame']
             data_i = transform_image(data_i, transforms)
             data[i] = data_i
             self._meta.loc[n, 'set'] = True
