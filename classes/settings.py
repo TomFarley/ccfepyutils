@@ -485,10 +485,14 @@ class Settings(object):
     @in_state('loading', 'loaded')
     def load(self):
         assert self.file_exists
-        with Dataset(self.fn_path) as root:
-            # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
-            self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
-        self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
+        try:
+            with Dataset(self.fn_path) as root:
+                # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
+                self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
+            self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
+        except Exception as e:
+            # TODO: restore backup if corrupted?
+            raise e
         self.log_file.loaded(self.name)
         self.check_consistency()
  
