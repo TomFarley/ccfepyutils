@@ -51,27 +51,28 @@ def get_mast_camera_data_path(machine, camera, pulse):
 def get_synthcam_data_path(machine, camera, pulse):
     """Return path to movie file"""
     # TODO: get paths from settings/config file
+    if is_number(pulse):
+        pulse = str(int(pulse))
     host_name = socket.gethostname()
     host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
     if machine == 'MAST':
         # TODO: Get path format from settings file
         if host_name == 'freia':
-            path = '/home/nwalkden/python_tools/cySynthCam/error_analysis/'
+            path_root = '/home/nwalkden/python_tools/cySynthCam/error_analysis/'
+            path_root = Path(path_root).expanduser().resolve()
+            path_options = [path_root / pulse]
         else:
-            path = '~/data/synth_frames/{}/'.format(machine)
-        path = '~/data/synth_frames/'
+            path_root = '~/data/synth_frames/'
+            path_root = Path(path_root).expanduser().resolve()
+            path_options = [path_root / machine / pulse, path_root / pulse]
         fn_formats = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']
     else:
         raise ValueError('Machine "{}" file lookup not yet supported'.format(machine))
-    path_root = Path(path).expanduser().resolve()
     assert path_root.is_dir(), 'Movie data path doesnt exist'
-    if is_number(pulse):
-        pulse = str(int(pulse))
     assert isinstance(pulse, str)
-    path_options = [path_root / machine / pulse, path_root / pulse]
     fn_format = None
     for path in path_options:
-        if not path.parent.is_dir():
+        if not path.is_dir():
             logger.debug('Path "{}" does not exist'.format(str(path.parent)))
             continue
         for fn in fn_formats:
