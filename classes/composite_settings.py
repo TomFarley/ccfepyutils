@@ -120,9 +120,9 @@ class CompositeSettings(object):
                 else:
                     assert col in self.columns, 'Column not found: {}'.format(col)
                     col_set += [col]
-            if cols == ['repr']:
-                col_set.pop(col_set.index('name'))
-                col_set += ['parent']
+            # if cols == ['repr']:
+            #     col_set.pop(col_set.index('name'))
+            #     col_set += ['parent']
         if items == 'all':
             items = self.items
         elif isinstance(items, str):

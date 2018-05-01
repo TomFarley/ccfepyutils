@@ -23,67 +23,92 @@ from ccfepyutils.classes.plot import Plot
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-def get_mast_camera_data_path(machine, camera, pulse):
-    """Return path to movie file"""
+def get_camera_data_path(machine, camera, pulse):
+    """Return path to movie file, looking up settings for camera"""
     # TODO: get paths from settings/config file
-    host_name = socket.gethostname()
-    host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
-    # TODO: Raise warning message if need to create new settings file for this machine etc
-    s = Settings.get('MAST_movie_paths', host_name)
-    if camera == 'SA1.1':
-        # path = '~/data/camera_data/SA1/'
-        path = s['SA1_movie_path'].value
-        fn = 'C001H001S0001-{n:02d}.mraw'
-    else:
-        raise ValueError('Camera "{}" file lookup not yet supported'.format(camera))
-    path = Path(path).expanduser().resolve()
-    assert path.is_dir(), 'Movie data path doesnt exist'
     if is_number(pulse):
         pulse = str(int(pulse))
-    assert isinstance(pulse, str)
-    path = path / pulse / 'C001H001S0001' / fn
-    if not path.parent.is_dir():
-        raise IOError('Path "{}" does not exist'.format(str(path)))
-    if not Path(str(path).format(n=0)).is_file():
-        raise IOError('Cannot locate file "{}" in path {}'.format(fn, str(path)))
-    return str(path), fn
+    # host_name = socket.gethostname()
+    # host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
 
-def get_synthcam_data_path(machine, camera, pulse):
-    """Return path to movie file"""
-    # TODO: get paths from settings/config file
-    if is_number(pulse):
-        pulse = str(int(pulse))
-    host_name = socket.gethostname()
-    host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
-    if machine == 'MAST':
-        # TODO: Get path format from settings file
-        if host_name == 'freia':
-            path_options = ['~nwalkden/python_tools/cySynthCam/error_analysis/{pulse}/',
-                            '~nwalkden/python_tools/elzar/elzar2/synthetic_imaging/{pulse}/']
-        else:
-            path_options = ['~/data/synth_frames/{machine}/{pulse}']
-        fn_options = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']
-    else:
-        raise ValueError('Machine "{}" file lookup not yet supported'.format(machine))
+    camera_settings = Settings.get('Movie_data_locations', '{}_{}'.format(machine, camera))
+    if len(camera_settings) == 0:
+        raise ValueError('No Movie_data_locations settings exist for "{}" on "{}"'.format(camera, machine))
+    
+    path_options = camera_settings['path_options']
+    fn_options = camera_settings['fn_options']
+    
     path_kws = {'machine': machine, 'pulse': pulse}
     fn_kws = {'n': 0}
     path, fn_format = locate_file(path_options, fn_options, path_kws=path_kws, fn_kws=fn_kws,
                           return_raw_path=False, return_raw_fn=True, _raise=True, verbose=True)
-    return path, fn_format
+    if ('frame_transforms' in camera_settings) and (isinstance(camera_settings['frame_transforms'], list)):
+        transforms = camera_settings['frame_transforms']
+    else:
+        transforms = [] 
+    return path, fn_format, transforms
 
-def get_mast_movie_transforms(machine, camera, pulse):
-    """Get transforms to apply to each raw movie frame"""
-    if camera == 'SA1.1':
-        # transforms = ['transpose', 'reverse_y']
-        # transforms = ['transpose']#, 'reverse_y']
-        transforms = []
-    return transforms
+# def get_mast_camera_data_path(machine, camera, pulse):
+#     """Return path to movie file"""
+#     # TODO: get paths from settings/config file
+#     host_name = socket.gethostname()
+#     host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
+#     # TODO: Raise warning message if need to create new settings file for this machine etc
+#     s = Settings.get('MAST_movie_paths', host_name)
+#     if camera == 'SA1.1':
+#         # path = '~/data/camera_data/SA1/'
+#         path = s['SA1_movie_path'].value
+#         fn = 'C001H001S0001-{n:02d}.mraw'
+#     else:
+#         raise ValueError('Camera "{}" file lookup not yet supported'.format(camera))
+#     path = Path(path).expanduser().resolve()
+#     assert path.is_dir(), 'Movie data path doesnt exist'
+#     if is_number(pulse):
+#         pulse = str(int(pulse))
+#     assert isinstance(pulse, str)
+#     path = path / pulse / 'C001H001S0001' / fn
+#     if not path.parent.is_dir():
+#         raise IOError('Path "{}" does not exist'.format(str(path)))
+#     if not Path(str(path).format(n=0)).is_file():
+#         raise IOError('Cannot locate file "{}" in path {}'.format(fn, str(path)))
+#     return str(path), fn
+# 
+# def get_synthcam_data_path(machine, camera, pulse):
+#     """Return path to movie file"""
+#     # TODO: get paths from settings/config file
+#     if is_number(pulse):
+#         pulse = str(int(pulse))
+#     host_name = socket.gethostname()
+#     host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
+#     if machine == 'MAST':
+#         # TODO: Get path format from settings file
+#         if host_name == 'freia':
+#             path_options = ['~nwalkden/python_tools/cySynthCam/error_analysis/{pulse}/',
+#                             '~nwalkden/python_tools/elzar/elzar2/synthetic_imaging/{pulse}/']
+#         else:
+#             path_options = ['~/data/synth_frames/{machine}/{pulse}']
+#         fn_options = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']
+#     else:
+#         raise ValueError('Machine "{}" file lookup not yet supported'.format(machine))
+#     path_kws = {'machine': machine, 'pulse': pulse}
+#     fn_kws = {'n': 0}
+#     path, fn_format = locate_file(path_options, fn_options, path_kws=path_kws, fn_kws=fn_kws,
+#                           return_raw_path=False, return_raw_fn=True, _raise=True, verbose=True)
+#     return path, fn_format
 
-def get_synthcam_transforms(machine, camera, pulse):
-    """Get transforms to apply to each raw movie frame"""
-    if machine == 'MAST':
-        transforms = ['transpose', 'reverse_y']
-    return transforms
+# def get_mast_movie_transforms(machine, camera, pulse):
+#     """Get transforms to apply to each raw movie frame"""
+#     if camera == 'SA1.1':
+#         # transforms = ['transpose', 'reverse_y']
+#         # transforms = ['transpose']#, 'reverse_y']
+#         transforms = []
+#     return transforms
+#
+# def get_synthcam_transforms(machine, camera, pulse):
+#     """Get transforms to apply to each raw movie frame"""
+#     if machine == 'MAST':
+#         transforms = ['transpose', 'reverse_y']
+#     return transforms
 
 class Frame(Slice):
     """Frame object returned by Movie class"""
@@ -149,17 +174,16 @@ class Frame(Slice):
             logger.exception('Cannot annotate frame plot. {}'.format(e))
 
 class Movie(Stack):
-    # TODO: Load compatibilities from config file
-    compatibities = dict((
-        ('MAST', dict((
-            ('SA1.1', dict((
-                ('get_path', get_mast_camera_data_path), ('transforms', get_mast_movie_transforms)
-                ))),
-            ('SynthCam', dict((
-                ('get_path', get_synthcam_data_path), ('transforms', get_synthcam_transforms)
-            ))),
-            ),)),
-        ))
+    # compatibities = dict((
+    #     ('MAST', dict((
+    #         ('SA1.1', dict((
+    #             ('get_path', get_mast_camera_data_path), ('transforms', get_mast_movie_transforms)
+    #             ))),
+    #         ('SynthCam', dict((
+    #             ('get_path', get_synthcam_data_path), ('transforms', get_synthcam_transforms)
+    #         ))),
+    #         ),)),
+    #     ))
     slice_class = Frame
     time_format = '{:0.5f}s'
     def __init__(self, pulse=None, machine=None, camera=None, fn=None, settings='repeat', source=None, range=None, 
@@ -251,14 +275,7 @@ class Movie(Stack):
     @classmethod
     def locate_movie_file(cls, pulse, machine, camera, **kwargs):
         """Locate movie file given movie info"""
-        if machine not in cls.compatibities:
-            raise ValueError('Movie class is not currently compatible with machine "{}". Compatibilties: {}'.format(
-                    machine, cls.compatibities.values()))
-        if camera not in cls.compatibities[machine]:
-            raise ValueError('Movie class is not currently compatible with camera "{}". Compatibilties: {}'.format(
-                    camera, cls.compatibities[machine].values()))
-        path, fn_patern = cls.compatibities[machine][camera]['get_path'](machine, camera, pulse, **kwargs)
-        transforms = cls.compatibities[machine][camera]['transforms'](machine, camera, pulse)
+        path, fn_patern, transforms = get_camera_data_path(machine, camera, pulse)
         return path, fn_patern, transforms
 
     def set_frames(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
@@ -515,11 +532,11 @@ class Movie(Stack):
                 ret, frame, header = vid.read(transforms=self._transforms)
                 data[i_data, :, :] = frame
                 self._meta.loc[n, 'set'] = True
+                i_data += 1
             else:
                 # TODO: Increment vid frame number without reading data
                 vid._current_frame += 1
                 # ret, frame, header = vid.read(transforms=self._transforms)
-            i_data += 1
             n += 1
         vid.release()
         return data
@@ -814,9 +831,9 @@ class Movie(Stack):
     @machine.setter
     def machine(self, value):
         if value is not None:
-            if value not in self.compatibities:
-                raise ValueError('Movie class is not compatible with machine "{}". Options: {}'.format(
-                        value, self.compatibities.keys()))
+            # if value not in self.compatibities:
+            #     raise ValueError('Movie class is not compatible with machine "{}". Options: {}'.format(
+            #             value, self.compatibities.keys()))
             self.source_info['machine'] = value
 
     @property
@@ -827,9 +844,9 @@ class Movie(Stack):
     def camera(self, value):
         if value is not None:
             assert self.machine is not None, 'Machine must be set before camera'
-            if value not in self.compatibities[self.machine]:
-                raise ValueError('Movie class is not compatible with camera "{}". Options: {}'.format(
-                        value, self.compatibities[self.machine].keys()))
+            # if value not in self.compatibities[self.machine]:
+            #     raise ValueError('Movie class is not compatible with camera "{}". Options: {}'.format(
+            #             value, self.compatibities[self.machine].keys()))
             self.source_info['camera'] = value
 
     @property
