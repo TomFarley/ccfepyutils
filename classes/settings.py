@@ -194,7 +194,8 @@ class Settings(object):
                            'type': [('float', bool), ('int', bool), ('bool', bool), ('str', bool)],
                            'io': [('fn_str', str), ('priority', float)],
                            'meta': [('setting', bool), ('function', str), ('runtime', bool), ('order', int)],
-                           'repr': [('value', str), ('description', str), ('setting', bool)]}  # plotting?
+                           'repr': [('value', str), ('description', str), ('setting', bool)],
+                           'comp': [('value', str), ('runtime', bool), ('setting', bool)]}  # plotting?
     # TODO: Add modified column in order to keep track of what's been modified since last save?
     # TODO: block reserved states being used
     reserved_item_names = ['all', 'ignore_state']
@@ -255,6 +256,7 @@ class Settings(object):
     def collect(cls, application=None, name=None, values={}, blacklist=[], whitelist=[], exclude_if_col_true=(),
                 **kwargs):
         from .composite_settings import CompositeSettings
+        exclude_if_col_true = make_itterable(exclude_if_col_true)
         settings = Settings.get(application, name)
         for item, value in values.items():
             settings.set(item, value, ignore=[None])

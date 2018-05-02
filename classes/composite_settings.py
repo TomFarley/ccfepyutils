@@ -106,7 +106,7 @@ class CompositeSettings(object):
         self.build_composite_df()
         logger.info('Rebuilt composite settings {}'.format(repr(self)))
 
-    def view(self, items='all', cols='repr', order=None, ascending=True):
+    def view(self, items='all', cols=('comp', 'parent'), order=None, ascending=True):
         """Return dataframe containing a subst of columns, with items ordered as requried"""
         if cols == 'all':
             raise NotImplementedError
