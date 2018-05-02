@@ -75,6 +75,6 @@ def edit_movie_source_settings():
     pass
 
 if __name__ == '__main__':
-    edit_movie_source_settings()
-    # read_npz_synthetic_movie()
+    # edit_movie_source_settings()
+    read_npz_synthetic_movie()
     # enhance_movie()
