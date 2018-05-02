@@ -695,8 +695,8 @@ if __name__ == '__main__':
     y = np.sin(x)
     z = np.ones((41, 41)) * y
 
-    # plot = Plot(x, y, label='test 1', axes=(2,1))
-    # plot.plot(x, -y, ax=1, label='test 2')
+    # plot = Plot(x, y, label='test_tmp 1', axes=(2,1))
+    # plot.plot(x, -y, ax=1, label='test_tmp 2')
 
     plot = Plot(x, y, z)
 

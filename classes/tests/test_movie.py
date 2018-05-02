@@ -85,7 +85,7 @@ class TestMovie(unittest.TestCase):
         movie[self.start_frame].plot()
 
 def suite():
-    print('Setting test suit')
+    print('Setting test_tmp suit')
     suite = unittest.TestSuite()
 
     suite.addTest(TestMovie('test_init'))

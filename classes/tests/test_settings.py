@@ -66,7 +66,7 @@ class TestSettings(unittest.TestCase):
         settings.delete_file(force=True)
 
 def suite():
-    print('Setting test suit')
+    print('Setting test_tmp suit')
     suite = unittest.TestSuite()
 
     suite.addTest(TestSettings('test_saved_settings'))

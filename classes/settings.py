@@ -30,9 +30,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 ## TODO: Load from config file
-# TODO: Create base .ccfetools/settings/ directory structure if doesn't exist
 settings_dir = os.path.expanduser('~/.ccfetools/settings/')
-
 
 # TODO: Fix deepcopy of Setting objects
 class Setting(abc.ABC):
@@ -1228,7 +1226,7 @@ def t_now_str(format="compressed", dl=''):
     return string
 
 if __name__ == '__main__':
-    s = Settings('test', 'default')
+    s = Settings('test_tmp', 'default')
     print(s)
     s.add_columns(['Description', 'I/O', 'Precedence', 'Representation'])
     print(s)

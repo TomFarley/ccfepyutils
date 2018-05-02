@@ -8,7 +8,7 @@ from ccfepyutils.classes.composite_settings import CompositeSettings
 
 
 def settings():
-    # Settings.get_logfile('test').delete_file(force=True)
+    # Settings.get_logfile('test_tmp').delete_file(force=True)
     settings = Settings.get('Settings_demo', 'default')
     print()
     print(settings)
