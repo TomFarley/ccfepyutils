@@ -218,6 +218,7 @@ def is_subset(subset, full_set):
 
 def is_in(items, collection):
     items = make_itterable(items)
+    collection = make_itterable(collection)
     out = pd.Series(items).isin(collection).values
     return out
 
