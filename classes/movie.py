@@ -422,7 +422,7 @@ class Movie(Stack):
         return movie_meta
 
     @classmethod
-    def get_npz_movie_info(cls, fn_path, transforms=[]):
+    def get_npz_movie_info(cls, fn_path, transforms=()):
         """Get meta data from pickled frame data"""
         path, fn = os.path.split(fn_path)
         # TODO: Get filename formats from settings file
@@ -449,6 +449,11 @@ class Movie(Stack):
         movie_meta['t_range'] = [np.nan, np.nan]
         movie_meta['fps'] = np.nan
         example_frame = np.load(os.path.join(path, frame_files[0]))['frame']
+
+        # TODO: Remove tmp bodge!
+        if transforms == []:
+            transforms = ['transpose', 'reverse_y']
+
         movie_meta['frame_shape'] = transform_image(example_frame, transforms).shape
         movie_meta['frame0'] = 0
         return movie_meta
@@ -577,6 +582,11 @@ class Movie(Stack):
                 raise IOError('Cannot locate npz file for frame n={}'.format(n))
             fn = frames_all[n]
             data_i = np.load(os.path.join(path, fn))['frame']
+
+            # TODO: remove tmp bodge for npz files which are saved in different format to pickle synth data!
+            if transforms == []:
+                transforms = ['transpose', 'reverse_y']
+
             data_i = transform_image(data_i, transforms)
             data[i] = data_i
             self._meta.loc[n, 'set'] = True

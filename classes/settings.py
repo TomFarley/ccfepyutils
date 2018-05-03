@@ -905,7 +905,10 @@ class Settings(object):
                                                                  len=len(self.items), state=self.state)
 
     def __del__(self):
-        self.instances[self.application].pop(self.name)
+        try:
+            self.instances[self.application].pop(self.name)
+        except KeyError as e:
+            logger.error('{}: {}'.format(self, e))
         # super().__del__()
 
     @property
@@ -1070,7 +1073,14 @@ class SettingsLogFile(object):
         if not self.file_exists:
             self.init()
             return False
-        self._df = xr.open_dataset(self.fn_path).to_dataframe()
+        for attempt in [0,1]:
+            try:
+                self._df = xr.open_dataset(self.fn_path).to_dataframe()
+            except Exception as e:
+                if attempt == 1:
+                    logger.error('Failed to open settingslogfile: {}'.format(self.fn_path))
+                    # TODO: copy backedup file?
+                    raise e
         return True
     
     def created(self, name, time=None, overwrite=True):
