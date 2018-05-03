@@ -326,7 +326,7 @@ class Movie(Stack):
             if end_frame == -1:
                 end_frame = self._movie_meta['frame_range'][-1]
             if start_frame is not None and end_frame is not None:
-                assert start_frame < end_frame
+                assert start_frame <= end_frame
                 nframes = end_frame - start_frame + 1
             elif start_frame is not None and nframes is not None:
                 end_frame = start_frame + nframes - 1
