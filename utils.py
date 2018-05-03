@@ -216,6 +216,11 @@ def is_subset(subset, full_set):
     """Return True if all elements of subset are in fullset"""
     return set(subset).issubset(set(full_set))
 
+def is_in(items, collection):
+    items = make_itterable(items)
+    out = pd.Series(items).isin(collection).values
+    return out
+
 def to_list(obj):
     """Convert to list, nesting if nessesary"""
     if isinstance(obj, list):
