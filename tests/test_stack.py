@@ -79,7 +79,7 @@ class TestStack(unittest.TestCase):
 
 
 def suite():
-    print('Setting test suit')
+    print('Setting test_tmp suit')
     suite = unittest.TestSuite()
 
     suite.addTest(TestStack('test_init_empty'))

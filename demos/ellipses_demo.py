@@ -11,7 +11,7 @@ def single_ellipse():
     y_arr = np.linspace(-20, 20, 501)
 
     # Plot ellipse taking widths as 1 sigma widths
-    plot = el.plot_3d_superimposed(x_arr, y_arr, 1, show=False, mode='contourf', num='ellipse test')
+    plot = el.plot_3d_superimposed(x_arr, y_arr, 1, show=False, mode='contourf', num='ellipse test_tmp')
     # Add rings at 2 sigma and 3 sigma
     el.plot(plot.ax(), scale_factor=2)
     el.plot(plot.ax(), scale_factor=3)
@@ -28,7 +28,7 @@ def multi_ellipse():
     y_arr = np.linspace(-20, 20, 501)
 
     # Plot ellipse taking widths as 1 sigma widths
-    plot = el.plot_3d_superimposed(x_arr, y_arr, 1, show=False, mode='contourf', num='ellipse test', scale_factor=[1,2,3])
+    plot = el.plot_3d_superimposed(x_arr, y_arr, 1, show=False, mode='contourf', num='ellipse test_tmp', scale_factor=[1,2,3])
     # Add rings at 2 sigma and 3 sigma
     # el.plot(plot.ax(), scale_factor=2)
     # el.plot(plot.ax(), scale_factor=3)

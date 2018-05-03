@@ -761,7 +761,7 @@ def test_pickle(obj):
     """
     import pickle
     # sys.setrecursionlimit(10000)
-    path = 'test.p.tmp'
+    path = 'test_tmp.p.tmp'
     if os.path.isfile(path):
         os.remove(path)  # remove temp file
     try:

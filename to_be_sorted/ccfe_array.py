@@ -174,7 +174,7 @@ def tup0(obj):
 
 
 if __name__ == "__main__":
-    # from test.run_test import test_tf_array
+    # from test_tmp.run_test import test_tf_array
     print(repr(make_itterable(np.array([1,2,3]))))
     # test_tf_array()
 

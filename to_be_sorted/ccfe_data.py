@@ -491,12 +491,12 @@ if __name__ == "__main__":
     print("interp_val(x, y, 2.3649, kind='linear') = ", end=' ')
     print(interp_val(x, y, 2.3649, kind='linear'))
 
-    fig = plt.figure('conv_diff test')
+    fig = plt.figure('conv_diff test_tmp')
     fig.clear()
     plt.plot( x, y, label = 'sin', c='k', lw=3)
     for n in range(4):
         plt.plot(x, conv_diff(y, order=n), label='n={}'.format(n))
-    plt.title('conv_diff test')
+    plt.title('conv_diff test_tmp')
     plt.legend(loc='best')
     plt.grid(True)
     plt.show()
