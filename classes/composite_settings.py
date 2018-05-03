@@ -63,6 +63,7 @@ class CompositeSettings(object):
         if (len(self._whitelist) > 0) and (application not in self._whitelist) and (not add_to_whitelist):
             logger.debug('Skipping non whitelist settings "{}:{}" from {}'.format(application, name, repr(self)))
             return df
+        exclude_if_col_true = make_itterable(exclude_if_col_true)
         logger.debug('Adding "{}:{}" settings to {}'.format(application, name, repr(self)))
         s = Settings.get(application, name)
         # Add parent column to note which Settings file each setting originates from

@@ -380,7 +380,13 @@ def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, r
         # Insert missing info in
         path_raw = str(path_raw)
         path = path_raw.format(**path_kws)
-        path = Path(path).expanduser()
+        try:
+            path = Path(path).expanduser()
+        except RuntimeError as e:
+            if "Can't determine home directory" in str(e):
+                continue
+            else:
+                raise e
         if not path.is_dir():
             continue
         path = path.resolve()
