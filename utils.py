@@ -229,7 +229,11 @@ def to_list(obj):
 def to_array(obj, silent=True):
     """Return object as an itterable ndarray"""
     if isinstance(obj, np.ndarray):
-        return obj
+        if obj.ndim > 0:
+            return obj
+        else:
+            # 0D array - convert to singe element 1D array
+            return np.array([float(obj)])
 
     try:
         import pandas as pd
