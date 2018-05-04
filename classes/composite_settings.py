@@ -328,7 +328,8 @@ class CompositeSettings(object):
         fn_path = os.path.join(path, fn)
         t0 = t_now_str(format='natural')
         if not os.path.isfile(fn_path):
-            meta = {'application': self._application, 'name': self._name, 'first_used': t0, 'last_used': t0}
+            meta = {'application': self._application, 'name': self._name, 'first_used': t0, 'last_used': t0,
+                    'protected': False}
             df.to_xarray().to_netcdf(fn_path, mode='w', group='df')
             with Dataset(fn_path, "a", format="NETCDF4") as root:
                 dict_to_netcdf(root, 'meta', meta)

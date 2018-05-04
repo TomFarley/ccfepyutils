@@ -11,7 +11,8 @@ import xarray as xr
 from nested_dict import nested_dict
 from past.types import basestring
 
-from ccfepyutils.utils import string_types, signal_abbreviations, logger, signal_sets, make_itterable, compare_dict
+from ccfepyutils.utils import string_types, signal_abbreviations, logger, signal_sets, make_itterable, compare_dict, \
+    is_number, is_subset
 
 logger = logging.getLogger(__name__)
 
@@ -32,30 +33,7 @@ def create_config_file(fn, dic):
 
 def get_from_ini(config, setting, value):
     """Return value for setting from config ini file if value is None"""
-
-if __name__ == '__main__':
-    fn = os.path.expanduser('~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
-    file = nested_dict()
-    file['Paths']['elzar_path'] = '~/elzar/:'
-    file['Paths']['data'] = ''
-
-    file['Movie']['source'] = 'repeat'
-
-    file['Invertor']['type'] = 'PsfInvertor'
-    file['Invertor']['settings'] = 'repeat'
-    file['Invertor']['resolution'] = 'repeat'
-
-    file['Detector']['type'] = 'QuadMinEllipseDetector'
-    file['Detector']['settings'] = 'repeat'
-
-    file['Tracker']['type'] = 'NormedVariationTracker'
-    file['Tracker']['settings'] = 'repeat'
-
-    file['Benchmarker']['type'] = 'ProximityBenchmarker'
-    file['Tracker']['settings'] = 'repeat'
-    # file['elzar_path']['path'] = os.path.expanduser('~/elzar/')
-    create_config_file(fn, file)
-
+    raise NotImplementedError
 
 def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, *args, **kwargs):
     """Get data with IDL_bridge getdata if available, else load from pickle store."""
@@ -114,26 +92,90 @@ def getUserFile(type=""):
     return filename
 
 
-def file_filter(path, extension='.p', contain=None, not_contain=None):
+def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, **kwargs):
+    """Return dict of filenames in given directory that match supplied regex pattern
 
-    for (dirpath, dirnames, filenames) in os.walk(path_in):
-        break  # only look at files in path_in
-    if extension is not None:
-        filenames = [f for f in filenames if f[-len(extension):] == extension]  # eg only pickle files
-    if contain is not None:
-        if isinstance(contain, basestring):
-            contain = [contain]
-        for pat in contain:
-            filenames = [f for f in filenames if pat in f] # only files with fixed variable
-    if not_contain is not None:
-        if isinstance(not_contain, basestring):
-            not_contain = [not_contain]
-        for pat in not_contain:
-            filenames = [f for f in filenames if pat not in f] # only files with fixed variable
+    The keys of the returned dict are the matched groups for each file from the fn_pattern.
+    :param path: path in which to search for/filter filenames
+    :param fn_pattern: regex pattern to match against files. kwargs will be substituted into the pattern (see example)
+    :param group_keys: list that links the ordering of the regex groups to the kwargs keys. Warnings are raised
+                         if not all of the kwarg values are mmatched to files.
+    :param raise_on_incomplete_match: raise an exception if not all kwarg values are located
+    :param kwargs: values are substituted into the fn_pattern (provided the pattern contains a format key matching that
+                    of the kwarg) with lists/arrays of values converted to the appropriate regex pattern.
+    e.g. to get the files with values of n between 10 and 50 use. The returned dict will be keyed by the number n and
+    the last group in the filename (<n>, <.*>). You will be warned if any of the requested n's are not found.
+    fn_pattern = 'myfile-n({n})-(.*).nc'
+    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(20,51))
 
-    fn = filenames[0]
+    """
+    path = Path(path)
+    path = path.expanduser()
+    if not path.is_dir():
+        raise IOError('Search directory "{}" does not exist'.format(path))
+    # If kwargs are supplied convert them to re paterns
+    re_patterns = {}
+    for key, value in kwargs.items():
+        if isinstance(value, (np.ndarray, list, tuple)):  # and is_number(value[0]):
+            # List/array of numbers, so match any number in list
+            re_patterns[key] = '[{}]'.format('|'.join([str(v) for v in value]))
+    fn_pattern = fn_pattern.format(**re_patterns)
+    filenames_all = os.listdir(path)
+    out = {}
+    i = 0
+    for fn in filenames_all:
+        m = re.search(fn_pattern, fn)
+        if m is None:
+            continue
+        ngroups = len(m.groups())
+        if ngroups == 0:
+            key = i
+        elif ngroups == 1:
+            key = m.groups()[0]
+        else:
+            key = m.groups()
+        n = m.groups()  # Get frame number of match
+        out[key] = fn
+        i += 1
 
-    return filenames
+    if len(out) == 0:
+        raise IOError('Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, path))
+    for i, group_key in enumerate(group_keys):
+        if group_key not in kwargs:
+            continue
+        # List of located values for group cast to same type
+        located_values = [type(kwargs[group_key][0])(key[i]) for key in out.keys()]
+        if not is_subset(kwargs[group_key], list(located_values)):
+            message = 'Could not locate files for frame numbers: {}'.format(
+                    set(kwargs[group_key]) - set(located_values))
+            if raise_on_incomplete_match:
+                raise RuntimeError(message)
+            else:
+                logger.warning(message)
+
+
+    return out
+
+# def filter_files_in_dir(path, extension='.p', contain=None, not_contain=None):
+#
+#     for (dirpath, dirnames, filenames) in os.walk(path_in):
+#         break  # only look at files in path_in
+#     if extension is not None:
+#         filenames = [f for f in filenames if f[-len(extension):] == extension]  # eg only pickle files
+#     if contain is not None:
+#         if isinstance(contain, basestring):
+#             contain = [contain]
+#         for pat in contain:
+#             filenames = [f for f in filenames if pat in f] # only files with fixed variable
+#     if not_contain is not None:
+#         if isinstance(not_contain, basestring):
+#             not_contain = [not_contain]
+#         for pat in not_contain:
+#             filenames = [f for f in filenames if pat not in f] # only files with fixed variable
+#
+#     fn = filenames[0]
+#
+#     return filenames
 
 
 def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
@@ -471,3 +513,30 @@ def read_netcdf_group(fn_path, group):
     with xr.open_dataset(fn_path, group=group, autoclose=True) as match_data:
             match_data = match_data.copy(deep=True)
     return match_data
+
+if __name__ == '__main__':
+    path = '/home/tfarley/elzar2/checkpoints/MAST/SynthCam/single_filament_scan/Corrected_inversion_data/6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3/'
+    fn_pattern = 'corr_inv-test1-n({n})-6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3.nc'
+    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(2,8))
+
+    fn = os.path.expanduser('~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
+    file = nested_dict()
+    file['Paths']['elzar_path'] = '~/elzar/:'
+    file['Paths']['data'] = ''
+
+    file['Movie']['source'] = 'repeat'
+
+    file['Invertor']['type'] = 'PsfInvertor'
+    file['Invertor']['settings'] = 'repeat'
+    file['Invertor']['resolution'] = 'repeat'
+
+    file['Detector']['type'] = 'QuadMinEllipseDetector'
+    file['Detector']['settings'] = 'repeat'
+
+    file['Tracker']['type'] = 'NormedVariationTracker'
+    file['Tracker']['settings'] = 'repeat'
+
+    file['Benchmarker']['type'] = 'ProximityBenchmarker'
+    file['Tracker']['settings'] = 'repeat'
+    # file['elzar_path']['path'] = os.path.expanduser('~/elzar/')
+    create_config_file(fn, file)

@@ -163,9 +163,11 @@ def is_number(s):
     """
     TODO: Test on numbers and strings and arrays
     """
+    # from numbers import
     try:
         n=str(float(s))
-        if n == "nan" or n=="inf" or n=="-inf" : return False
+        if n == "nan" or n=="inf" or n=="-inf" :
+            return False
     except ValueError:
         try:
             complex(s) # for complex
