@@ -1,3 +1,4 @@
+import os
 from collections import OrderedDict
 from copy import copy
 import logging
@@ -5,7 +6,11 @@ import inspect
 
 import numpy as np
 import re
+
+from io_tools import mkdir
 from nested_dict import nested_dict
+from netcdf_tools import dict_to_netcdf
+
 from ..utils import make_itterable
 
 from .settings import Settings
@@ -315,6 +320,19 @@ class CompositeSettings(object):
         mask = ~self._df['runtime']
         df = self._df.loc[mask, 'value']
         hash_id = gen_hash_id(df)
+        path = os.path.expanduser('~/.ccfetools/settings_hash_records/{}/{}/'.format(self._application, self._name))
+        if not os.path.isdir(path):
+            mkdir(path, depth=3)
+        fn = 'settings_hash_record-{}.nc'.format(hash_id)
+        fn_path = os.path.join(path, fn)
+        if not os.path.isfile(fn_path):
+            from netCDF4 import Dataset
+            meta = {'application': self._application, 'name': self._name}
+            df.to_xarray().to_netcdf(fn_path, mode='w', group='df')
+            with Dataset(fn_path, "a", format="NETCDF4") as root:
+                dict_to_netcdf(root, 'meta', meta)
+            logger.info('Created new settings hash file: {}'.format(fn))
+
         return hash_id
 
     @property

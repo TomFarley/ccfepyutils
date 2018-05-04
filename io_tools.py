@@ -10,9 +10,8 @@ import numpy as np
 import xarray as xr
 from nested_dict import nested_dict
 from past.types import basestring
-from .utils import string_types
 
-from .utils import signal_abbreviations, logger, signal_sets, make_itterable, compare_dict
+from ccfepyutils.utils import string_types, signal_abbreviations, logger, signal_sets, make_itterable, compare_dict
 
 logger = logging.getLogger(__name__)
 

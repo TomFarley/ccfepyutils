@@ -21,7 +21,7 @@ from ccfepyutils.io_tools import pickle_load, locate_file
 from ccfepyutils.classes.plot import Plot
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 def get_camera_data_path(machine, camera, pulse):
     """Return path to movie file, looking up settings for camera"""
