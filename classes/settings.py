@@ -253,6 +253,11 @@ class Settings(object):
     @classmethod
     def collect(cls, application=None, name=None, values={}, blacklist=[], whitelist=[], exclude_if_col_true=(),
                 **kwargs):
+        """Collect together settings from multiple settings files into one large settings collection.
+
+        The settings file given by 'applicatoin' and 'name' will be loaded. Its values will be updated acording to the
+        'values' keyword dictionary. Then each item in that settings file that corresponds to another settings file will
+        be read in and combined into the same overaching settings collection. A CompositeSettings object is returned."""
         from .composite_settings import CompositeSettings
         exclude_if_col_true = make_itterable(exclude_if_col_true)
         settings = Settings.get(application, name)
