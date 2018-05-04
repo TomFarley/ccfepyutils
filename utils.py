@@ -2,6 +2,8 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
+from datetime import datetime
+
 from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
 
 """
@@ -870,3 +872,28 @@ if __name__ == '__main__':
     print('Arrays:')
     pprint(to_arrays(x, a, b, arr))
 
+
+def datetime2str(time, format="%y%m%d%H%M%S"):
+    string = time.strftime(format)
+    return string
+
+
+def str2datetime(string, format="%y%m%d%H%M%S"):
+    time = datetime.strptime(string, format)
+    return time
+
+
+def convert_str_datetime_format(string, format1="%y%m%d%H%M%S", format2="%H:%M:%S %d/%m/%y"):
+    time = str2datetime(string, format1)
+    string = datetime2str(time, format2)
+    return string
+
+
+def t_now_str(format="compressed", dl=''):
+    if format == 'compressed':
+        format="%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S"
+    elif format == 'natural':
+        format="%H:%M:%S %d/%m/%y"
+    format = format.format(dl=dl)
+    string = datetime2str(datetime.now(), format=format)
+    return string

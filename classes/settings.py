@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
-import os, itertools, gc, re, inspect, configparser, types, abc, numbers, time, shutil
-from collections import defaultdict, OrderedDict
+import os, itertools, gc, re, inspect, configparser, abc, numbers, time, shutil
+from collections import OrderedDict
 from nested_dict import nested_dict
-from datetime import datetime
-from copy import copy, deepcopy
+from copy import copy
 from pathlib import Path
 
 import numpy as np
@@ -14,16 +13,15 @@ import xarray as xr
 from netCDF4 import Dataset
 
 from ccfepyutils.classes.state import State, in_state
-from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class
+from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str
 from ccfepyutils.io_tools import mkdir
-from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict, set_netcdf_atrribute, dataframe_to_netcdf
+from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
 
 try:
     import cpickle as pickle
 except ImportError:
     import pickle
 import logging
-from logging.config import fileConfig
 
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
@@ -1219,28 +1217,6 @@ class SettingsLogFile(object):
         for item in self.items:
             out[item] = self[item]
         return out
-
-def datetime2str(time, format="%y%m%d%H%M%S"):
-    string = time.strftime(format)
-    return string
-
-def str2datetime(string, format="%y%m%d%H%M%S"):
-    time = datetime.strptime(string, format)
-    return time
-
-def convert_str_datetime_format(string, format1="%y%m%d%H%M%S", format2="%H:%M:%S %d/%m/%y"):
-    time = str2datetime(string, format1)
-    string = datetime2str(time, format2)
-    return string
-
-def t_now_str(format="compressed", dl=''):
-    if format == 'compressed':
-        format="%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S"
-    elif format == 'natural':
-        format="%H:%M:%S %d/%m/%y"
-    format = format.format(dl=dl)
-    string = datetime2str(datetime.now(), format=format)
-    return string
 
 if __name__ == '__main__':
     s = Settings('test_tmp', 'default')

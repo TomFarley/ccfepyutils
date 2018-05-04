@@ -10,11 +10,12 @@ import re
 from io_tools import mkdir
 from nested_dict import nested_dict
 from netcdf_tools import dict_to_netcdf
+from netCDF4 import Dataset
 
-from ..utils import make_itterable
+from ccfepyutils.utils import make_itterable, t_now_str
 
-from .settings import Settings
-from .state import State
+from ccfepyutils.classes.settings import Settings
+from ccfepyutils.classes.state import State
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -325,13 +326,16 @@ class CompositeSettings(object):
             mkdir(path, depth=3)
         fn = 'settings_hash_record-{}.nc'.format(hash_id)
         fn_path = os.path.join(path, fn)
+        t0 = t_now_str(format='natural')
         if not os.path.isfile(fn_path):
-            from netCDF4 import Dataset
-            meta = {'application': self._application, 'name': self._name}
+            meta = {'application': self._application, 'name': self._name, 'first_used': t0, 'last_used': t0}
             df.to_xarray().to_netcdf(fn_path, mode='w', group='df')
             with Dataset(fn_path, "a", format="NETCDF4") as root:
                 dict_to_netcdf(root, 'meta', meta)
-            logger.info('Created new settings hash file: {}'.format(fn))
+            logger.info('Created new settings hash file record: {}'.format(fn))
+        else:
+            with Dataset(fn_path, "a", format="NETCDF4") as root:
+                root['meta']['last_used'][0] = t0
 
         return hash_id
 
