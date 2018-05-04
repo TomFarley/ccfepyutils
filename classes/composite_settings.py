@@ -293,7 +293,9 @@ class CompositeSettings(object):
         """Replace all occurences of regex pattern in indices with 'replacement_string'"""
         for settings in self._settings.values():
             settings.rename_items_with_pattern(pattern, replacement_string, force=force)
-            self.df.loc[:,:] = settings._df
+        # TODO: Implement properly
+        # self._df.loc[settings._df.index] = settings._df
+        logger.warning('Changes will not be reflected in composite settings df')
 
     def to_dict(self):
         """Return settings values as dict"""

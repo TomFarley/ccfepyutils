@@ -46,9 +46,9 @@ class TestMovie(unittest.TestCase):
         logger.info('** Running test_init')
         movie = Movie(self.pulse, self.machine, self.camera)
         movie.set_frames(start_frame=self.start_frame, end_frame=self.end_frame)
-        self.assertTrue(movie._frame_range['n'] == self.nframes)
-        movie.set_frames(start_frame=self.start_frame, nframes=self.nframes)
-        self.assertTrue(movie._frame_range['frame_range'][1] == self.end_frame)
+        self.assertTrue(movie._frame_range_info_user['n'] == self.nframes)
+        movie.set_frames(start_frame=self.start_frame, nframes_user=self.nframes)
+        self.assertTrue(movie._frame_range_info_user['frame_range'][1] == self.end_frame)
 
         with self.assertRaises(ValueError):
             movie.set_frames(end_frame=20)

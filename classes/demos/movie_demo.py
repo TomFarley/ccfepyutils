@@ -51,7 +51,7 @@ def enhance_movie():
     print('Movie header meta data (reduced):\n{}'.format(movie_meta))
     print('Frame numbers: {}'.format(movie.frame_numbers))
     print('Frame times: {}'.format(movie.frame_times))
-    print('Frame ramge: {}'.format(movie._frame_range))
+    print('Frame ramge: {}'.format(movie._frame_range_info_user))
     # movie._enhancer.settings('reduce_noise_sigma_space', 75, name='sigma space',
     #                          description='Spacial width for blur (overriden by diameter)')
     pass
@@ -76,5 +76,5 @@ def edit_movie_source_settings():
 
 if __name__ == '__main__':
     # edit_movie_source_settings()
-    read_npz_synthetic_movie()
-    # enhance_movie()
+    # read_npz_synthetic_movie()
+    enhance_movie()
