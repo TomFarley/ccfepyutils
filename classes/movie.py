@@ -309,6 +309,8 @@ class Movie(Stack):
 
         # Initialise loadable frame range as same as user specified frame range
         self._frame_range_info_all = deepcopy(self._frame_range_info_user)
+        frames_all = self._frame_range_info_all['frames']
+        t_all = self._frame_range_info_all['t']
 
         frame_stack_enhancements = np.array(['extract_fg', 'extract_bg'])
         if any(is_in(frame_stack_enhancements, self.settings['enhancements'])):
@@ -819,7 +821,7 @@ class Movie(Stack):
         # TODO: make t ect valid input
         self._init_xarray()
         if frames == 'all':
-            frames = self.stack_axis_values
+            frames = self.frame_numbers
         enhancements = make_itterable(enhancements)
         if not self._setup_enhanced_movie(enhancements) and is_subset(frames, self.enhanced_frames):
             logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
