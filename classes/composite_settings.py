@@ -8,11 +8,11 @@ import numpy as np
 import re
 
 from nested_dict import nested_dict
-from netcdf_tools import dict_to_netcdf
 from netCDF4 import Dataset
 
 from ccfepyutils.utils import make_itterable, t_now_str
 from ccfepyutils.io_tools import mkdir
+from ccfepyutils.netcdf_tools import dict_to_netcdf
 from ccfepyutils.classes.settings import Settings
 from ccfepyutils.classes.state import State
 
