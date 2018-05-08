@@ -187,7 +187,7 @@ class Movie(Stack):
     _frame_range_keys = ['frame_range', 'nframes', 'stride', 'frames', 't_range', 't']
     slice_class = Frame
     time_format = '{:0.5f}s'
-    def __init__(self, pulse=None, machine=None, camera=None, fn=None, settings='repeat', source=None, range=None, 
+    def __init__(self, pulse=None, machine=None, camera=None, movie_path=None, settings='repeat', source=None, range=None,
                  enhancer=None, name=None, **kwargs):
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
@@ -207,7 +207,7 @@ class Movie(Stack):
         super(Movie, self).__init__(x, y, z, quantity=quantity, stack_axis='x', name=name)
 
         kws = self.settings.get_func_args(self.set_movie_source)
-        self.set_movie_source(**kws)
+        self.set_movie_source(fn_path=movie_path, **kws)
                 
         kws = self.settings.get_func_args(self.set_frames)
         self.set_frames(**kws)
@@ -241,7 +241,7 @@ class Movie(Stack):
                                                                 res=self.image_resolution, enh=enhanced)
         return out
 
-    def set_movie_source(self, pulse, machine, camera, fn_path=None, **kwargs):
+    def set_movie_source(self, machine, camera, pulse, fn_path=None, transforms=(), **kwargs):
         """Locate movie file to load data from"""
         # TODO: remove duplication?
         self.pulse = pulse
@@ -249,7 +249,10 @@ class Movie(Stack):
         self.camera = camera
         if fn_path is None:
             path, fn_format, self._transforms = self.locate_movie_file(self.pulse, self.machine, self.camera)
-        fn_path = Path(path) / fn_format
+            fn_path = Path(path) / fn_format
+        else:
+            fn_path = Path(fn_path)
+            self._transforms = transforms
 
         # Check file path exists
         if not fn_path.parent.is_dir():
