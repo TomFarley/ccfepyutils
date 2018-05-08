@@ -334,8 +334,11 @@ class CompositeSettings(object):
                 dict_to_netcdf(root, 'meta', meta)
             logger.info('Created new settings hash file record: {}'.format(fn))
         else:
-            with Dataset(fn_path, "a", format="NETCDF4") as root:
-                root['meta']['last_used'][0] = t0
+            try:
+                with Dataset(fn_path, "a", format="NETCDF4") as root:
+                    root['meta']['last_used'][0] = t0
+            except IndexError as e:
+                logger.warning('Settings_hash_record file does not contain "meta/last_used" variable: {}'.format(fn))
 
         return hash_id
 
