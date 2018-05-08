@@ -113,7 +113,7 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     path = path.expanduser()
     if not path.is_dir():
         raise IOError('Search directory "{}" does not exist'.format(path))
-    # If kwargs are supplied convert them to re paterns
+    # If kwargs are supplied convert them to re patterns
     re_patterns = {}
     for key, value in kwargs.items():
         if isinstance(value, (np.ndarray, list, tuple)):  # and is_number(value[0]):
@@ -146,14 +146,12 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
         # List of located values for group cast to same type
         located_values = [type(kwargs[group_key][0])(key[i]) for key in out.keys()]
         if not is_subset(kwargs[group_key], list(located_values)):
-            message = 'Could not locate files for frame numbers: {}'.format(
-                    set(kwargs[group_key]) - set(located_values))
+            message = 'Could not locate files with {} = {}'.format(group_key,
+                                                                  set(kwargs[group_key]) - set(located_values))
             if raise_on_incomplete_match:
                 raise RuntimeError(message)
             else:
                 logger.warning(message)
-
-
     return out
 
 # def filter_files_in_dir(path, extension='.p', contain=None, not_contain=None):
