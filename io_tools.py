@@ -14,6 +14,12 @@ from past.types import basestring
 from ccfepyutils.utils import string_types, signal_abbreviations, logger, signal_sets, make_itterable, compare_dict, \
     is_number, is_subset
 
+try:
+    from natsort import natsorted
+    sorted = natsorted
+except ImportError as e:
+    logger.debug('Please install natsort for improved sorting')
+
 logger = logging.getLogger(__name__)
 
 def create_config_file(fn, dic):
@@ -120,7 +126,7 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
             # List/array of numbers, so match any number in list
             re_patterns[key] = '[{}]'.format('|'.join([str(v) for v in value]))
     fn_pattern = fn_pattern.format(**re_patterns)
-    filenames_all = os.listdir(path)
+    filenames_all = sorted(os.listdir(str(path)))
     out = {}
     i = 0
     for fn in filenames_all:
@@ -141,7 +147,7 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     if len(out) == 0:
         raise IOError('Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, path))
     for i, group_key in enumerate(group_keys):
-        if group_key not in kwargs:
+        if (group_key not in kwargs) or (kwargs[group_key] is None):
             continue
         # List of located values for group cast to same type
         located_values = [type(kwargs[group_key][0])(key[i]) for key in out.keys()]
