@@ -24,6 +24,7 @@ except AssertionError as e:
 pd.set_option("display.width", 160)  # TODO: Use None when in ipython terminal - auto size?
 # Double max column display width to display long descriptive strings in columns
 pd.set_option("display.max_colwidth", 80)
+pd.options.display.max_rows = 999
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

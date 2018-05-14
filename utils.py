@@ -11,6 +11,7 @@ Utility functions used in the filament tracker program
 """
 from past.builtins import basestring  # pip install future
 from pprint import pprint
+import string
 try:
     from Tkinter import Tk  # python2 freia
     from tkFileDialog import askopenfilename
@@ -448,9 +449,9 @@ class ROISelector(object):
 def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
                   decimals=2, nth_loop=2, barLength=50):
     """
-    from http://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
+    Based on http://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
 
-    Call in a loop to create terminal progress bar
+    Call at start of a loop to create terminal progress bar
     @params:
         iteration   - Required  : current iteration starting at 0 (Int)
         total       - Required  : total iterations (Int)
@@ -475,6 +476,9 @@ def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
     if t0 is None:
         time = ''
     else:
+        if isinstance(t0, float):
+            # Convert float time from time.time() (seconds since the Epoch) to datetime
+            t0 = datetime.fromtimestamp(t0)
         t1 = datetime.now()
         t_diff_past = relativedelta(t1, t0)  # time past in loop
         mul = float(total - iteration) / iteration if iteration > 0 else 0
@@ -484,6 +488,8 @@ def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
             t_diff_rem = (datetime.now() + t_diff_rem).strftime("(%d/%m/%y %H:%M)")
         else:  # Display expected time remaining
             t_diff_rem = '({h}h {m}m {s}s)'.format(h=t_diff_rem.hours, m=t_diff_rem.minutes, s=t_diff_rem.seconds)
+        if mul == 0:
+            t_diff_rem = '?h ?m ?s'
         time = ' {past} -> {remain}'.format(past=t_diff_past, remain=t_diff_rem)
 
     sys.stdout.write('\r %s |%s| %s%s%s%s %s' % (prefix, bar, frac, percents, '%', time, suffix)),
@@ -899,3 +905,27 @@ def t_now_str(format="compressed", dl=''):
     format = format.format(dl=dl)
     string = datetime2str(datetime.now(), format=format)
     return string
+
+
+class PartialFormatter(string.Formatter):
+    def __init__(self):
+        pass
+
+    def get_field(self, field_name, args, kwargs):
+        # Handle a key not found
+        try:
+            val = super(PartialFormatter, self).get_field(field_name, args, kwargs)
+            # Python 3, 'super().get_field(field_name, args, kwargs)' works
+        except (KeyError, AttributeError):
+            val = ([field_name], field_name)
+        return val
+
+    def format_field(self, value, spec):
+        # handle an invalid format
+        if isinstance(value, list):
+            return '{' + '{value}:{spec}'.format(value=value[0], spec=spec) + '}'
+        try:
+            return super(PartialFormatter, self).format_field(value, spec)
+        except ValueError:
+            if self.bad_fmt is not None: return self.bad_fmt
+            else: raise
