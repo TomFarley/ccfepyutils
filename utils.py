@@ -449,9 +449,9 @@ class ROISelector(object):
 def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
                   decimals=2, nth_loop=2, barLength=50):
     """
-    from http://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
+    Based on http://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
 
-    Call in a loop to create terminal progress bar
+    Call at start of a loop to create terminal progress bar
     @params:
         iteration   - Required  : current iteration starting at 0 (Int)
         total       - Required  : total iterations (Int)
@@ -476,6 +476,9 @@ def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
     if t0 is None:
         time = ''
     else:
+        if isinstance(t0, float):
+            # Convert float time from time.time() (seconds since the Epoch) to datetime
+            t0 = datetime.fromtimestamp(t0)
         t1 = datetime.now()
         t_diff_past = relativedelta(t1, t0)  # time past in loop
         mul = float(total - iteration) / iteration if iteration > 0 else 0
@@ -485,6 +488,8 @@ def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
             t_diff_rem = (datetime.now() + t_diff_rem).strftime("(%d/%m/%y %H:%M)")
         else:  # Display expected time remaining
             t_diff_rem = '({h}h {m}m {s}s)'.format(h=t_diff_rem.hours, m=t_diff_rem.minutes, s=t_diff_rem.seconds)
+        if mul == 0:
+            t_diff_rem = '?h ?m ?s'
         time = ' {past} -> {remain}'.format(past=t_diff_past, remain=t_diff_rem)
 
     sys.stdout.write('\r %s |%s| %s%s%s%s %s' % (prefix, bar, frac, percents, '%', time, suffix)),
