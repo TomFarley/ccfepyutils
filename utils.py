@@ -11,6 +11,7 @@ Utility functions used in the filament tracker program
 """
 from past.builtins import basestring  # pip install future
 from pprint import pprint
+import string
 try:
     from Tkinter import Tk  # python2 freia
     from tkFileDialog import askopenfilename
@@ -899,3 +900,27 @@ def t_now_str(format="compressed", dl=''):
     format = format.format(dl=dl)
     string = datetime2str(datetime.now(), format=format)
     return string
+
+
+class PartialFormatter(string.Formatter):
+    def __init__(self):
+        pass
+
+    def get_field(self, field_name, args, kwargs):
+        # Handle a key not found
+        try:
+            val = super(PartialFormatter, self).get_field(field_name, args, kwargs)
+            # Python 3, 'super().get_field(field_name, args, kwargs)' works
+        except (KeyError, AttributeError):
+            val = ([field_name], field_name)
+        return val
+
+    def format_field(self, value, spec):
+        # handle an invalid format
+        if isinstance(value, list):
+            return '{' + '{value}:{spec}'.format(value=value[0], spec=spec) + '}'
+        try:
+            return super(PartialFormatter, self).format_field(value, spec)
+        except ValueError:
+            if self.bad_fmt is not None: return self.bad_fmt
+            else: raise

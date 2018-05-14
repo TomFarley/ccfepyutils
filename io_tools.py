@@ -109,6 +109,9 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(20,51))
 
     """
+    from ccfepyutils.utils import PartialFormatter
+    fmt = PartialFormatter()
+
     path = Path(path)
     path = path.expanduser()
     if not path.is_dir():
@@ -119,7 +122,8 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
         if isinstance(value, (np.ndarray, list, tuple)):  # and is_number(value[0]):
             # List/array of numbers, so match any number in list
             re_patterns[key] = '[{}]'.format('|'.join([str(v) for v in value]))
-    fn_pattern = fn_pattern.format(**re_patterns)
+    # fn_pattern = fn_pattern.format(**re_patterns)
+    fn_pattern = fmt.format(fn_pattern, **re_patterns)
     filenames_all = os.listdir(path)
     out = {}
     i = 0
@@ -142,6 +146,8 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
         raise IOError('Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, path))
     for i, group_key in enumerate(group_keys):
         if group_key not in kwargs:
+            continue
+        if kwargs[group_key] is None:
             continue
         # List of located values for group cast to same type
         located_values = [type(kwargs[group_key][0])(key[i]) for key in out.keys()]

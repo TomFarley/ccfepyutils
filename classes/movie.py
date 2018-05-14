@@ -379,8 +379,10 @@ class Movie(Stack):
             # Complete information about frame range
             if any((start_time, end_time, duration)):
                 raise NotImplementedError
-            if end_frame == -1:
-                end_frame = self._movie_meta['frame_range'][-1]
+            if start_frame < 0:
+                start_frame = self._movie_meta['frame_range'][1] + start_frame + 1
+            if end_frame < 0:
+                end_frame = self._movie_meta['frame_range'][1] + end_frame + 1
             if start_frame is not None and end_frame is not None:
                 assert start_frame <= end_frame
                 nframes = end_frame - start_frame + 1
