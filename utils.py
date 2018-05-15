@@ -908,6 +908,7 @@ def t_now_str(format="compressed", dl=''):
 
 
 class PartialFormatter(string.Formatter):
+    """NOTE: Can use double braces for this! '{{no key passed to this}}'.format() -> '{no key passed to this}"""
     def __init__(self):
         pass
 

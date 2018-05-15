@@ -811,10 +811,12 @@ class Settings(object):
         """Reorder settings"""
         df = self._df
         self(item, order=new_order_index)
-        higher_indices = df.index.loc[(df['order'] >= new_order_index) & df.index != item]
+        higher_indices = df.index[(df['order'] >= new_order_index).values & (df.index != item)]
         for index in higher_indices:
             df.loc[index, 'order'] = df.loc[index, 'order'] + 1
-        self._df = df.sort_values('order', axis='index')
+        df = df.sort_values('order', axis='index')
+        df['order'] = np.arange(len(df))
+        self._df = df
         if save:
             self.save()
 
