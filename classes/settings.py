@@ -38,7 +38,11 @@ class Setting(abc.ABC):
     def __init__(self, settings, item):
         self._settings = settings
         self._item = item
-        self._df = self._settings._df.loc[[item], :]
+        try:
+            self._df = self._settings._df.loc[[item], :]
+        except KeyError as e:
+            # SettingList does not have a single item
+            self._df = self._settings._df
 
     def __repr__(self):
         class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
@@ -60,6 +64,7 @@ class Setting(abc.ABC):
     def __iter__(self):
         raise NotImplementedError
 
+    @property
     def columns(self):
         return self._df.columns.values
 
@@ -124,19 +129,29 @@ class SettingBool(Setting, int):
     def __bool__(self):
         return bool(self._settings._df.loc[self._item, 'value_num'])
 
-# TODO: Move new and init into Setting base class
+# TODO: Move new and init into Setting base class!
 
 class SettingList(Setting, list):  # TODO: implement SettingsList  !
     type = list
     # value_column = 'value_num'
     def __new__(cls, settings, item):
-        value = list(settings._df.loc[item, cls.value_column])
-        return int.__new__(cls, value)
+        value = settings.list_items(settings, item)
+        return list.__new__(cls, value)
 
     def __init__(self, settings, item):
         list.__init__(self)
         Setting.__init__(self, settings, item)
 
+    def __str__(self):
+        return str(self.value)
+
+    @property
+    def value(self):
+        return self.type(self._settings.list_items(self._settings, self._item))
+
+    def __iter__(self):
+        for x in self.value:
+            yield x
 
 class Settings(object):
     """Object to store, save, load and interact with collections of settings for other classes
@@ -364,7 +379,7 @@ class Settings(object):
         item, category = self.get_item_index(self, item)
         if category == 'list':
             # If item is a list, unpack it's values into a list
-            return Settings.list_items(self, item)
+            return SettingList(self, item)
         if category == 'function':
             return self.get_func_name_args(item)
 

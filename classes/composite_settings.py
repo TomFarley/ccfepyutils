@@ -10,7 +10,7 @@ import re
 from nested_dict import nested_dict
 from netCDF4 import Dataset
 
-from ccfepyutils.utils import make_itterable, t_now_str
+from ccfepyutils.utils import make_itterable, t_now_str, get_methods_class
 from ccfepyutils.io_tools import mkdir
 from ccfepyutils.netcdf_tools import dict_to_netcdf
 from ccfepyutils.classes.settings import Settings
@@ -191,9 +191,11 @@ class CompositeSettings(object):
         else:
             return 0
 
-    def get_func_args(self, funcs, func_names=None, ignore_func_name=False):
+    def get_func_args(self, funcs, func_names=None, ignore_func_name=True):
         """Get arguments for function from settings object
         :param: funcs - function instances or strings describing the function name"""
+        if ignore_func_name is False:
+            raise NotImplementedError
         funcs = make_itterable(funcs)
         if func_names is not None:
             func_names = make_itterable(func_names)
@@ -210,11 +212,11 @@ class CompositeSettings(object):
             sig = inspect.signature(func)
             for i, kw in enumerate(sig.parameters.values()):
                 name = kw.name
-                if name not in self.items:
+                if not any(re.match('{}(:\d+)?'.format(name), item) for item in self.items):
                     continue
-                compatible_functions = self._df.loc[name, 'function'].strip().split(',')
-                if (name in self) and ((func_name in compatible_functions) or ignore_func_name):
-                    kws[name] = self[name].value
+                # compatible_functions = self._df.loc[name, 'function'].strip().split(',')
+                # if (name in self) and ((func_name in compatible_functions) or ignore_func_name):
+                kws[name] = self[name].value
                 # if setting in kwargs:
                 #     kws[name] = kwargs[name]
         return kws
@@ -273,7 +275,7 @@ class CompositeSettings(object):
             raise Exception('Unexpected error. Item {} not in items dict'.format(item))
         return settings
 
-    def save_to_ddf5(self, fn, group='settings'):
+    def save_to_hdf5(self, fn, group='settings'):
         """Save composite settings dataframe to hdf5 file group"""
         self._df.to_xarray().to_netcdf(fn, mode='a', group=group)
         logger.debug('Saved composite settings {} to file: {}'.format(repr(self), fn))
