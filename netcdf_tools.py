@@ -11,6 +11,11 @@ from ccfepyutils.utils import is_scalar, to_array
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+def get_netcdf_file_groups(fn):
+    dset = netCDF4.Dataset(fn)
+    groups = dset.groups
+    return groups
+
 def set_netcdf_atrribute(group, name, value):
     """Set NetCDF group attirbute safely replacing None values with np.nan"""
     if value is None:

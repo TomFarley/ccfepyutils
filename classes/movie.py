@@ -165,7 +165,7 @@ class Frame(Slice):
         try:
             n_str = 'Frame: {:d}'.format(int(n))
             # TODO: implement time string in annotation
-            t_str = '  Time: {:0.5f}s'.format(t) if t is not None else ''
+            t_str = '  Time: {:0.5f}s'.format(t) if ((t is not None) and (t != np.nan)) else ''
 
             text = n_str + t_str
             frametxt = ax.annotate(text, xy=xy, xycoords='axes fraction', color='white', fontsize=8)
@@ -208,7 +208,7 @@ class Movie(Stack):
 
         kws = self.settings.get_func_args(self.set_movie_source)
         self.set_movie_source(fn_path=movie_path, **kws)
-                
+
         kws = self.settings.get_func_args(self.set_frames)
         self.set_frames(**kws)
         logger.debug('Initialised {}'.format(repr(self)))
