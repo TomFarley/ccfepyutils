@@ -234,11 +234,14 @@ def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
                 print('Directory {} was not created as does not start at {} .'.format(dirs,
                                                                                           os.path.relpath(start_dir)))
                 continue
-            os.makedirs(d)
-            print('Created directory: ' + d)
-            if info:  # Write file describing purpose of directory etc
-                with open(os.path.join(d, 'DIR_INFO.txt'), 'w') as f:
-                    f.write(info)
+            try:
+                os.makedirs(d)
+                print('Created directory: ' + d)
+                if info:  # Write file describing purpose of directory etc
+                    with open(os.path.join(d, 'DIR_INFO.txt'), 'w') as f:
+                        f.write(info)
+            except FileExistsError as e:
+                logging.warning('Directory already created in parallel thread/process: {}'.format(e))
         else:
             if verbose:
                 print('Directory "' + d + '" already exists')
