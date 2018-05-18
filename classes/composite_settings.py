@@ -19,6 +19,9 @@ from ccfepyutils.classes.state import State
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+## TODO: Load from config file
+settings_dir = os.path.expanduser('~/.ccfetools/settings/')
+
 class CompositeSettings(object):
     instances = nested_dict()
     def __init__(self, application, name, blacklist=[], whitelist=[], include_children=True, exclude_if_col_true=()):
@@ -325,7 +328,7 @@ class CompositeSettings(object):
         mask = ~self._df['runtime']
         df = self._df.loc[mask, 'value']
         hash_id = gen_hash_id(df)
-        path = os.path.expanduser('~/.ccfetools/settings_hash_records/{}/{}/'.format(self._application, self._name))
+        path = os.path.join(settings_dir, 'hash_records', self._application, self._name)
         if not os.path.isdir(path):
             mkdir(path, depth=3)
         fn = 'settings_hash_record-{}.nc'.format(hash_id)

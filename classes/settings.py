@@ -916,15 +916,15 @@ class Settings(object):
         else:
             raise ValueError('Input format not recognised: {}'.format(type(other_settings)))
         results = {'same': [], 'different': [], 'missing': []}
-        for item in df.items():
+        for item in df.index:
             if item not in self:
                 results['missing'].append(item)
             else:
-                if df[item] == self._df['value']:
+                if df.loc[item, 'value'] == self._df.loc[item, 'value']:
                     results['same'].append(item)
                 else:
                     results['different'].append(item)
-        if len(results['same'] != len(df)):
+        if len(results['same']) != len(df):
             different_items = results['different']+results['missing']
             df_diffs = copy(df.loc[different_items, 'value'])
             df_diffs['self'] = self._df.loc[different_items, 'value']
@@ -1039,7 +1039,7 @@ class Settings(object):
     def path(self):
         """Path to settings files"""
         ## TODO: Load from config file
-        return os.path.expanduser('~/.ccfetools/settings/{}/'.format(self.application))
+        return os.path.join(settings_dir, 'values', self.application)
 
 
     @property
@@ -1196,7 +1196,7 @@ class SettingsLogFile(object):
     @ classmethod
     def get_applications(cls):
         """Get list of all applications with saved settings"""
-        applications = next(os.walk(settings_dir))[1]
+        applications = next(os.walk(os.path.join(settings_dir, 'values')))[1]
         return sorted(applications)
 
     def __repr__(self):
@@ -1232,7 +1232,7 @@ class SettingsLogFile(object):
     @property
     def path(self):
         """Path to settings log files"""
-        out = Path(settings_dir) / self.application
+        out = Path(settings_dir) / 'log_files'
         return str(out)
 
     @property
