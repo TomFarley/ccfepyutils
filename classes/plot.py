@@ -213,7 +213,9 @@ class Plot(object):
                 del ax_names[old_name]
         else:
             index = ax
-            logger.debug('Adding axis at {} to {}'.format(index, self))
+            logger.debug('index {} not in self._gs_slices {}'.format(index, self._gs_slices))
+            logger.debug('Adding axis at index {} to fig {} in {} with axes {}'.format(index, self.fig, self,
+                                                                                       self.fig.axes))
             ax = self.fig.add_subplot(self.gs[ax])
             ax.ccfe_plot = self
             self._gs_slices[index] = ax

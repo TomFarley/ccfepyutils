@@ -930,6 +930,7 @@ class Settings(object):
             df_diffs['self'] = self._df.loc[different_items, 'value']
             message = 'Settings comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
                     len(results['same']), results['different'], results['missing'], df_diffs)
+            print(df_diffs)
             if raise_on_difference:
                 raise ValueError(message)
             logger.warning(message)
