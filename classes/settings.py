@@ -907,6 +907,36 @@ class Settings(object):
             value = self[item]
             out[key] = value
         return out
+
+    def compare_settings(self, other_settings, raise_on_difference=True):
+        if isinstance(other_settings, Settings):
+            df = other_settings._df
+        elif isinstance(other_settings, pd.DataFrame):
+            df = other_settings
+        else:
+            raise ValueError('Input format not recognised: {}'.format(type(other_settings)))
+        results = {'same': [], 'different': [], 'missing': []}
+        for item in df.items():
+            if item not in self:
+                results['missing'].append(item)
+            else:
+                if df[item] == self._df['value']:
+                    results['same'].append(item)
+                else:
+                    results['different'].append(item)
+        if len(results['same'] != len(df)):
+            different_items = results['different']+results['missing']
+            df_diffs = copy(df.loc[different_items, 'value'])
+            df_diffs['self'] = self._df.loc[different_items, 'value']
+            message = 'Settings comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
+                    len(results['same']), results['different'], results['missing'], df_diffs)
+            if raise_on_difference:
+                raise ValueError(message)
+            logger.warning(message)
+        else:
+            df_diffs = None
+
+        return results, df_diffs
     
     def _block_protected(self):
         """Block modificaton of a protected file"""

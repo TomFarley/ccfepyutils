@@ -275,6 +275,9 @@ class CompositeSettings(object):
             raise Exception('Unexpected error. Item {} not in items dict'.format(item))
         return settings
 
+    def compare_settings(self, other_settings, raise_on_difference=True):
+        return Settings.compare_settings(self, other_settings, raise_on_difference=raise_on_difference)
+
     def save_to_hdf5(self, fn, group='settings'):
         """Save composite settings dataframe to hdf5 file group"""
         self._df.to_xarray().to_netcdf(fn, mode='a', group=group)
