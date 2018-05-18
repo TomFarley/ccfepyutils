@@ -1133,6 +1133,8 @@ class SettingsLogFile(object):
     
     def created(self, name, time=None, overwrite=True):
         """Update time settings file for settings name was created"""
+        import getpass
+
         df = self._df
         if name in self.names and (not overwrite or df.loc[name, 'protected']):
             raise RuntimeError('Cannot overwrite values for setting {}'.format(name))
@@ -1141,6 +1143,7 @@ class SettingsLogFile(object):
         df.loc[name, ['created', 'modified', 'loaded']] = time
         df.loc[name, ['mod_count', 'load_count', 'load_count_total']] = 0
         df.loc[name, 'protected'] = False
+        df.loc[name, 'creator'] = getpass.getuser()  # User creating file
         pass
     
     def loaded(self, name, time=None):
