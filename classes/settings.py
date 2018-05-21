@@ -866,6 +866,11 @@ class Settings(object):
             kwargs.pop('value')
             self(item, col_value, **kwargs)
 
+    def update_from_dict(self, dictionary, **kwargs):
+        for item, value in dictionary.items():
+            self(item, value, **kwargs)
+        # logger.debug('Updated {} with values: {}, cols: {}'.format(self, dictionary, kwargs))
+
     @staticmethod
     def get_item_index(settings, item, _raise=True):
         """Lookup item key given name"""
