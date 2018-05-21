@@ -501,6 +501,11 @@ class Settings(object):
         logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
 
     @in_state('modifying', 'modified')
+    def clear(self):
+        self.delete_items(self.items)
+
+
+    @in_state('modifying', 'modified')
     def append_item(self, name, values={'value': []}, categories=[], create_cols=True):
         """Add item with an already existing name to settings.
 
