@@ -14,7 +14,7 @@ from netCDF4 import Dataset
 
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str
-from ccfepyutils.io_tools import mkdir
+from ccfepyutils.io_tools import mkdir, filter_files_in_dir
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
 
 try:
@@ -281,6 +281,14 @@ class Settings(object):
         composite_settings.set_value(**kwargs)
         composite_settings.save()
         return composite_settings
+
+    @classmethod
+    def from_dict(cls, application, name, dictionary, **kwargs):
+        s = Settings(application, name)
+        s.delete_items(s.items)
+        for key, value in dictionary.items():
+            s(key, value, **kwargs)
+        return s
 
     @in_state('init', 'modified')
     def init(self):
@@ -752,7 +760,15 @@ class Settings(object):
     @classmethod
     def existing_settings(cls, application):
         """Get list of all saved settings names for given application"""
-        return SettingsLogFile(application).names
+        fn_pattern = 'settings-{app}-(.*).nc'.format(app=application)
+        path = os.path.join(settings_dir, 'values', application)
+        if os.path.isdir(path):
+            files = filter_files_in_dir(path, fn_pattern, group_keys=['name'])
+            names = list(files.keys())
+        else:
+            names = []
+        return names
+        # return SettingsLogFile(application).names
 
     @staticmethod
     def is_list_item(settings, item):
@@ -915,21 +931,21 @@ class Settings(object):
             df = other_settings
         else:
             raise ValueError('Input format not recognised: {}'.format(type(other_settings)))
-        results = {'same': [], 'different': [], 'missing': []}
+        summary = {'same': [], 'different': [], 'missing': []}
         for item in df.index:
             if item not in self:
-                results['missing'].append(item)
+                summary['missing'].append(item)
             else:
                 if df.loc[item, 'value'] == self._df.loc[item, 'value']:
-                    results['same'].append(item)
+                    summary['same'].append(item)
                 else:
-                    results['different'].append(item)
-        if len(results['same']) != len(df):
-            different_items = results['different']+results['missing']
+                    summary['different'].append(item)
+        if len(summary['same']) != len(df):
+            different_items = summary['different']+summary['missing']
             df_diffs = copy(df.loc[different_items, 'value'])
             df_diffs['self'] = self._df.loc[different_items, 'value']
             message = 'Settings comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
-                    len(results['same']), results['different'], results['missing'], df_diffs)
+                    len(summary['same']), summary['different'], summary['missing'], df_diffs)
             print(df_diffs)
             if raise_on_difference:
                 raise ValueError(message)
@@ -937,7 +953,7 @@ class Settings(object):
         else:
             df_diffs = None
 
-        return results, df_diffs
+        return summary, df_diffs
     
     def _block_protected(self):
         """Block modificaton of a protected file"""
@@ -1234,6 +1250,12 @@ class SettingsLogFile(object):
         self.load()
 
     @property
+    def hash_id(self):
+        # TODO: Move method here = swap location
+        from ccfepyutils.classes.composite_settings import CompositeSettings
+        return CompositeSettings.hash_id(self)
+
+    @property
     def path(self):
         """Path to settings log files"""
         out = Path(settings_dir) / 'log_files'
@@ -1268,6 +1290,29 @@ class SettingsLogFile(object):
         for item in self.items:
             out[item] = self[item]
         return out
+
+def compare_settings_hash(application, name, settings_obj, n_output=3, skip_identical=False):
+    """ Compare settings to saved settings hashes"""
+    if isinstance(settings_obj, dict):
+        settings_obj = Settings.from_dict(application, name, settings_obj, runtime=False)
+    hash_path = '/home/tfarley/.ccfetools/settings/hash_records/Elzar/synthcam_test/'
+    fn_pattern = 'settings_hash_record-(\w+).nc'
+    files = filter_files_in_dir(hash_path, fn_pattern, ['hash_id'])
+    differences = {}
+    diff_table = pd.DataFrame(columns=['n_same', 'n_missing', 'n_different'])
+    for fn, hash_id in files.items():
+        hash_settings = xr.open_dataset(os.path.join(hash_path, fn), group='df').to_dataframe()
+        summary, df_diffs = settings_obj.compare_settings(hash_settings, raise_on_difference=False)
+        differences[hash_id] = df_diffs
+        diff_table.loc[hash_id, ['n_changes', 'n_missing', 'n_different']] = len(settings_obj)-len(summary['same']), \
+                                                                    len(summary['missing']), len(summary['different'])
+        diff_table.sort_values(['n_changes', 'n_missing'], ascending=True)
+    for i in np.arange(np.min(n_output, len(diff_table))):
+        hash_id = diff_table.index[i]
+        if skip_identical and diff_table.loc[hash_id, 'n_changes'] == 0:
+            continue
+        logger.info('{}th closest match: {}\n{}'.format(i+1, hash_id, differences[hash_id]))
+    return diff_table, differences
 
 if __name__ == '__main__':
     s = Settings('test_tmp', 'default')
