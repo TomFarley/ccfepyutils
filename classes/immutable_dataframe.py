@@ -138,7 +138,11 @@ if __name__ == '__main__':
     from types import MappingProxyType
     from pandas.util import hash_pandas_object
 
-    df = pd.DataFrame.from_dict({'hi': 'bye', 'good': 'bad', 'yes': 'no'}, orient='index')
+    df = pd.DataFrame(columns=['value'])
+    df.loc['hi'] = 'bye'
+    df.loc['good'] = 'bad'
+    df.loc['yes'] = 'no'
+
     df2 = DataFrameProxy(df)
     df3 = MappingProxyType(df.to_dict())
     d = df.to_dict()
