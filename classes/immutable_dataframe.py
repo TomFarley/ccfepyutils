@@ -153,7 +153,7 @@ if __name__ == '__main__':
     # h.update(bytes(str(df5), 'utf-8'))
     h.update(repr(df).encode())
     # hash_id = h.hexdigest()
-    hash_id = hashlib.sha3_256(df.to_json().encode()).hexdigest()
+    hash_id = hashlib.sha256(df.to_json().encode()).hexdigest()
     print(repr(df))
     print(repr(df).encode())
     print(hash_id)
