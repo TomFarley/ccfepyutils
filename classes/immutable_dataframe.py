@@ -147,8 +147,10 @@ if __name__ == '__main__':
     print(hash(df2))
     print(repr(df2))
     print(df4)
+    print(df5)
     h = hashlib.new('sha1')
-    h.update(bytes(str(df5), 'utf-8'))
+    # h.update(bytes(str(df5), 'utf-8'))
+    h.update(df.values.tobytes())
     hash_id = h.hexdigest()
     print(hash_id)
 
