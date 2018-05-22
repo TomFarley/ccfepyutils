@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """ 
-Author: T. Farley
+Taken from https://stackoverflow.com/questions/24928306/pandas-immutable-dataframe#
 """
 
 import logging, os, itertools, re, inspect, configparser, time
@@ -135,11 +135,20 @@ class DataFrameProxy(_ReadOnly):
         return self._obj.sort(*args, **kwargs)
 
 if __name__ == '__main__':
+    from types import MappingProxyType
+    from pandas.util import hash_pandas_object
+
     df = pd.DataFrame.from_dict({'hi': 'bye', 'good': 'bad', 'yes': 'no'}, orient='index')
     df2 = DataFrameProxy(df)
+    df3 = MappingProxyType(df.to_dict())
+    d = df.to_dict()
+    df4 = tuple((k, d[k]) for k in sorted(d.keys()))
     print(hash(df2))
     print(repr(df2))
+    print(df4)
     h = hashlib.new('sha1')
-    h.update(bytes(str(df2), 'utf-8'))
+    h.update(bytes(str(df4), 'utf-8'))
     hash_id = h.hexdigest()
     print(hash_id)
+
+    print(hash_pandas_object(df))
