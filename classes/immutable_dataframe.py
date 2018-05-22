@@ -161,5 +161,11 @@ if __name__ == '__main__':
     print(repr(df))
     print(repr(df).encode())
     print(hash_id)
+
+    h = hashlib.new('ripemd160')
+    h.update(bytes(str(df), 'utf-8'))
+    hash_id = h.hexdigest()
+    print(hash_id)
+
     pass
     # print(hash_pandas_object(df))
