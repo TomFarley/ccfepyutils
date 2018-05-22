@@ -153,6 +153,8 @@ if __name__ == '__main__':
     # h.update(bytes(str(df5), 'utf-8'))
     h.update(repr(df).encode())
     hash_id = h.hexdigest()
+    print(repr(df))
+    print(repr(df).encode())
     print(hash_id)
     pass
     # print(hash_pandas_object(df))
