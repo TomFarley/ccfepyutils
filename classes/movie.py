@@ -286,7 +286,7 @@ class Movie(Stack):
         return path, fn_patern, transforms
 
     def set_frames(self, frames_user=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
-                   nframes_user=None, duration=None, stride=1, all=False, transforms=None):
+                   nframes_user=None, duration=None, frame_stride=1, all=False, transforms=None):
         """Set frame range in file to read"""
         if self._movie_meta is None:
             assert RuntimeError('The movie file must be set before the frame range is set')
@@ -299,9 +299,9 @@ class Movie(Stack):
         frames_user, nframes_user, frame_range_user = self.get_frame_range(frames=frames_user,
                                                                            start_frame=start_frame, end_frame=end_frame,
                                                                            start_time=start_time, end_time=end_time,
-                                                                           nframes=nframes_user, duration=duration, stride=stride)
+                                                                           nframes=nframes_user, duration=duration, stride=frame_stride)
         
-        self._frame_range_info_user.update({'frame_range': frame_range_user, 'nframes': nframes_user, 'stride': stride,
+        self._frame_range_info_user.update({'frame_range': frame_range_user, 'nframes': nframes_user, 'stride': frame_stride,
                                        'frames': frames_user})
         self.check_user_frame_range()
         fps = self._movie_meta['fps']

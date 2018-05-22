@@ -874,6 +874,7 @@ class Settings(object):
     def update_from_dict(self, dictionary, **kwargs):
         for item, value in dictionary.items():
             self(item, value, **kwargs)
+        return self
         # logger.debug('Updated {} with values: {}, cols: {}'.format(self, dictionary, kwargs))
 
     @staticmethod
