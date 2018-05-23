@@ -808,7 +808,7 @@ class Settings(object):
         out = {key: self(key) for key in items}
         return out
 
-    def get_func_args(self, funcs, func_names=None):
+    def get_func_args(self, funcs, func_names=None, whitelist=(), blacklist=()):
         """Get arguments for function from settings object
         :param: funcs - function instances or strings describing the function name"""
         funcs = to_list(funcs)
@@ -827,7 +827,9 @@ class Settings(object):
             sig = inspect.signature(func)
             for i, kw in enumerate(sig.parameters.values()):
                 name = kw.name
-                if (name in self):# and (self._df.loc[name, 'function'] == func_name):
+                if name in blacklist:
+                    continue
+                if (name in self) or (name in whitelist):# and (self._df.loc[name, 'function'] == func_name):
                     kws[name] = self[name].value
                 # if setting in kwargs:
                 #     kws[name] = kwargs[name]
