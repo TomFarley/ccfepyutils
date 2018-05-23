@@ -13,7 +13,8 @@ import xarray as xr
 from netCDF4 import Dataset
 
 from ccfepyutils.classes.state import State, in_state
-from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str
+from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str, \
+    to_list
 from ccfepyutils.io_tools import mkdir, filter_files_in_dir
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
 
@@ -503,7 +504,7 @@ class Settings(object):
     @in_state('modifying', 'modified')
     def clear(self):
         self.delete_items(self.items)
-
+        return self
 
     @in_state('modifying', 'modified')
     def append_item(self, name, values={'value': []}, categories=[], create_cols=True):
@@ -810,7 +811,7 @@ class Settings(object):
     def get_func_args(self, funcs, func_names=None):
         """Get arguments for function from settings object
         :param: funcs - function instances or strings describing the function name"""
-        funcs = make_itterable(funcs)
+        funcs = to_list(funcs)
         if func_names is not None:
             func_names = make_itterable(func_names)
         else:
@@ -826,7 +827,7 @@ class Settings(object):
             sig = inspect.signature(func)
             for i, kw in enumerate(sig.parameters.values()):
                 name = kw.name
-                if (name in self) and (self._df.loc[name, 'function'] == func_name):
+                if (name in self):# and (self._df.loc[name, 'function'] == func_name):
                     kws[name] = self[name].value
                 # if setting in kwargs:
                 #     kws[name] = kwargs[name]
