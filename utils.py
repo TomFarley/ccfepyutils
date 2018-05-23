@@ -231,10 +231,12 @@ def to_list(obj):
     """Convert to list, nesting if nessesary"""
     if isinstance(obj, list):
         out = obj
-    elif is_scalar(obj):
-        out = (obj,)  # number to [num] etc
-    else:
+    elif isinstance(obj, (np.ndarray, tuple, set)):
         out = list(obj)  # convert tuple, ndarray etc
+    else:
+        out = [obj]  # eg float to [float] etc
+    # elif is_scalar(obj):
+    #
     return out
 
 def to_array(obj, silent=True):
