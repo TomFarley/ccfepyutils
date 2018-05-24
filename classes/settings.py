@@ -285,7 +285,7 @@ class Settings(object):
 
     @classmethod
     def from_dict(cls, application, name, dictionary, **kwargs):
-        s = Settings(application, name)
+        s = Settings.get(application, name)
         s.delete_items(s.items)
         for key, value in dictionary.items():
             s(key, value, **kwargs)
@@ -1066,6 +1066,11 @@ class Settings(object):
         types = {k: v for key, value in self._column_sets.items() for k, v in value}
         return types
 
+    def hash_id(self):
+        # TODO: Move method here = swap location
+        from ccfepyutils.classes.composite_settings import CompositeSettings
+        return CompositeSettings.hash_id(self)
+
     @property
     def path(self):
         """Path to settings files"""
@@ -1264,12 +1269,6 @@ class SettingsLogFile(object):
         self.load()
 
     @property
-    def hash_id(self):
-        # TODO: Move method here = swap location
-        from ccfepyutils.classes.composite_settings import CompositeSettings
-        return CompositeSettings.hash_id(self)
-
-    @property
     def path(self):
         """Path to settings log files"""
         out = Path(settings_dir) / 'log_files'
@@ -1309,21 +1308,25 @@ def compare_settings_hash(application, name, settings_obj, n_output=3, skip_iden
     """ Compare settings to saved settings hashes"""
     if isinstance(settings_obj, dict):
         settings_obj = Settings.from_dict(application, name, settings_obj, runtime=False)
-    hash_path = '/home/tfarley/.ccfetools/settings/hash_records/Elzar/synthcam_test/'
+    hash_path = '/home/tfarley/.ccfetools/settings/hash_records/{app}/{name}/'.format(app=application, name=name)
     fn_pattern = 'settings_hash_record-(\w+).nc'
     files = filter_files_in_dir(hash_path, fn_pattern, ['hash_id'])
     differences = {}
-    diff_table = pd.DataFrame(columns=['n_same', 'n_missing', 'n_different'])
-    for fn, hash_id in files.items():
-        hash_settings = xr.open_dataset(os.path.join(hash_path, fn), group='df').to_dataframe()
+    diff_table = pd.DataFrame(columns=['n_same', 'n_changes', 'n_missing', 'n_different'])
+    for hash_id, fn in files.items():
+        try:
+            with xr.open_dataset(os.path.join(hash_path, fn), group='df') as ds:
+                hash_settings = ds.to_dataframe()
+        except Exception as e:
+            raise e
         summary, df_diffs = settings_obj.compare_settings(hash_settings, raise_on_difference=False)
         differences[hash_id] = df_diffs
-        diff_table.loc[hash_id, ['n_changes', 'n_missing', 'n_different']] = len(settings_obj)-len(summary['same']), \
-                                                                    len(summary['missing']), len(summary['different'])
+        diff_table.loc[hash_id, ['n_same', 'n_changes', 'n_missing', 'n_different']] = (len(summary['same']),
+                            len(settings_obj)-len(summary['same']), len(summary['missing']), len(summary['different']))
         diff_table.sort_values(['n_changes', 'n_missing'], ascending=True)
-    for i in np.arange(np.min(n_output, len(diff_table))):
+    for i in np.arange(np.min((n_output, len(diff_table)))):
         hash_id = diff_table.index[i]
-        if skip_identical and diff_table.loc[hash_id, 'n_changes'] == 0:
+        if skip_identical and (diff_table.loc[hash_id, 'n_changes'] == 0):
             continue
         logger.info('{}th closest match: {}\n{}'.format(i+1, hash_id, differences[hash_id]))
     return diff_table, differences

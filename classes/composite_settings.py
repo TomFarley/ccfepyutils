@@ -5,6 +5,7 @@ import logging
 import inspect
 
 import numpy as np
+import pandas as pd
 import re
 
 from nested_dict import nested_dict
@@ -115,7 +116,8 @@ class CompositeSettings(object):
         self.build_composite_df()
         logger.info('Rebuilt composite settings {}'.format(repr(self)))
 
-    def view(self, items='all', cols=('comp', 'parent'), order=None, ascending=True):
+    def view(self, items='all', cols=('comp', 'parent'), order=None, ascending=True, _expand_settings=True,
+             _contains=True, _ignore_case=True):
         """Return dataframe containing a subst of columns, with items ordered as requried"""
         if cols == 'all':
             raise NotImplementedError
@@ -135,19 +137,33 @@ class CompositeSettings(object):
         if items == 'all':
             items = self.items
         elif isinstance(items, str):
-            items = self.search(items)
+            items = self.search_items(items, ignorecase=_ignore_case, contains=_contains)
         if order is None:
             df = self._df
         elif order == 'alphabetical':
             df = self._df.sort_index(ascending=ascending)
         elif order == 'custom':
             df = self._df.sort_values('order', ascending=ascending)
-        out = df.loc[items, col_set]
+        df = df.loc[items, col_set]
+        out = df
+        if _expand_settings:
+            # For items that correspond to a settings file, include the contents of that settings file in output
+            #TODO: Integrate with ordering
+            df2 = pd.DataFrame(columns=df.columns)
+            for item in df.index:
+                df2.loc[item] = df.loc[item]
+                if df.loc[item, 'setting']:
+                    df2 = df2.append(self._df.loc[self._df['parent'] == '{}:{}'.format(item, self[item].value), col_set])
+            out = df2
         return out
 
-    def search(self, pattern):
-        r = re.compile(pattern, re.IGNORECASE)
-        newlist = list(filter(r.search, self.items))
+    def search_items(self, pattern, contains=True, ignorecase=True):
+        args = [re.IGNORECASE] if ignorecase else []
+        r = re.compile(pattern, *args)
+        if contains:
+            newlist = list(filter(r.search, self.items))
+        else:
+            newlist = list(filter(r.match, self.items))
         return newlist
 
     def add_item(self, application, item, value, **kwargs):
@@ -322,7 +338,6 @@ class CompositeSettings(object):
             out[key] = value
         return out
 
-    @property
     def hash_id(self):
         from ccfepyutils.io_tools import gen_hash_id
         mask = ~self._df['runtime']

@@ -14,7 +14,7 @@ def rm_files(path, pattern, verbose=True):
     if verbose:
         print('Deleting files with pattern "{}" in path: {}'.format(pattern, path))
     for fn in os.listdir(path):
-        if re.search(pattern, fn):
+        if re.search_items(pattern, fn):
             os.remove(os.path.join(path, fn))
             if verbose:
                 print('Deleted file: {}'.format(fn))
