@@ -420,6 +420,10 @@ class Settings(object):
     def __len__(self):
         return len(self._df)
 
+    def __iter__(self):
+        for item in self._df.index:
+            yield item
+
     @in_state('modifying', 'modified')
     def add_item(self, item, value):
         assert item not in list(self.items), 'Item {} already exists'.format(item)
@@ -955,7 +959,7 @@ class Settings(object):
                 else:
                     summary['different'].append(item)
         # Get items in self not present in comparison settings
-        for item in self:
+        for item in self._df.index:
             if item not in df.index:
                 summary['missing'].append(item)
         if len(summary['same']) != len(df):

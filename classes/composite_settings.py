@@ -210,6 +210,10 @@ class CompositeSettings(object):
         else:
             return 0
 
+    def __iter__(self):
+        for item in self._df.index:
+            yield item
+
     def get_func_args(self, funcs, func_names=None, ignore_func_name=True):
         """Get arguments for function from settings object
         :param: funcs - function instances or strings describing the function name"""
