@@ -938,24 +938,30 @@ class Settings(object):
             out[key] = value
         return out
 
-    def compare_settings(self, other_settings, raise_on_difference=True):
+    def compare_settings(self, other_settings, include_missing=True, raise_on_difference=True):
         if isinstance(other_settings, Settings):
             df = other_settings._df
         elif isinstance(other_settings, pd.DataFrame):
             df = other_settings
         else:
             raise ValueError('Input format not recognised: {}'.format(type(other_settings)))
-        summary = {'same': [], 'different': [], 'missing': []}
+        summary = {'same': [], 'different': [], 'missing': [], 'added': [], 'identical': False}
         for item in df.index:
             if item not in self:
-                summary['missing'].append(item)
+                summary['added'].append(item)
             else:
                 if df.loc[item, 'value'] == self._df.loc[item, 'value']:
                     summary['same'].append(item)
                 else:
                     summary['different'].append(item)
+        # Get items in self not present in comparison settings
+        for item in self:
+            if item not in df.index:
+                summary['missing'].append(item)
         if len(summary['same']) != len(df):
-            different_items = summary['different']+summary['missing']
+            different_items = summary['different']+summary['added']
+            if include_missing:
+                different_items += summary['missing']
             df_diffs = copy(df.loc[different_items, 'value'])
             df_diffs['self'] = self._df.loc[different_items, 'value']
             message = 'Settings comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
@@ -966,6 +972,7 @@ class Settings(object):
             logger.warning(message)
         else:
             df_diffs = None
+            summary['identical'] = True
 
         return summary, df_diffs
     
