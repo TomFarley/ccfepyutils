@@ -46,6 +46,10 @@ class TestStack(unittest.TestCase):
         logger.info('** Running test_init_empty')
         coords = self.coords
         stack = Stack(coords['x'], coords['y'], coords['z'])
+        self.assertTrue(stack._data is None)  # Make sure data xarray has not been initialised yet (only on access)
+        with self.assertRaises(ValueError):
+            slice = stack[0]
+        # self.assertTrue(stack._data is not None)  # Make sure data xarray has not been initialised yet (only on access)
         logger.info(repr(stack))
         pass
 
@@ -75,12 +79,13 @@ class TestStack(unittest.TestCase):
 
 
 def suite():
-    print('Setting test suit')
+    print('Setting test_tmp suit')
     suite = unittest.TestSuite()
 
     suite.addTest(TestStack('test_init_empty'))
     suite.addTest(TestStack('test_init_empty2'))
     suite.addTest(TestStack('test_loc'))
+    suite.addTest(TestStack('test_meta'))
 
 
     return suite

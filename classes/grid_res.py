@@ -43,8 +43,8 @@ from copy import copy
 from ccfepyutils.utils import compare_dict
 #
 # from pyEquilibrium.equilibrium import equilibrium
-from pyFastcamTools.frameHistory import frameHistory
-from pyFastcamTools.Frames import Frame
+# from pyFastcamTools.frameHistory import frameHistory
+# from pyFastcamTools.Frames import Frame
 
 try:
     import pandas as pd
@@ -107,7 +107,7 @@ class GridLimits(object):
                 msg = 'Grid limits object (name={}) does not have enough information to be set up: {}'.format(
                                                                                             self['name'], self.dict)
                 logger.warning(msg)
-                raise ValueError, msg
+                raise ValueError(msg)
                 return
             values = np.linspace(float(min_), float(max_), int(N))
         elif self['values'] is not None:
@@ -123,7 +123,7 @@ class GridLimits(object):
             msg = 'Grid limits object (name={}) does not have enough information to be set up: {}'.format(
                                                                                             self['name'], self.dict)
             logger.warning(msg)
-            raise ValueError, msg
+            raise ValueError(msg)
             # return
         self['min'] = float(min_)
         self['max'] = float(max_)

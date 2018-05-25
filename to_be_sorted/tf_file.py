@@ -116,8 +116,8 @@ def batch_rename(directory, pattern, rep_str, recursive=False, user_confirm=Fals
         print('The following %d files will be renamed in: "%s":' % (n, directory))
     if user_confirm:
         print(tf_string.str_cols(fn_matches, fn_new, sep=' --> '))
-        choice = input('Rename %d file(s)? [y/n]: ' % n)
-        if not choice == 'y':
+        choice = input('Rename %d file(s)? [Y/n]: ' % n)
+        if choice.lower() == 'n':
             print('No files were renamed')
             return  ## return from function without renaming
     for fn_old, fn_repl in zip(fn_matches, fn_new):

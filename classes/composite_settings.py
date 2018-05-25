@@ -167,6 +167,7 @@ class CompositeSettings(object):
         return newlist
 
     def add_item(self, application, item, value, **kwargs):
+        """Add item to settings file contained within CompositeSettings instance"""
         assert application in self._settings, 'Application {} not recognised. Posibilities: {}'.format(
                 application, self._settings.keys())
         settings = self._settings[application]
@@ -278,7 +279,6 @@ class CompositeSettings(object):
         for item in items:
             self(item, **kws)
 
-    
     def get_settings_for_item(self, item):
         """Return Settings object instance that item belongs to"""
         # Check input is valid
