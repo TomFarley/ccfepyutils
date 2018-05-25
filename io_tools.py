@@ -11,16 +11,16 @@ import xarray as xr
 from nested_dict import nested_dict
 from past.types import basestring
 
-from ccfepyutils.utils import string_types, signal_abbreviations, logger, signal_sets, make_itterable, compare_dict, \
+from ccfepyutils.utils import string_types, signal_abbreviations, signal_sets, make_itterable, compare_dict, \
     is_number, is_subset
 
+logger = logging.getLogger(__name__)
 try:
     from natsort import natsorted
     sorted = natsorted
 except ImportError as e:
     logger.debug('Please install natsort for improved sorting')
 
-logger = logging.getLogger(__name__)
 
 def create_config_file(fn, dic):
     """Create ini config file structured around supplied dictionary"""

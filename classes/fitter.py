@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
-
+from future.utils import iteritems
 """Class for performing quick fits to data and plotting them"""
 import inspect
 import logging
@@ -12,10 +12,11 @@ from scipy.optimize import curve_fit
 import matplotlib
 import matplotlib.pyplot as plt
 
+import inference_tools
 from inference_tools.gp_tools import GpRegressor
 from ccfepyutils.ccfe_const import functions  # fix import path ****
 from ccfepyutils.utils import is_scalar, sub_range, args_for  # fix import path ****
-from ccfepyutils.mpl_tools import repeat_color  # fix import path ****
+from ccfepyutils.plotUtils import repeat_color  # fix import path ****
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
