@@ -585,8 +585,8 @@ class Settings(object):
             logger.exception('Failed to update Settings File for application "{app}": {path}'.format(
                     app=self.application, path=self.fn_path))
         else:
-            logger.info('Updated/saved Settings File for application "{app}": {path}'.format(
-                    app=self.application, path=self.fn_path))
+            logger.info('Updated/saved SettingsFile values for application "{app}({name})": {path}'.format(
+                    app=self.application, name=self.name, path=self.fn_path))
             self.log_file.updated(self.name)
 
 

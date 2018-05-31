@@ -356,7 +356,7 @@ def smooth(x, window_len=10, window='hanning'):
     assert(len(s) == len(x) + 2*window_len)
 
     if window == 'flat': #moving average
-        w = np.ones(window_len,'d')
+        w = np.ones(window_len, np.int)
     else:
         w = getattr(np, window)(window_len)
     y = np.convolve(w/w.sum(), s, mode='same')  # len(y) = len(s)-2 ?
@@ -367,10 +367,12 @@ def smooth(x, window_len=10, window='hanning'):
 
 
 def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
-        max_resolution=None, density=False, max_1=False):
+        max_resolution=None, density=False, max_1=False, filter_nans=True):
     """Return distribution in x of peaks in y nsigma above mean"""
     # Todo: add outlier detection to auto pdf
     assert not ((nbins is not None) and (bin_edges is not None)), 'Only supply one bins argument'
+    if filter_nans:
+        x = x[~np.isnan(x)]
     if len(x) < 2:
         return np.array([]), np.array([]), np.array([])
     if (nbins is None) and (bin_edges is None):

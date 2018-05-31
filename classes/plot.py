@@ -33,6 +33,7 @@ from ccfepyutils.utils import make_itterable, make_itterables, args_for, to_arra
 from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
+from ccfepyutils.data_processing import pdf
 try:
     string_types = (basestring, unicode)  # python2
 except Exception as e:
@@ -57,6 +58,7 @@ class Plot(object):
                       ((2, 2 , 2), ('contourf', 'surface3D',)),
                       ((1, 1, 2), ('contourf', 'contour', 'image', 'surface3D')),
                       ((2, None, None), ('contourf', 'contour', 'image')),
+                      # ((1, 1, 1), ('scatter3D')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
     instances = []  # List of all Plot instances
@@ -124,6 +126,7 @@ class Plot(object):
         self._gs_slices = None  # grid spec slices of existing axes
         self._axes_dict = None  # dict linking grid spec slices to existing axes
         self._axes_names = None  # dict linking string names for axes to their grid spec slices
+        self.return_values = None  # values returned by internal function calls
 
     def set_figure_variables(self, ax=None, num=None, axes=None, **kwargs):
         """Set figure attributes"""
@@ -285,7 +288,11 @@ class Plot(object):
         if mode is None:
             mode = self._get_modes(x, y, z)[0]  # take first compatible mode as default
         self._check_mode(x, y, z, mode)  # Check mode is compatible with supplied data
-        if mode == 'line':
+        if mode == 'pdf':
+            kws = args_for(plot_1d, kwargs, include=self.plot_args, remove=True)
+            bin_edges, bin_centres, counts = plot_pdf(x, ax, **kws)
+            self.return_values = bin_edges, bin_centres, counts
+        elif mode == 'line':
             kws = args_for(plot_1d, kwargs, include=self.plot_args, remove=True)
             plot_1d(x, y, ax, **kws)
         elif mode == 'scatter':
@@ -430,6 +437,14 @@ def plot_1d(x, y, ax, **kwargs):
         ax.plot(x, y, **kwargs)
     else:
         ax.plot(x, **kwargs)
+
+def plot_pdf(x, ax, label=None, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
+        max_resolution=None, density=False, max_1=False, **kwargs):
+    bin_edges, bin_centres, counts = pdf(x, nbins=nbins, bin_edges=bin_edges, min_data_per_bin=min_data_per_bin,
+                                         nbins_max=nbins_max, nbins_min=nbins_min, max_resolution=max_resolution,
+                                         density=density, max_1=max_1)
+    ax.plot(bin_centres, counts, label=label, **kwargs)
+    return bin_edges, bin_centres, counts
 
 def scatter_1d(x, y, ax, **kwargs):
     ax.scatter(x, y, **kwargs)
