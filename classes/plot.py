@@ -26,6 +26,7 @@ if batch_mode == 'yes':
         logger.warning('Failed to switch matplotlib backend in batch mode')
 import matplotlib.pyplot as plt
 import matplotlib
+import mpl_toolkits
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -191,8 +192,10 @@ class Plot(object):
 
     def _name2ax(self, ax, name=None):
         """Return axis object given axis index, grid spec slice or string name"""
-        ax_names = self._axes_names
         # Convert to gridspec slice
+        if isinstance(ax, matplotlib.axes.Axes):  # TODO: improve this!
+            return ax  # already an axis instance
+        ax_names = self._axes_names
         if isinstance(ax, numbers.Integral):
             shape = self._ax_shape
             assert ax <= np.prod(shape), 'axes {} is outside of axes shape {}'.format(ax, shape)
@@ -204,10 +207,8 @@ class Plot(object):
         elif isinstance(ax, (tuple, list)):
             assert np.array(ax).shape == self._ax_shape, 'Axis tuple selection of wrong shape: {} not {}'.format(
                     np.array(ax).shape, self._ax_shape)
-        elif isinstance(ax, matplotlib.axes.Axes):  # TODO: improve this!
-            return ax  # already an axis instance
         else:
-            raise TypeError
+            raise TypeError()
 
         # Convert grid spec slice to axis instance
         if index in self._gs_slices:
@@ -395,6 +396,10 @@ class Plot(object):
 
     def convert_ax_to_3d(self, ax):
         ax = self.ax(ax)
+        if isinstance(ax, mpl_toolkits.mplot3d.axes3d.Axes3D):
+            return ax
+        elif not isinstance(ax, matplotlib.axes._subplots.Axes):
+            raise TypeError('ax must be axis instance')
         nx, ny = self._ax_shape[0], self._ax_shape[1]
         for i in np.arange(nx):
             axes_subset = self.axes[i] if nx > 1 else self.axes  # Extract row of axes
@@ -402,7 +407,9 @@ class Plot(object):
                 if ax0 is ax:
                     ax.remove()
                     # self.fig.axes.pop(self.fig.axes.index(ax))
-                    axes_subset[j] = self.fig.add_subplot(nx, ny, i*ny+j+1, projection='3d')
+                    ax = self.fig.add_subplot(nx, ny, i*ny+j+1, projection='3d')
+                    axes_subset[j] = ax
+                    self._gs_slices[(i, j)] = ax
                     if nx > 1:
                         # TODO: Fix!
                         self.axes[i] = axes_subset
