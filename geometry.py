@@ -17,7 +17,7 @@ from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 
-from ccfepyutils.utils import make_itterable, make_itterables, is_scalar, safe_len, safe_zip, describe_array, args_for
+from ccfepyutils.utils import make_iterable, make_iterables, is_scalar, safe_len, safe_zip, describe_array, args_for
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.classes.plot import plot_ellipses
 
@@ -276,7 +276,7 @@ def elliptic_gaussian_grid(x_grid, y_grid, x, y, dx, dy, angle=0, amp=1, full_wi
     if full_widths:  # Convert to half widths for gaussian calculation
         dx, dy = 0.5 * dx, 0.5 * dy
     # Make sure inputs same length itterables
-    x, y, dx, dy, angle, amp = make_itterables(x, y, dx, dy, angle, amp)
+    x, y, dx, dy, angle, amp = make_iterables(x, y, dx, dy, angle, amp)
     if is_scalar(amp):  # Make sure same length as ellipse info
         amp = np.full_like(dx, amp)
     if is_scalar(angle):  # Make sure same length as ellipse info

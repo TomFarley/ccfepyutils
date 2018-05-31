@@ -16,7 +16,7 @@ from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
 from ccfepyutils.classes.data_stack import Stack, Slice
 from ccfepyutils.classes.settings import Settings
-from ccfepyutils.utils import return_none, is_number, none_filter, to_array, make_itterable, args_for, is_subset, is_in
+from ccfepyutils.utils import return_none, is_number, none_filter, to_array, make_iterable, args_for, is_subset, is_in
 from ccfepyutils.io_tools import pickle_load, locate_file
 from ccfepyutils.classes.plot import Plot
 
@@ -560,7 +560,7 @@ class Movie(Stack):
         if n is None:
             self.set_data(data, reset=True)  # whole dataset
         else:
-            n = make_itterable(n)
+            n = make_iterable(n)
             self._data.loc[{'n': n}] = data
         # logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
 
@@ -575,7 +575,7 @@ class Movie(Stack):
             i_meta = 0
             i_data = 0
         else:
-            frames = make_itterable(n)
+            frames = make_iterable(n)
             n = frames[0]
             end = frames[-1]
             i_data = 0
@@ -608,7 +608,7 @@ class Movie(Stack):
 
     def read_pickle_movie(self, n=None):
         # Loop over frames from start frame, including those in the frame set
-        frames = self._frame_range_info_all['frames'] if n is None else make_itterable(n)
+        frames = self._frame_range_info_all['frames'] if n is None else make_iterable(n)
         # Initialise array for data to be read into
         data = np.zeros((len(frames), *self._movie_meta['frame_shape']))
         
@@ -629,7 +629,7 @@ class Movie(Stack):
     def read_npz_movie(self, n=None):
         # raise NotImplementedError
         # Loop over frames from start frame, including those in the frame set
-        frames = self._frame_range_info_all['frames'] if n is None else make_itterable(n)
+        frames = self._frame_range_info_all['frames'] if n is None else make_iterable(n)
         # Initialise array for data to be read into
         data = np.zeros((len(frames), *self._movie_meta['frame_shape']))
 
@@ -827,7 +827,7 @@ class Movie(Stack):
         self._init_xarray()
         if frames == 'all':
             frames = self.frame_numbers
-        enhancements = make_itterable(enhancements)
+        enhancements = make_iterable(enhancements)
         if not self._setup_enhanced_movie(enhancements) and is_subset(frames, self.enhanced_frames):
             logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
             return
@@ -994,7 +994,7 @@ class Enhancer(object):
     def __call__(self, enhancements, data, **kwargs):
         out = copy(data)
         funcs = self.functions
-        enhancements = make_itterable(enhancements)
+        enhancements = make_iterable(enhancements)
         if np.max(data) == 0:
             logging.warning('Enhancement(s) {} is being applied to an empty frame'.format(enhancements))
         for enhancement in enhancements:

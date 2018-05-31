@@ -13,7 +13,7 @@ import xarray as xr
 from netCDF4 import Dataset
 
 from ccfepyutils.classes.state import State, in_state
-from ccfepyutils.utils import make_itterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str, \
+from ccfepyutils.utils import make_iterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str, \
     to_list
 from ccfepyutils.io_tools import mkdir, filter_files_in_dir
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
@@ -273,7 +273,7 @@ class Settings(object):
         'values' keyword dictionary. Then each item in that settings file that corresponds to another settings file will
         be read in and combined into the same overaching settings collection. A CompositeSettings object is returned."""
         from .composite_settings import CompositeSettings
-        exclude_if_col_true = make_itterable(exclude_if_col_true)
+        exclude_if_col_true = make_iterable(exclude_if_col_true)
         settings = Settings.get(application, name)
         for item, value in values.items():
             settings.set(item, value, ignore=[None])
@@ -313,7 +313,7 @@ class Settings(object):
             col_set = self.ordered_column_names
         else:
             col_set = []
-            cols = make_itterable(cols)
+            cols = make_iterable(cols)
             for col in cols:
                 if col in self.column_sets_names.keys():
                     col_set += self.column_sets_names[col]
@@ -499,9 +499,9 @@ class Settings(object):
     @in_state('modifying', 'modified')
     def delete_items(self, items):
         """Remove item(s) from settings"""
-        items = make_itterable(items)
+        items = make_iterable(items)
         assert all(i in self.items for i in items), 'Items "{}" not in {}'.format(items, repr(self))
-        items = make_itterable(items)
+        items = make_iterable(items)
         self._df = self._df.drop(items)
         logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
 
@@ -817,7 +817,7 @@ class Settings(object):
         :param: funcs - function instances or strings describing the function name"""
         funcs = to_list(funcs)
         if func_names is not None:
-            func_names = make_itterable(func_names)
+            func_names = make_iterable(func_names)
         else:
             func_names = [None]*len(funcs)
         args, kws = [], {}
@@ -1128,7 +1128,7 @@ class SettingsLogFile(object):
         if cols is None:
             return self[name]
         else:
-            cols = make_itterable(cols)
+            cols = make_iterable(cols)
             return self._df.loc[name, cols]
 
     def init(self):

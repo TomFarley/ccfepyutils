@@ -29,7 +29,7 @@ import matplotlib
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
 
-from ccfepyutils.utils import make_itterable, make_itterables, args_for, to_array, is_scalar
+from ccfepyutils.utils import make_iterable, make_iterables, args_for, to_array, is_scalar
 from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
@@ -56,9 +56,9 @@ class Plot(object):
                       ((1, 1 , None), ('line', 'scatter')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
                       ((2, 2 , 2), ('contourf', 'surface3D',)),
-                      ((1, 1, 2), ('contourf', 'contour', 'image', 'surface3D')),
+                      ((1, 1, 2), ('contourf', 'contour', 'image', 'surface_3d')),
                       ((2, None, None), ('contourf', 'contour', 'image')),
-                      # ((1, 1, 1), ('scatter3D')),
+                      ((1, 1, 1), ('scatter_3d')),
                       # ((None, None , 2), ('image', 'contour', 'contourf'))
                       ))
     instances = []  # List of all Plot instances
@@ -154,8 +154,12 @@ class Plot(object):
         kws.update(kwargs)
         self.fig = plt.figure(num=num, **kws)
         self.gs = gridspec.GridSpec(axes[0], axes[1])
-        self.axes = to_array(self.fig.axes)
         self._gs_slices = OrderedDict()
+        for i in range(axes[0]):
+            for j in range(axes[1]):
+                ax = self.fig.add_subplot(self.gs[i, j])
+                self._gs_slices[(i, j)] = ax
+        self.axes = to_array(self.fig.axes)
         self._axes_names = OrderedDict()
         self._ax_shape = np.array(axes)  # Shape of axes grid
         pass
@@ -192,7 +196,7 @@ class Plot(object):
         if isinstance(ax, numbers.Integral):
             shape = self._ax_shape
             assert ax <= np.prod(shape), 'axes {} is outside of axes shape {}'.format(ax, shape)
-            index = (ax//shape[1], ax%shape[1])
+            index = (ax // shape[1], ax % shape[1])
         elif isinstance(ax, string_types):
             assert ax in ax_names
             index = ax_names[ax]
@@ -212,19 +216,21 @@ class Plot(object):
             if name is not None:
                 # Rename axis
                 ax_names[name] = index
-                old_name = ax_names.keys()[list(ax_names.values()).index(index)]
+                old_name = list(ax_names.keys())[list(ax_names.values()).index(index)]
                 del ax_names[old_name]
         else:
             index = ax
             logger.debug('index {} not in self._gs_slices {}'.format(index, self._gs_slices))
             logger.debug('Adding axis at index {} to fig {} in {} with axes {}'.format(index, self.fig, self,
                                                                                        self.fig.axes))
-            ax = self.fig.add_subplot(self.gs[ax])
+            ax = self.fig.add_subplot(self.gs[index])
+            self._gs_slices[index] = ax
             ax.ccfe_plot = self
             self._gs_slices[index] = ax
             if name is None:
                 name = str(index)
             ax_names[name] = index
+            self.axes = to_array(self.fig.axes)
         return ax
 
     def _check_mode(self, x, y, z, mode):
@@ -263,7 +269,8 @@ class Plot(object):
         """Inspect supplied data to see whether further actions should be taken with it"""
         raise NotImplementedError
 
-    def call_if_args(self, kwargs, raise_on_exception=True):
+    def call_if_args(self, ax, kwargs, raise_on_exception=True):
+        kwargs['ax'] = ax
         for func in (self.set_axis_labels, self.set_axis_limits, self.show):
             kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
@@ -278,7 +285,7 @@ class Plot(object):
         
         Type of plotting is controlled by mode."""
         if (x is None) and (y is None) and (z is None):
-            self.call_if_args(kwargs)
+            self.call_if_args(None, kwargs)
             return  # No data to plot
         ax = self.ax(ax)
       
@@ -289,7 +296,7 @@ class Plot(object):
             mode = self._get_modes(x, y, z)[0]  # take first compatible mode as default
         self._check_mode(x, y, z, mode)  # Check mode is compatible with supplied data
         if mode == 'pdf':
-            kws = args_for(plot_1d, kwargs, include=self.plot_args, remove=True)
+            kws = args_for(plot_pdf, kwargs, include=self.plot_args, remove=True)
             bin_edges, bin_centres, counts = plot_pdf(x, ax, **kws)
             self.return_values = bin_edges, bin_centres, counts
         elif mode == 'line':
@@ -304,9 +311,14 @@ class Plot(object):
         elif mode in ('image', 'imshow'):
             kws = args_for((imshow, plt.imshow), kwargs, remove=True)
             imshow(ax, x, y, z, **kws)
-        elif mode == 'surface3D':
+        elif mode == 'scatter_3d':
             ax = self.convert_ax_to_3d(ax)
-            plot3d_surface(ax, x, y, z)
+            kws = args_for((plot_scatter_3d, plt.scatter), kwargs, remove=True)
+            plot_scatter_3d(ax, x, y, z, **kws)
+        elif mode == 'surface_3d':
+            ax = self.convert_ax_to_3d(ax)
+            kws = args_for(plot_surface(), kwargs, remove=True)
+            plot_surface(ax, x, y, z, **kws)
         else:
             raise NotImplementedError('Mode={}'.format(mode))
 
@@ -314,10 +326,10 @@ class Plot(object):
             kws = args_for(Fitter.plot, kwargs, remove=True)
             f = Fitter(x, y).plot(ax=ax, data=False, envelope=False, show=False, **kws)
 
-        self.call_if_args(kwargs)
+        self.call_if_args(ax, kwargs)
         return self
 
-    def set_axis_labels(self, xlabel=None, ylabel=None, ax=None, tight_layout=False):
+    def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, ax=None, tight_layout=False):
         assert isinstance(xlabel, (string_types, type(None)))
         assert isinstance(ylabel, (string_types, type(None)))
         if ax == 'all':
@@ -329,6 +341,8 @@ class Plot(object):
             ax.set_xlabel(xlabel)
         if ylabel is not None:
             ax.set_ylabel(ylabel)
+        if zlabel is not None:
+            ax.set_zlabel(zlabel)
         if tight_layout:
             plt.tight_layout()
 
@@ -387,8 +401,16 @@ class Plot(object):
             for j, ax0 in enumerate(axes_subset):
                 if ax0 is ax:
                     ax.remove()
+                    # self.fig.axes.pop(self.fig.axes.index(ax))
                     axes_subset[j] = self.fig.add_subplot(nx, ny, i*ny+j+1, projection='3d')
+                    if nx > 1:
+                        # TODO: Fix!
+                        self.axes[i] = axes_subset
+                        # self.fig.axes = self.axes
+                    else:
+                        self.axes = to_array(self.fig.axes)
                     return axes_subset[j]
+        raise RuntimeError("2D axis wasn't replaced with 3D one")
 
     def save(self, save=False, settings=None, prefix='', description=None,
              bbox_inches='tight', transparent=True, dpi=90):
@@ -444,6 +466,17 @@ def plot_pdf(x, ax, label=None, nbins=None, bin_edges=None, min_data_per_bin=10,
                                          nbins_max=nbins_max, nbins_min=nbins_min, max_resolution=max_resolution,
                                          density=density, max_1=max_1)
     ax.plot(bin_centres, counts, label=label, **kwargs)
+    if ax.get_xlabel() == '':
+        ax.set_xlabel(label)
+    if ax.get_ylabel() == '':
+        if density:
+            y_label = 'Frequency density [N/A]'
+        elif max_1:
+            y_label = 'Normalised frequency [N/A]'
+        else:
+            y_label = 'Frequency [N/A]'
+        ax.set_ylabel(y_label)
+    ax.set_ylim(bottom=0)
     return bin_edges, bin_centres, counts
 
 def scatter_1d(x, y, ax, **kwargs):
@@ -617,7 +650,10 @@ def plot_2d(self, z, x, y, ax, raw=False, show=True, save=False, annotate=True,
         plt.show()
     return ax
 
-def plot3d_surface(ax, x, y, z, cmap='viridis', colorbar=True, **kwargs):
+def plot_scatter_3d(ax, x, y, z, **kwargs):
+    points = ax.scatter(x, y, z, **kwargs)
+
+def plot_surface(ax, x, y, z, cmap='viridis', colorbar=True, **kwargs):
     if x.ndim == 1 and y.ndim == 1:
         x, y = np.meshgrid(x, y)
     surf = ax.plot_surface(x, y, z, cmap=cmap, **kwargs)
@@ -658,7 +694,7 @@ def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, 
         major = 2 * copy(major)
         minor = 2 * copy(minor)
 
-    x, y, major, minor, angle = make_itterables(x, y, major, minor, angle)
+    x, y, major, minor, angle = make_iterables(x, y, major, minor, angle)
 
     for i, (x0, y0, major0, minor0, angle0) in enumerate(list(zip(x, y, major, minor, angle))):
         # Matplotlib ellipse takes:

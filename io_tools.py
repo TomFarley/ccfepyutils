@@ -11,7 +11,7 @@ import xarray as xr
 from nested_dict import nested_dict
 from past.types import basestring
 
-from ccfepyutils.utils import string_types, signal_abbreviations, signal_sets, make_itterable, compare_dict, \
+from ccfepyutils.utils import string_types, signal_abbreviations, signal_sets, make_iterable, compare_dict, \
     is_number, is_subset
 
 logger = logging.getLogger(__name__)
@@ -72,8 +72,8 @@ def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, *args, 
 def store_mast_signals(signals, pulses, save_path='~/data/MAST_signals/', *args, **kwargs):
     if isinstance(signals, (str, basestring)) and signals in signal_sets:
         signals = signal_sets[signals]
-    pulses = make_itterable(pulses)
-    signals = make_itterable(signals)
+    pulses = make_iterable(pulses)
+    signals = make_iterable(signals)
     save_path = os.path.expanduser(save_path)
     assert os.path.isdir(save_path), 'Save path does not exist'
     for pulse in pulses:
@@ -335,7 +335,7 @@ def to_csv(x, ys, fn, xheading=None, yheadings=None, description='data'):
     ys = np.squeeze(ys)
     if ys.shape[0] != len(x) and ys.shape[1] == len(x):
         ys = ys.T
-    df = pd.DataFrame(data=ys, index=make_itterable(x), columns=yheadings)
+    df = pd.DataFrame(data=ys, index=make_iterable(x), columns=yheadings)
     if xheading:
         df.index.name = xheading
     # df.columns.name = 'tor'

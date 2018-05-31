@@ -11,7 +11,7 @@ import re
 from nested_dict import nested_dict
 from netCDF4 import Dataset
 
-from ccfepyutils.utils import make_itterable, t_now_str, get_methods_class
+from ccfepyutils.utils import make_iterable, t_now_str, get_methods_class
 from ccfepyutils.io_tools import mkdir
 from ccfepyutils.netcdf_tools import dict_to_netcdf
 from ccfepyutils.classes.settings import Settings
@@ -72,7 +72,7 @@ class CompositeSettings(object):
         if (len(self._whitelist) > 0) and (application not in self._whitelist) and (not add_to_whitelist):
             logger.debug('Skipping non whitelist settings "{}:{}" from {}'.format(application, name, repr(self)))
             return df
-        exclude_if_col_true = make_itterable(exclude_if_col_true)
+        exclude_if_col_true = make_iterable(exclude_if_col_true)
         logger.debug('Adding "{}:{}" settings to {}'.format(application, name, repr(self)))
         s = Settings.get(application, name)
         # Add parent column to note which Settings file each setting originates from
@@ -124,7 +124,7 @@ class CompositeSettings(object):
             col_set = self.ordered_column_names
         else:
             col_set = []
-            cols = make_itterable(cols)
+            cols = make_iterable(cols)
             for col in cols:
                 if col in self.column_sets_names.keys():
                     col_set += self.column_sets_names[col]
@@ -220,9 +220,9 @@ class CompositeSettings(object):
         :param: funcs - function instances or strings describing the function name"""
         if ignore_func_name is False:
             raise NotImplementedError
-        funcs = make_itterable(funcs)
+        funcs = make_iterable(funcs)
         if func_names is not None:
-            func_names = make_itterable(func_names)
+            func_names = make_iterable(func_names)
         else:
             func_names = [None]*len(funcs)
         args, kws = [], {}
@@ -268,7 +268,7 @@ class CompositeSettings(object):
         assert col in self.columns, 'Column "{}" invalid. Options: {}'.format(col, self.columns)
         if items == 'all':
             items = self.items
-        items = make_itterable(items)
+        items = make_iterable(items)
         if apply_to_groups:
             # If item is the name of a settings file application modify its contents
             for item in copy(items):

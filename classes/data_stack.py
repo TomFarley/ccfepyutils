@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict
 
 from copy import deepcopy
 
-from ccfepyutils.utils import isclose_within, make_itterable, class_name, args_for
+from ccfepyutils.utils import isclose_within, make_iterable, class_name, args_for
 from ccfepyutils.data_processing import find_nearest
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, none_filter, lookup_from_dataframe
@@ -236,7 +236,7 @@ class Stack(object):
             # Setting subset of frames
             if self._values is None:
                 self._values = np.zeros(self.shape)
-            slice_values = make_itterable(slice_values)
+            slice_values = make_iterable(slice_values)
             for slice in slice_values:
                 i = self.lookup('i', {self.stack_dim: slice})
                 self._values[i, :, :] = values
@@ -266,7 +266,7 @@ class Stack(object):
     def get_slice(self, item):
         """Get slice object at given stack coord index"""
         # Check item is valid stack coord index
-        values = make_itterable(self.coord_obj(self._stack_axis)['values'])
+        values = make_iterable(self.coord_obj(self._stack_axis)['values'])
         if not item in values:
             raise ValueError('Item {} not in stack coordinate values: {}'.format(item, values))
 
@@ -277,7 +277,7 @@ class Stack(object):
             return self.create_slice(item)
 
     def create_slice(self, item, raw=False):
-        if item in make_itterable(self.coord_obj(self._stack_axis)['values']):
+        if item in make_iterable(self.coord_obj(self._stack_axis)['values']):
             slice = self.slice_class(self, self._stack_axis, item)
             self._slices[item] = slice
             return slice

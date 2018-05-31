@@ -132,16 +132,21 @@ def replace_in(values, reference, index=False, tol=1e-10):
         out = out[0]
     return out
 
-def make_itterable(obj, ndarray=False):
+def make_iterable(obj, ndarray=False, cast=None):
     """If object is a scalar nest it in a list so it can be iterated over
     If ndarray is True, the object will be returned as an array (note avoids scalar ndarrays)"""
     if not hasattr(obj, '__iter__') or isinstance(obj, basestring):
         obj = [obj]
     if ndarray:
         obj = np.array(obj)
+    if isinstance(cast, type):
+        if cast == np.ndarray:
+            obj = np.array(obj)
+        else:
+            obj = cast(obj)  # cast to new type eg list
     return obj
 
-def make_itterables(*args):
+def make_iterables(*args):
     """Convert multiple input arguments to itterables"""
     # TODO: make compatible with ndarray
     out = []
@@ -192,7 +197,7 @@ def safe_zip(*args):
     """Return zip iterator even if supplied with scaler values"""
     args = list(args)
     for i, arg in enumerate(args):
-        args[i] = make_itterable(arg)
+        args[i] = make_iterable(arg)
     return zip(*args)
 
 def safe_arange(start, stop, step):
@@ -222,8 +227,8 @@ def is_subset(subset, full_set):
     return set(subset).issubset(set(full_set))
 
 def is_in(items, collection):
-    items = make_itterable(items)
-    collection = make_itterable(collection)
+    items = make_iterable(items)
+    collection = make_iterable(collection)
     out = pd.Series(items).isin(collection).values
     return out
 
@@ -689,7 +694,7 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
     :param - named_dict      - if kwargs contains a dict under key '<func_name>_args' return its contents (+ filtered kwargs)
     :param - remove          - remove filtered kwargs from original kwargs
     """
-    func = make_itterable(func)  # Nest lone function in list for itteration
+    func = make_iterable(func)  # Nest lone function in list for itteration
     kws = {}
     keep = []
     name_args = []
@@ -837,7 +842,7 @@ def lookup_from_dataframe(df, col, **kwargs):
         values = df[key].values
         if value not in values.astype(type(value)):
             raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, df[key]))
-        value = make_itterable(value)
+        value = make_iterable(value)
         mask *= df[key].isin(value)
     new_value = df.loc[mask, col].values
     if len(new_value) == 1:
