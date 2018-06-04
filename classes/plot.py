@@ -136,11 +136,15 @@ class Plot(object):
         elif hasattr(ax, 'ccfe_plot'):
             # Axis is from an exisiting ccfe_plot instance
             self = ax.ccfe_plot
-        else:
+        elif isinstance(ax, matplotlib.axes.Axes):
             self.fig = ax.figure
             self.axes = np.array(self.fig.axes)
             self._ax_shape = np.array(np.array(self.fig.axes).shape)  # TODO fix so 2 element shape, not len
             self._default_ax = np.where(self.axes == ax)[0][0]
+            if len(self._ax_shape) == 1:
+                self._ax_shape = np.insert(self._ax_shape, 0, 1)
+        else:
+            raise ValueError('Unexpected axis object! {}'.format(ax))
         self._num = self.fig.canvas.get_window_title()
         return self
 
@@ -159,10 +163,13 @@ class Plot(object):
         for i in range(axes[0]):
             for j in range(axes[1]):
                 ax = self.fig.add_subplot(self.gs[i, j])
+                ax.ccfe_plot = self
                 self._gs_slices[(i, j)] = ax
         self.axes = to_array(self.fig.axes)
         self._axes_names = OrderedDict()
         self._ax_shape = np.array(axes)  # Shape of axes grid
+        if len(self._ax_shape) == 1:
+            self._ax_shape = np.insert(self._ax_shape, 0, 1)
         pass
 
     def set_ready(self):
@@ -201,7 +208,7 @@ class Plot(object):
             assert ax <= np.prod(shape), 'axes {} is outside of axes shape {}'.format(ax, shape)
             index = (ax // shape[1], ax % shape[1])
         elif isinstance(ax, string_types):
-            assert ax in ax_names
+            assert ax in ax_names, 'Axis name "{}" not recognised. Options: {}'.format(ax, ax_names)
             index = ax_names[ax]
             # raise NotImplementedError
         elif isinstance(ax, (tuple, list)):
@@ -214,17 +221,20 @@ class Plot(object):
         if index in self._gs_slices:
             # Axis instance already exists
             ax = self._gs_slices[index]
+            ax.ccfe_plot = self
             if name is not None:
                 # Rename axis
+                if index in ax_names.values():
+                    old_name = list(ax_names.keys())[list(ax_names.values()).index(index)]
+                    del ax_names[old_name]
                 ax_names[name] = index
-                old_name = list(ax_names.keys())[list(ax_names.values()).index(index)]
-                del ax_names[old_name]
         else:
             index = ax
             logger.debug('index {} not in self._gs_slices {}'.format(index, self._gs_slices))
             logger.debug('Adding axis at index {} to fig {} in {} with axes {}'.format(index, self.fig, self,
                                                                                        self.fig.axes))
             ax = self.fig.add_subplot(self.gs[index])
+            ax.ccfe_plot = self
             self._gs_slices[index] = ax
             ax.ccfe_plot = self
             self._gs_slices[index] = ax

@@ -67,7 +67,7 @@ def input_output_scatter3d(inp, output=None, extra_points={}, axis_labels=None, 
             if np.any([((v is None) or (np.isnan(v))) for v in (xi, yi, zi, xj, yj, zj)]):
                 continue
             trace_line = go.Scatter3d(x=(xi, xj), y=(yi, yj), z=(zi, zj), mode='lines',
-                                      line=dict(width=1.5, color='black'), opacity=0.3, hoverinfo='skip', #hoveron=False,
+                                      line=dict(width=1.0, color='black'), opacity=0.2, hoverinfo='skip', #hoveron=False,
                                       # marker={'size': 0, 'opacity': 0.0},
                                       legendgroup='mappings', showlegend=(i in (0, len(x1)-1)), name='mappings',
                                       visible='legendonly')

@@ -196,6 +196,7 @@ class CompositeSettings(object):
         settings = self.get_settings_for_item(item)
         out = settings(item, value=value, create_columns=create_columns, _save=_save, **kwargs)
         # Update combined settings instance to reflect change
+        #TODO: Properly handle list settings
         self._df.loc[item, :] = settings._df.loc[item, :]
         return out
     
