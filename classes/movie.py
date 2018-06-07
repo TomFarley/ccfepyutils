@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import natsort
+import matplotlib.pyplot as plt
 
 from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
@@ -306,7 +307,7 @@ class Movie(Stack):
         self.check_user_frame_range()
         fps = self._movie_meta['fps']
         t_range_user = (self._movie_meta['t_range'][0] + frame_range_user / fps)
-        t_user = np.linspace(t_range_user[0], t_range_user[1], nframes_user)  # [::frame_stride]
+        t_user = self._movie_meta['t_range'][0] + frames_user / fps  # [::frame_stride]
         self._frame_range_info_user['t_range'] = t_range_user
         self._frame_range_info_user['t'] = t_user
 
@@ -315,6 +316,7 @@ class Movie(Stack):
         frames_all = self._frame_range_info_all['frames']
         t_all = self._frame_range_info_all['t']
 
+        movie_range = self._movie_meta['frame_range']
         frame_stack_enhancements = np.array(['extract_fg', 'extract_bg'])
         if any(is_in(frame_stack_enhancements, self.settings['enhancements'])):
             # Enhacements require the frame range to be extended due to enhancement functions needing a 'frame_stack'
@@ -328,13 +330,24 @@ class Movie(Stack):
                 func_arg = '{func_name}::{arg}'.format(func_name=enhancement, arg=arg)
                 if func_arg in self.settings:
                     kws[arg] = self.settings[func_arg].value
-
-            frame_range_all[0] = np.min(np.concatenate([self.get_frame_list(frame_range_user[0], limits=None, **kws),
-                                                        frame_range_user]))
-            frame_range_all[1] = np.max(np.concatenate([self.get_frame_list(frame_range_user[-1], limits=None, **kws),
-                                                        frame_range_user]))
+            if frame_stride == 1:
+                frame_range_all[0] = np.min(np.concatenate([self.get_frame_list(frame_range_user[0],
+                                                            limits=movie_range, **kws),frame_range_user]))
+                frame_range_all[1] = np.max(np.concatenate([self.get_frame_list(frame_range_user[-1],
+                                                            limits=movie_range, **kws), frame_range_user]))
+                # Get additional frames to sadwitch user frames with
+                buffer_front = np.arange(frame_range_all[0], frame_range_user[0])
+                buffer_end = np.arange(frame_range_user[1] + 1, frame_range_all[1] + 1)
+                frames_all = np.concatenate((buffer_front, frames_user, buffer_end))
+                logger.info('Padded movie frame range with {}+{}={} additional frames for enhancement "{}"'.format(
+                    len(buffer_front), len(buffer_end), len(frames_all) - nframes_user, enhancement))
+            else:
+                for n in frames_user:
+                    frames_all = set(frames_all).union(self.get_frame_list(n, limits=movie_range, **kws))
+                frames_all = np.sort(np.array(list(frames_all)))
+                logger.info('Added additional {} frames for enhancement "{}"'.format(
+                                    len(frames_all) - nframes_user, enhancement))
             # Make sure extended frame range is within movie range
-            movie_range = self._movie_meta['frame_range']
             if (movie_range[0] > frame_range_all[0]):
                 logger.warning('Movie enhancement "{}" lacks preceeding frames for first {} frames'.format(
                         enhancement, movie_range[0]-frame_range_all[0]))
@@ -344,10 +357,7 @@ class Movie(Stack):
                         enhancement, frame_range_all[1] - movie_range[1]))
                 frame_range_all[1] = movie_range[1]
             frame_range_info_all['frame_range'] = frame_range_all
-            # Get additional frames to sadwitch user frames with
-            buffer_front = np.arange(frame_range_all[0], frame_range_user[0])
-            buffer_end = np.arange(frame_range_user[1]+1, frame_range_all[1]+1)
-            frames_all = np.concatenate((buffer_front, frames_user, buffer_end))
+
             nframes_all = len(frames_all)
             t_all = self._movie_meta['t_range'][0] + frames_all / fps
             t_range_all = [np.min(t_all), np.max(t_all)]
@@ -355,8 +365,7 @@ class Movie(Stack):
             frame_range_info_all['nframes'] = nframes_all
             frame_range_info_all['t'] = t_all
             frame_range_info_all['t_range'] = t_range_all
-            logger.info('Padded movie frame range with {}+{}={} additional frames for enhancement "{}"'.format(
-                    len(buffer_front), len(buffer_end), len(frames_all) - nframes_user, enhancement))
+
             assert len(frames_all) == len(t_all) == nframes_all
 
         assert len(frames_user) == len(t_user) == nframes_user, '{} != {} != {}'.format(
@@ -656,8 +665,8 @@ class Movie(Stack):
     def __getitem__(self, n, raw=False, load=True):
         """Return data slices from the stack of data"""
         # If have enhaced data return that over raw data
-        if n not in self.frame_numbers:
-            raise IndexError('{} is not a valid frame number. Options: {}'.format(n, self.frame_numbers))
+        if n not in self._frame_range_info_all['frames']:
+            raise IndexError('{} is not a valid frame number. Options: {}'.format(n, self._frame_range_info_all['frames']))
         if self._enhanced_movie is not None and not raw:
             movie = self._enhanced_movie
             is_set = movie.check_data(n)
@@ -698,25 +707,25 @@ class Movie(Stack):
         # Frames preceding current frame
         frame_nos = [np.linspace(start_frame,
                                  n - frame_list_settings['skip_backwards'] - 1,
-                                 num=frame_list_settings['n_backwards'])]
+                                 num=frame_list_settings['n_backwards']).astype(int)]
         # Include current frame
         if current:
             frame_nos.append(np.array([n]))
         # Frames after current frame
         frame_nos.append(np.linspace(n + frame_list_settings['skip_forwards'] + 1,
                                 end_frame,
-                                num=frame_list_settings['n_forwards']))
+                                num=frame_list_settings['n_forwards']).astype(int))
         frame_nos = np.round(np.hstack(frame_nos)).astype(int)
 
         # Make sure frames are in frame range
         if limits is not None:
             frame_nos = frame_nos.clip(min=limits[0], max=limits[1])
         # frameMarks = frameNos + self.frameNumbers[0]
-        unique_frames = list(set(frame_nos))
+        unique_frames = np.sort(np.array(list(set(frame_nos))))
         if len(unique_frames) < len(frame_nos):
             logger.warning('Frame list contains duplicates')
         if unique:  # remove duplicates
-            frame_nos = list(set(frame_nos))
+            frame_nos = unique_frames
         logger.debug('Frames in frame_list:  {}'.format(str(frame_nos)))
         return frame_nos
 
