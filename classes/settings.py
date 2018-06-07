@@ -528,7 +528,7 @@ class Settings(object):
                     # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
                     self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
                 self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
-            except Exception as e:
+            except OSError as e:
                 if attempt == 2:
                     raise e
                     # TODO: restore backup if corrupted?

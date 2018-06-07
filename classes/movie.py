@@ -305,8 +305,8 @@ class Movie(Stack):
                                        'frames': frames_user})
         self.check_user_frame_range()
         fps = self._movie_meta['fps']
-        t_range_user = self._movie_meta['t_range'][0] + frame_range_user / fps
-        t_user = np.linspace(t_range_user[0], t_range_user[1], nframes_user)
+        t_range_user = (self._movie_meta['t_range'][0] + frame_range_user / fps)
+        t_user = np.linspace(t_range_user[0], t_range_user[1], nframes_user)  # [::frame_stride]
         self._frame_range_info_user['t_range'] = t_range_user
         self._frame_range_info_user['t'] = t_user
 
@@ -359,7 +359,8 @@ class Movie(Stack):
                     len(buffer_front), len(buffer_end), len(frames_all) - nframes_user, enhancement))
             assert len(frames_all) == len(t_all) == nframes_all
 
-        assert len(frames_user) == len(t_user) == nframes_user
+        assert len(frames_user) == len(t_user) == nframes_user, '{} != {} != {}'.format(
+                                                            len(frames_user), len(t_user), nframes_user)
 
         self._x['values'] = frames_all
 
@@ -385,7 +386,6 @@ class Movie(Stack):
                 end_frame = self._movie_meta['frame_range'][1] + end_frame + 1
             if start_frame is not None and end_frame is not None:
                 assert start_frame <= end_frame
-                nframes = end_frame - start_frame + 1
             elif start_frame is not None and nframes is not None:
                 end_frame = start_frame + nframes - 1
             else:
@@ -397,6 +397,7 @@ class Movie(Stack):
         else:
             frames = np.array(frames)
             start_frame, end_frame, nframes = frames.min(), frames.max(), len(frames)
+        nframes = len(frames)
 
         # tODO: change start stop to range list []
         frame_range = np.array([start_frame, end_frame])
