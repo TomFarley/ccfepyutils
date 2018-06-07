@@ -9,6 +9,8 @@ from copy import deepcopy
 
 import numpy as np
 import scipy as sp
+from scipy import stats
+import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 
 
@@ -153,7 +155,7 @@ def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_lo
     i = np.arange(len(x))
     ## Find the average distace between the x data
     diff = np.diff(x)               # differences between adjacent data
-    av_gap = np.mode(diff) if not av_diff else np.average(diff)       # average/modal separation
+    av_gap = stats.mode(diff) if not av_diff else np.average(diff)       # average/modal separation
     ## Get indices of begining of gaps sufficiently greater than the average
     igap = np.nonzero(diff>gap_length*av_gap)[0] # nonzero nested in tuple
 
@@ -204,7 +206,8 @@ def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_lo
             if verbose: print('data_split: Last set exluded as too short')
 
     # If return_longest is True, only return longest section of data without gaps, else return all data with gap removed
-    ind = np.array([len(x) for x in xsplit]).argmax() if return_longest else np.arange(len(xsplit))
+    ind = int(np.array([len(x) for x in xsplit]).argmax()) if return_longest else np.arange(len(xsplit)).astype(int)
+    isplit_all, xsplit, ysplit = np.array(isplit_all), np.array(xsplit), np.array(ysplit)
     if y is not None:
         return isplit_all[ind], xsplit[ind], ysplit[ind]
     else:
@@ -487,3 +490,214 @@ def find_furthest(arr, point, index=True, normalise=False):
     """ Find furthest point to supplied point in either 1d array, 2d grid or 2xn array of coordinate pairs
     """
     return _find_dist_extrema(arr, point, index=index, normalise=normalise, func=np.argmax)
+
+
+def interp_val(x, y, x0, kind='linear'):
+    "Interpolated y value at x0 (scipy.interpolate.interp1d wrapper)"
+    ## TODO: add numpy array check
+    x = np.array(x)
+    y = np.array(y)
+    isort = np.argsort(x)  # interp x values must be monotonically increasing
+    finterp = interp1d(x[isort], y[isort], kind=kind)  # cubic noisy
+    y0 = finterp(x0)  # [0] #???
+    return y0
+
+
+def central_diff(x, y, n=1):
+    """ Calculate central difference derivate """
+    ## Cannot calc central derivative of first element
+    diffs = np.array([float('NaN')])
+    for i in 1 + np.arange(len(x) - 2):
+        if x[i + 1] == x[i - 1]:  # dx=0
+            dydx = float('Inf')
+        else:
+            dydx = (y[i + 1] - y[i - 1]) / (x[i + 1] - x[i - 1])
+        diffs = np.append(diffs, dydx)
+    ## Cannot calc central derivative of last element
+    diffs = np.append(diffs, float('NaN'))
+
+    ## Calculate higher derivatives recursively - are the NaNs ok?
+    if n > 1:
+        n -= 1
+        diffs = central_diff(x, diffs, n=n)
+
+    return diffs
+
+
+def argrelmax_global(array):
+    """ Inedex of glabal array maximum """
+    order = len(array)
+    imax = argrelmax(array, order=order)[0]
+    if len(imax) == 0:
+        # print "WARNING: argrelmax_gloabal failed to find a global maximum - trying orders < {}".format(order)
+        print("WARNING: argrelmax_gloabal failed to find a global maximum - using max/where".format(order))
+        ## I think this happens when two or more max points have the same value - common in low res data
+    else:
+        return imax
+
+    maximum = np.amax(array)
+    imax = np.nonzero(array == maximum)[0]
+    print('imax = {}, from max/where method, max = {}'.format(imax[0], maximum))
+
+    # while len(imax) == 0:
+    #     try:
+    #         order -= 1
+    #         imax = argrelmax(array, order = order)[0] # Extract index of global maximum
+    #     except IndexError:
+    #         raise
+    # print 'imax = {}, for order = {}'.format(imax, order)
+
+    return imax[0]
+
+
+def conv_diff(y_data, width=51, order=1):
+    """ Normalised derivative of data convolved with gaussian """
+
+    x1 = np.linspace(-3, 3, width)  # +/- 3 sigma of gaussian, sampled at width # of points
+    gauss0 = np.exp(-x1 ** 2)
+    gauss1 = (-2 * x1) * np.exp(-x1 ** 2)
+    gauss2 = (4 * x1 ** 2) * np.exp(-x1 ** 2)
+    gauss3 = (-8 * x1 ** 3) * np.exp(-x1 ** 2)
+    gauss4 = (32 * x1 ** 4) * np.exp(-x1 ** 2)
+
+    # if order == 0:
+    #     y1 = gauss0
+    # elif order == 1:
+    #     y1 = gauss1
+    # elif order == 2:
+    #     y1 = gauss2
+    # elif order == 3:
+    #     y1 = gauss3
+    # elif order == 3:
+    #     y1 = gauss4
+    # else:
+    #     raise RuntimeError('conv_diff got unexpected order arguement value')
+
+    if order > 0:
+        y1 = gauss1
+
+        y_conv = np.r_[y_data[width - 1:0:-1], y_data, y_data[-1:-width:-1]]  # mirror data at edges
+        y_conv = np.convolve(y_conv, y1, mode="same")
+        y_conv = y_conv[(width - 1):-(width - 1)]  # "-(width-1)" is slight bodge to get right number of elements
+        y_conv /= np.amax(np.absolute(y_conv))  # normalise output (not rigourus!)
+
+        y_conv = conv_diff(y_conv, width=width, order=order - 1)
+
+        return y_conv
+    else:
+        return y_data
+
+
+def find_linear(x_data, y_data, width=51, gap_length=3, data_length=10,
+                tol_type='rel_peak', tol=0.6, plot=False, fig_name=False):
+    """ Identify linear sections in experimental data
+    x_data, y_data - experimental data
+    width - convolution smoothing width
+    Returns two lists of arrays containing x data and y data for each linear section
+    """
+    ## Approach 1:
+    # create convolution kernel for calculating the smoothed second order derivative from:
+    # http://stackoverflow.com/questions/13691775/python-pinpointing-the-linear-part-of-a-slope
+    x1 = np.linspace(-3, 3, width)  # +/- 3 sigma of gaussian, sampled at width # of points
+
+    ## Try normalising this gaussian?
+
+    # db(x1=len(x1))
+    norm = np.sum(np.exp(-x1 ** 2)) * (x1[1] - x1[0])  # ad hoc normalization
+    ## Twice differentiated normal distribution - not sure about -2 and norm
+    y1 = (4 * x1 ** 2 - 2) * np.exp(-x1 ** 2) / width * 8  # norm*(x1[1]-x1[0])
+    y2 = (-8 * x1 ** 3) * np.exp(-x1 ** 2) / width * 8  # for third derivative
+
+    ## Add mirroed data at ends
+    # db(len(y_data[width-1:0:-1]), len(y_data[-1:-width:-1]))
+    y_conv = np.r_[y_data[width - 1:0:-1], y_data, y_data[-1:-width:-1]]
+    y_conv2 = np.r_[y_data[width - 1:0:-1], y_data, y_data[-1:-width:-1]]
+    ## Calculate second order deriv. through convolution
+    y_conv = np.convolve(y_conv, y1, mode="same")
+    y_conv2 = np.convolve(y_conv2, y2, mode="same")
+    # db( len(y_conv[0:(width-1)]), len(y_conv[-(width):-1]) )
+    ## Remove mirrored data at ends
+    y_conv = y_conv[(width - 1):-(width - 1)]  # "-(width-1)" is slight bodge to get right number of elements
+    y_conv2 = y_conv2[(width - 1):-(width - 1)]  # "-(width-1)" is slight bodge to get right number of elements
+
+    ## Approach 2:
+    ## Use home made central diff applied to smoothed fit
+    y_smooth = smooth(y_data, window_len=58, window='hamming')
+    y_cent = central_diff(x_data, y_smooth, n=2)
+    # y_cent *=  np.amax(y_conv) / np.amax(y_cent) # smooth(y_cent, window_len=10)
+
+    # db(len(y_data), len(y_conv), len(y_smooth), len(y_cent))
+    # db(y_conv=y_conv)
+
+    ## Find where 2nd derviative goes above tollerance
+    if tol_type == 'abs':
+        tol = tol  # tol = 1.8e-7
+    elif tol_type == 'rel_peak':
+        ## Tolerance in 2nd derviative taken relative to maximum in 2nd derivative
+        tol = tol * np.amax(y_conv)
+    elif tol_type == 'rel_mean':
+        tol = tol * np.average(np.absolute(y_conv))
+
+    lims = interp_val(y_conv, x_data, tol)
+    # db(lims=lims)
+    x_intol, y_intol = tf.extract_2D(x_data, y_data, np.abs(y_conv) <= tol)
+
+    xlinear, ylinear = data_split(x_intol, y_intol, gap_length=gap_length, data_length=data_length)
+
+    # db('{} linear region(s) identified'.format(len(xlinear)))
+
+    if plot:
+        # plot data
+        fig = plt.figure(fig_name) if fig_name else plt.figure()
+        fig.clear()
+        ## Plot data
+        plt.plot(x_data, y_data, "o", label="noisy data")
+        plt.plot(x_data, y_smooth, "x-", label="smoothed data")
+        for x, y in zip(xlinear, ylinear):
+            plt.plot(x, y, "or", label="linear data")
+            plt.axvline(x[0], linestyle='--', color='k', alpha=0.5)
+            plt.axvline(x[-1], linestyle='--', color='k', alpha=0.5)
+        ## Plot 2nd derivative (shitfted to data)
+        shift = np.average(y_data)
+        plt.plot(x_data, y_conv + shift, '-', label="conv second deriv", alpha=0.6)
+        plt.plot(x_data, y_conv2, '-', label="conv third deriv", alpha=0.6)
+        plt.plot(x_data, y_cent + shift, '--', label="central second deriv", alpha=0.6, color=(0.7, 0.2, 0.5))
+        # plt.axhline(0)
+        plt.axhline(0 + shift, linestyle='--', color='k', alpha=0.5)
+        # plt.axhline(tol)
+        # plt.axvspan(0,4, color="y", alpha=0.2)
+        # plt.axvspan(6,14, color="y", alpha=0.2)
+        plt.axhspan(-tol + shift, tol + shift, color="b", alpha=0.4)
+        # plt.vlines([0, 4, 6],-10, 10)
+        # plt.xlim(-2.5,12)
+        # plt.ylim(-2.5,6)
+        plt.legend(loc='best')
+        plt.show()
+
+    return xlinear, ylinear
+
+if __name__ == "__main__":
+    print('*** data_processing.py demo ***')
+    x = np.linspace(0,1000,1000)
+    y = np.sin(np.deg2rad(x))#+x
+    y = y/np.amax(np.absolute(y))
+    x = x
+    print("interp_val(x, y, 2.3649, kind='linear') = ", end=' ')
+    print(interp_val(x, y, 2.3649, kind='linear'))
+
+    fig = plt.figure('conv_diff test_tmp')
+    fig.clear()
+    plt.plot( x, y, label = 'sin', c='k', lw=3)
+    for n in range(4):
+        plt.plot(x, conv_diff(y, order=n), label='n={}'.format(n))
+    plt.title('conv_diff test_tmp')
+    plt.legend(loc='best')
+    plt.grid(True)
+    plt.show()
+
+    x = np.arange(30)
+    s = smooth(x, window_len=5)
+    print('lenx:', len(x), len(s))
+
+    pass
+

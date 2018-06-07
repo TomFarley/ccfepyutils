@@ -15,6 +15,16 @@ def sample_lognormal(mean=0.0, sigma=1.0, scale=1.0, offset=0.0, size=None):
 def lognormal(x, mean=0.0, stdev=1.0, amp=1.0, c=0.0):
     return amp/(x * stdev * np.sqrt(2*np.pi)) * np.exp(-(np.log(x)-mean)**2/(2*stdev**2)) + c
 
+def flinear(x, m, c):
+    """ Linear function: m*x + c """
+    return m*x + c
+
+def fquadratic(x, a, b, c):
+    return a*x**2 + b*x + c
+
+def fsqrt(x, a, b):
+    return a*x**0.5 + b
+
 lognormal = FitFunction('lognormal', lognormal,
                         name='lognormal',
                         fit_params=['mean', 'stdev'],
