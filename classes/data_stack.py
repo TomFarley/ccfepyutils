@@ -6,8 +6,8 @@ import pandas as pd
 # import multiprocessing as mp
 import concurrent.futures as cf
 from collections import defaultdict, OrderedDict
-
-from copy import deepcopy
+import re
+from copy import deepcopy, copy
 
 from ccfepyutils.utils import isclose_within, make_iterable, class_name, args_for
 from ccfepyutils.data_processing import find_nearest
@@ -124,14 +124,14 @@ class Stack(object):
         self.x_obj = x  # dict or Param object containing at least name and values of x coordinate
         self.y_obj = y  # dict or Param object containing at least name and values of y coordinate
         self.z_obj = z  # dict or Param object containing at least name and values of z coordinate
-        self._values = np.array(values) if values is not None else None  # 3D data indexed by x, y and z
+        # self._values = np.array(values) if values is not None else None  # 3D data indexed by x, y and z
         self.name = name  # Name of stack object
         self.quantity = quantity  # Quantity data represents eg intensity
         self.set_stack_axis(stack_axis)  # Axis along which to consider the data a stack of data slices
 
         # If not initialised here, the xarray will be initialised when it is first accessed
         if values is not None:
-            self.set_data()
+            self.set_data(values)
 
         # self.set_stack_axis()
         self._check_types()  # Check consistency of input types etc
@@ -244,15 +244,16 @@ class Stack(object):
             # Setting whole dataset
             assert values.shape == self.shape
             self._values = values
+            #TODO: If passed dataset use coord values
 
-        if self.data is None or reset:
-            self._init_xarray()
+        if (self.data is None) or (np.all(np.isnan(self.data.values))) or reset:
+            self._init_xarray(refresh=True)
         return self
 
     def loc(self, *args, **kwargs):
         self._init_xarray()
         if self._data is not None:
-            return self._data.loc[args]
+            return self._data.sel(*args, **kwargs)
 
     def lookup_slice_index(self, index):
         values = self.coord_obj(self._stack_axis)['values']
@@ -288,22 +289,33 @@ class Stack(object):
         if item in self._slices.keys():
             self._slices.pop(item)
 
-    def extract_contiguous_chunk(self, x='all', y='all', z='all'):
+    def extract_contiguous_chunk(self, x='all', y='all', z='all', **kwargs):
         """Extract chunk of data from stack within coordinate ranges"""
         x_all = self.x_obj['values']
         y_all = self.y_obj['values']
         z_all = self.z_obj['values']
-        if x == 'all':
+
+        if (self.xyz2dim('x') in kwargs):
+            x = kwargs[self.xyz2dim('x')]
+        if (self.xyz2dim('y') in kwargs):
+            y = kwargs[self.xyz2dim('y')]
+        if (self.xyz2dim('z') in kwargs):
+            z = kwargs[self.xyz2dim('z')]
+
+        if (x == 'all'):
             x = [np.min(x_all), np.max(x_all)]
         if y == 'all':
             y = [np.min(y_all), np.max(y_all)]
         if z == 'all':
             z = [np.min(z_all), np.max(z_all)]
-        ix = x[0] < x_all < x[1]
-        iy = y[0] < y_all < y[1]
-        iz = z[0] < z_all < z[1]
-        out = self.df.loc[{self.xyz2dim(xyz): values for xyz, values in zip(['x', 'y', 'z'], [ix, iy, iz])}]
+        ix = (x[0] <= x_all) * (x_all <= x[1])
+        iy = (y[0] <= y_all) * (y_all <= y[1])
+        iz = (z[0] <= z_all) * (z_all <= z[1])
+        out = self.data.loc[{self.xyz2dim(xyz): values for xyz, values in zip(['x', 'y', 'z'], [ix, iy, iz])}]
         return out
+
+    def extract_data(self):
+        pass
 
     def __call__(self, **kwargs):
         assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
@@ -312,6 +324,8 @@ class Stack(object):
 
     def __getitem__(self, item):
         """Return data slices from the stack of data"""
+        if self.stack_axis_values is None:
+            raise ValueError('Stack axis data must be set before the {} can be sliced'.format(self.__class__))
         if item not in self.stack_axis_values:
             raise IndexError('{} is not a stack axis value. Options: {}'.format(item, self.stack_axis_values))
         is_set = self.check_data(item)
@@ -378,9 +392,55 @@ class Stack(object):
                  for c in ['x', 'y', 'z']}
         return masks
 
-    def extract(self):
+    def extract(self, squeeze=True, **kwargs):
+        """ Extract subset of data and perform opperations over axes.
 
-        raise NotImplementedError
+        :param squeeze: Remove dimensions of length 1 in output
+        :param kwargs: Values of dimensions to select:
+                            <dim_name> = <array>  - extract data at these coordinate values
+                            <dim_name>_range = [min, max]  - extract data within coordinate interval
+                            <dim_name>_<func> = True  - apply <func> along given dimension eg mean, std, max, cumsum etc
+        :return: DataArray containing extracted subset of data
+        """
+        kws = copy(kwargs)
+        da = self.data
+        reduction_funcs = {'std'}
+        # Select the requested data
+        for arg in self.dims:
+            if arg in kws:
+                da = da.loc[{arg: kws[arg]}]
+                kws.pop(arg)
+            arg_range = '{}_range'.format(arg)
+            if arg_range in kws:
+                limits = kws[arg_range]
+                assert len(limits) == 2, 'Range must have two elements'
+                mask = (limits[0] <= da.coords[arg]) * (da.coords[arg] <= limits[1])
+                da = da.loc[{arg: mask}]
+                kws.pop(arg_range)
+        # Collapse dimensions by taking average or standard deviation etc along axis
+        for kw in copy(kws):
+            for arg in self.dims:
+                m = re.match('{}_(\w+)'.format(arg), kw)
+                if m:
+                    func = m.groups()[0]
+                    if hasattr(da, func):
+                        da = getattr(da, func)(dim=arg)
+                        kws.pop(kw)
+
+            # arg_av = '{}_average'.format(arg)
+            # if (arg_av in kws) and (kws[arg_av]):
+            #     da = da.mean(dim=arg)
+            #     kws.pop(arg_av)
+            # arg_std = '{}_std'.format(arg)
+            # if (arg_std in kws) and (kws[arg_std]):
+            #     da = da.std(dim=arg)
+            #     kws.pop(arg_std)
+        if len(kws) > 0:
+            raise ValueError('Keyword arguments {} not recognised'.format(kws))
+        if squeeze:
+            # Remove redudanct dimensions with length 1
+            da = da.squeeze()
+        return da
 
     def slice(self, **kwargs):
         assert len(kwargs) == 1
@@ -479,7 +539,7 @@ class Stack(object):
     @property
     def dim_to_xyz(self):
         """Dict linking dimension names to x, y, z equivalent"""
-        return OrderedDict(((d['name'], x) for (d, x) in zip(self.coord_objs, ('x', 'y', 'z'))))
+        return OrderedDict(((d['name'], x) for (x, d) in self.coord_objs.items()))
 
     @property
     def xyz_to_dim(self):
