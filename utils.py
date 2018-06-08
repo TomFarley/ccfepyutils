@@ -263,7 +263,7 @@ def to_array(obj, silent=True):
         obj = np.array(obj)
     elif isinstance(obj, np.ndarray) and obj.ndim == 0:
         obj = np.array([obj])  # make it indexable
-    elif is_number(obj):  # Equivalent to make_itterable
+    elif is_number(obj):  # Equivalent to make_iterable
         obj = np.array([obj])
     else:
         try:
@@ -794,7 +794,7 @@ def none_filter(old, new, nest=None):
         # If either old or new is not a tuple or list nest them
         # NOTE: this will fail if single values are passed which are naturally lists or tuples - then use keyword
         nest = (not isinstance(old, (tuple, list))) or (not isinstance(new, (tuple, list)))
-    # old, new = make_itterables(old, new)
+    # old, new = make_iterables(old, new)
     if nest:  # and (not (type(old) == type(new)))  # if not both tuple or list, nest in list
         old, new = [old], [new]
     # Make sure old is mutable

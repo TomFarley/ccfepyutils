@@ -78,8 +78,8 @@ def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, *args, 
 def store_mast_signals(signals, pulses, save_path='~/data/MAST_signals/', *args, **kwargs):
     if isinstance(signals, (str, basestring)) and signals in signal_sets:
         signals = signal_sets[signals]
-    pulses = make_itterable(pulses)
-    signals = make_itterable(signals)
+    pulses = make_iterable(pulses)
+    signals = make_iterable(signals)
     save_path = os.path.expanduser(save_path)
     assert os.path.isdir(save_path), 'Save path does not exist'
     for pulse in pulses:

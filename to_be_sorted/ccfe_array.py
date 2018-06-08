@@ -42,7 +42,7 @@ import tf_libs.tf_numeric as tf_numeric
 db = Debug(1,1,0)
 
 
-def make_itterable(obj):
+def make_iterable(obj):
     """If object is a scalar nest it in a list so it can be iterated over"""
     if not hasattr(obj, '__iter__') or isinstance(obj, basestring):
         obj = [obj]
@@ -175,7 +175,7 @@ def tup0(obj):
 
 if __name__ == "__main__":
     # from test_tmp.run_test import test_tf_array
-    print(repr(make_itterable(np.array([1,2,3]))))
+    print(repr(make_iterable(np.array([1,2,3]))))
     # test_tf_array()
 
 
