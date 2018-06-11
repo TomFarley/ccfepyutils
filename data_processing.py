@@ -549,6 +549,29 @@ def argrelmax_global(array):
 
     return imax[0]
 
+def nsigma(y, nsigma=2.5):
+    """Return mu+nsigma*sigma for supplied y"""
+    y_mean = np.mean(y)
+    y_std = np.std(y)
+    out = y_mean + y_std * nsigma
+    return out
+
+def get_peaks_argrelmax(y, nsigma=2.5, order=2):
+    """ Find peaks in time trace via nsigma devition from mean or from location in 3D filament
+
+    Keyword arguments
+    x - x data (eg time points)
+    y - y data (eg intensity values)
+    nsigma - Std dev threshold for peak to be averaged (default=2.5)
+    order - window size for maxima detection
+    """
+
+    # Find local maxima in time series nsigma above mean
+    y_thresh = deepcopy(y)
+    y_thresh[np.where(y_thresh < nsigma(y, nsigma))] = nsigma(y, nsigma)
+    ifil = np.argrelmax(y_thresh, order=order)[0]
+    ifil = np.round(ifil).astype(np.int)
+    return ifil
 
 def conv_diff(y_data, width=51, order=1):
     """ Normalised derivative of data convolved with gaussian """

@@ -696,15 +696,15 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
     """
     func = make_iterable(func)  # Nest lone function in list for itteration
     kws = {}
-    keep = []
+    keep = []  # list of argument names
     name_args = []
     for f in func:
         # Add arguments for each function to list of arguments to keep
         if isinstance(f, type):
             # If a class look at it's __init__ method
-            keep += inspect.getargspec(f.__init__)[0]
+            keep += list(inspect.signature(f.__init__).parameters.keys())
         else:
-            keep += inspect.getargspec(f)[0]
+            keep += list(inspect.signature(f).parameters.keys())
         name_args += ['{name}_args'.format(name=f.__name__)]
     if match_signature:
         matches = {k: v for k, v in kwargs.items() if (((k in keep) and (k not in exclude)) or (k in include))}
