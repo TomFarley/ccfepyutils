@@ -118,7 +118,7 @@ class Stack(object):
     xyz2num = {'x': 0, 'y': 1, 'z': 2}  # axis index value of each coordinate
     num2xyz = {v: k for k, v in xyz2num.items()}  # reverse lookup direction
 
-    def __init__(self, x, y, z, values=None, name=None, quantity=None, stack_axis='x'):
+    def __init__(self, x, y, z, values=None, name=None, quantity=None, stack_axis='x', meta=None):
         #TODO: convert param objects to dict or vv
         self._reset_stack_attributes()
         self.x_obj = x  # dict or Param object containing at least name and values of x coordinate
@@ -135,7 +135,9 @@ class Stack(object):
 
         # self.set_stack_axis()
         self._check_types()  # Check consistency of input types etc
-        self.initialise_meta()
+        if meta is None:
+            meta = {}
+        self.initialise_meta(**meta)
 
     def _reset_stack_attributes(self):
         """Set all Stack class attributes to None"""
@@ -167,7 +169,7 @@ class Stack(object):
         assert isinstance(self._name, (str, type(None)))
         assert self._stack_axis in ['x', 'y', 'z']
 
-    def initialise_meta(self, columns=()):
+    def initialise_meta(self, **kwargs):
         """Initialise meta data dataframe with coordinate values"""
         if self.stack_axis_values is not None:
             self._meta = pd.DataFrame({self.stack_dim: self.stack_axis_values,
@@ -178,6 +180,16 @@ class Stack(object):
         else:
             pass
             # logger.warning('Cannot initialise_meta')
+        self.add_meta(**kwargs)
+
+    def add_meta(self, **kwargs):
+        for key, values, in kwargs.items():
+            assert isinstance(key, str)
+            assert len(values) == len(self._meta)
+            self._meta[key] = values
+            if len(set(values)) == len(values):
+                self._init_xarray()
+                self.data.coords[key] = (self.stack_dim, values)
 
     def set_stack_axis(self, coord):
         """Change stack axis coordinate"""
@@ -313,9 +325,6 @@ class Stack(object):
         iz = (z[0] <= z_all) * (z_all <= z[1])
         out = self.data.loc[{self.xyz2dim(xyz): values for xyz, values in zip(['x', 'y', 'z'], [ix, iy, iz])}]
         return out
-
-    def extract_data(self):
-        pass
 
     def __call__(self, **kwargs):
         assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
