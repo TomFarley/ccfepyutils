@@ -353,7 +353,17 @@ class Settings(object):
         if isinstance(value, (list, tuple)):
             for i, v in enumerate(value):
                 item_i = '{}:{}'.format(item, i)
+                if i == 0:
+                    if item_i in self.items:
+                        order = self._df.loc[item_i, 'order']
+                        self.delete_items(item)
+                    else:
+                        order = len(self)
+                else:
+                    order += 1
                 self(item_i, v, create_columns=create_columns, **kwargs)
+                self.reorder_item(item_i, order, save=False)
+
             return
         assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
         df = self._df
@@ -500,7 +510,16 @@ class Settings(object):
     def delete_items(self, items):
         """Remove item(s) from settings"""
         items = make_iterable(items)
-        assert all(i in self.items for i in items), 'Items "{}" not in {}'.format(items, repr(self))
+        for item in items:
+            if item not in self.items:
+                # Check if item is a list item, in which case delete all parts
+                i = 0
+                while '{}:{}'.format(item, i) in self.items:
+                    items.append('{}:{}'.format(item, i) in self.items)
+                    i += 1
+                if i == 0:
+                    raise ValueError('Item "{}" not in {}'.format(item, repr(self)))
+                items.pop(item)
         items = make_iterable(items)
         self._df = self._df.drop(items)
         logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
