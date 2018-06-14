@@ -913,6 +913,22 @@ def t_now_str(format="compressed", dl=''):
     string = datetime2str(datetime.now(), format=format)
     return string
 
+def str_to_number(string, cast=None):
+    """ Convert string to int if integer, else float. If cannot be converted to number just return original string
+    :param string: string to convert number
+    :param cast: type to cast output to eg always float
+    :return: number
+    """
+    try:
+        out = int(string)
+    except ValueError as e:
+        try:
+            out = float(string)
+        except ValueError as e:
+            out = string
+    if isinstance(cast, type):
+        out = cast(out)
+    return out
 
 class PartialFormatter(string.Formatter):
     """NOTE: Can use double braces for this! '{{no key passed to this}}'.format() -> '{no key passed to this}"""

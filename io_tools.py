@@ -98,7 +98,8 @@ def getUserFile(type=""):
     return filename
 
 
-def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, **kwargs):
+def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True, 
+                        **kwargs):
     """Return dict of filenames in given directory that match supplied regex pattern
 
     The keys of the returned dict are the matched groups for each file from the fn_pattern.
@@ -115,21 +116,32 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(20,51))
 
     """
+    # TODO: Use glob for path selection
     from ccfepyutils.utils import PartialFormatter
     fmt = PartialFormatter()
 
     path = Path(path)
     path = path.expanduser()
     if not path.is_dir():
-        raise IOError('Search directory "{}" does not exist'.format(path))
+        if raise_on_missing_dir:
+            raise IOError('Search directory "{}" does not exist'.format(path))
+        else:
+            return {}
     # If kwargs are supplied convert them to re patterns
     re_patterns = {}
     for key, value in kwargs.items():
         if isinstance(value, (np.ndarray, list, tuple)):  # and is_number(value[0]):
             # List/array of numbers, so match any number in list
             re_patterns[key] = '[{}]'.format('|'.join([str(v) for v in value]))
+        if isinstance(value, str):
+            # Replace python format codes eg {time:0.3f} with regex pattern eg ([.\d]{3,4})
+            fmt_pattern = '{{{key:}[^_]*}}'.format(key=key).replace('{', '\{').replace('}', '\}')
+            fn_pattern = re.sub(fmt_pattern, value, fn_pattern)
     # fn_pattern = fn_pattern.format(**re_patterns)
-    fn_pattern = fmt.format(fn_pattern, **re_patterns)
+    try:
+        fn_pattern = fmt.format(fn_pattern, **re_patterns)
+    except IndexError as e:
+        pass
     filenames_all = sorted(os.listdir(str(path)))
     out = {}
     i = 0
@@ -139,10 +151,13 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
             continue
         ngroups = len(m.groups())
         if ngroups == 0:
+            # Use index of element as output key
             key = i
         elif ngroups == 1:
+            # Remove nesting tuple
             key = m.groups()[0]
         else:
+            # Use tuple of elements from pattern matches as key
             key = m.groups()
         n = m.groups()  # Get frame number of match
         out[key] = fn
@@ -151,7 +166,7 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     if len(out) == 0:
         raise IOError('Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, path))
     for i, group_key in enumerate(group_keys):
-        if (group_key not in kwargs) or (kwargs[group_key] is None):
+        if (group_key not in kwargs) or (isinstance(kwargs[group_key], (str, type(None)))):
             continue
         # List of located values for group cast to same type
         located_values = [type(kwargs[group_key][0])(key[i]) for key in out.keys()]
