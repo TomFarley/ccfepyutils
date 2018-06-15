@@ -351,11 +351,21 @@ class Settings(object):
         :kwargs: Use to set non-value columns"""
         # Store a list as an enumerated set of items
         if isinstance(value, (list, tuple)):
+            # scalar item being replaced by list item
+            if item in self.items:
+                order = self._df.loc[item, 'order']
+                kws = {k: self._df.loc[item, k] for k in ['description', 'runtime']}
+                kws.update(kwargs)
+                kwargs = kws
+                self.delete_items(item)
             for i, v in enumerate(value):
                 item_i = '{}:{}'.format(item, i)
                 if i == 0:
                     if item_i in self.items:
                         order = self._df.loc[item_i, 'order']
+                        kws = {k: self._df.loc[item_i, k] for k in ['description', 'runtime']}
+                        kws.update(kwargs)
+                        kwargs = kws
                         self.delete_items(item)
                     else:
                         order = len(self)
@@ -363,7 +373,6 @@ class Settings(object):
                     order += 1
                 self(item_i, v, create_columns=create_columns, **kwargs)
                 self.reorder_item(item_i, order, save=False)
-
             return
         assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
         df = self._df
@@ -510,17 +519,16 @@ class Settings(object):
     def delete_items(self, items):
         """Remove item(s) from settings"""
         items = make_iterable(items)
-        for item in items:
+        for item in copy(items):
             if item not in self.items:
                 # Check if item is a list item, in which case delete all parts
                 i = 0
                 while '{}:{}'.format(item, i) in self.items:
-                    items.append('{}:{}'.format(item, i) in self.items)
+                    items.append('{}:{}'.format(item, i))
                     i += 1
                 if i == 0:
                     raise ValueError('Item "{}" not in {}'.format(item, repr(self)))
-                items.pop(item)
-        items = make_iterable(items)
+                items.pop(items.index(item))
         self._df = self._df.drop(items)
         logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
 
@@ -659,18 +667,18 @@ class Settings(object):
         logger.warning('Deleted settings file: {}'.format(self.fn_path))
 
     @classmethod
-    def get_copy(cls, application=None, original=None, new_name=None):
+    def get_copy(cls, application=None, original=None, new_name=None, force_overwrite=False):
         """Get new settings object based on an existing 'original' template"""
         old_settings = cls.get(application, original)
         assert len(old_settings) > 0, 'Attempting to copy empty settings object'
         assert new_name is not None, 'Name required for new settings set'
-        new_settings = old_settings.copy(new_name)
+        new_settings = old_settings.copy(new_name, force_overwrite=force_overwrite)
         del old_settings
         return new_settings
 
-    def copy(self, new_name):
+    def copy(self, new_name, force_overwrite=False):
         """Copy internal values to new settings set name"""
-        if new_name in self.log_file.names:
+        if new_name in self.log_file.names and (not force_overwrite):
             out = input('New name "{}" already exists. Overwrite it (Y)/n? '.format(new_name))
             if out.lower() not in ('y', ''):
                 return
@@ -892,10 +900,10 @@ class Settings(object):
 
             kwargs = {}
             for col, col_value in values.items():
-                if col in self.columns:
+                if (col in self.columns) and (col not in ('value_num', 'value_str')):
                     kwargs[col] = col_value
             kwargs.pop('value')
-            self(item, col_value, **kwargs)
+            self(item, value, **kwargs)
 
     def update_from_dict(self, dictionary, **kwargs):
         for item, value in dictionary.items():
@@ -985,11 +993,11 @@ class Settings(object):
             different_items = summary['different']+summary['added']
             if include_missing:
                 different_items += summary['missing']
-            df_diffs = copy(df.loc[different_items, 'value'])
+            df_diffs = copy(df.loc[different_items, ['value']]).rename(columns={'value': 'comparison'})
             df_diffs['self'] = self._df.loc[different_items, 'value']
             message = 'Settings comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
                     len(summary['same']), summary['different'], summary['missing'], df_diffs)
-            print(df_diffs)
+            # print(df_diffs)
             if raise_on_difference:
                 raise ValueError(message)
             logger.warning(message)
@@ -1334,7 +1342,7 @@ class SettingsLogFile(object):
             out[item] = self[item]
         return out
 
-def compare_settings_hash(application, name, settings_obj, n_output=3, skip_identical=False):
+def compare_settings_hash(application, name, settings_obj, n_output=1, skip_identical=False):
     """ Compare settings to saved settings hashes"""
     if isinstance(settings_obj, dict):
         settings_obj = Settings.from_dict(application, name, settings_obj, runtime=False)

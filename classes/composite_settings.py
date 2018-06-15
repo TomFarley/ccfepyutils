@@ -237,7 +237,8 @@ class CompositeSettings(object):
             sig = inspect.signature(func)
             for i, kw in enumerate(sig.parameters.values()):
                 name = kw.name
-                if not any(re.match('{}(:\d+)?'.format(name), item) for item in self.items):
+                if ((name not in self.items) and
+                    (not any(re.match('{}(:\d+)?$'.format(name), item) for item in self.items))):
                     continue
                 # compatible_functions = self._df.loc[name, 'function'].strip().split(',')
                 # if (name in self) and ((func_name in compatible_functions) or ignore_func_name):
