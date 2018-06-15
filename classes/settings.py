@@ -969,7 +969,7 @@ class Settings(object):
             out[key] = value
         return out
 
-    def compare_settings(self, other_settings, include_missing=True, raise_on_difference=True):
+    def compare_settings(self, other_settings, include_missing=True, raise_on_difference=True, log_difference=True):
         if isinstance(other_settings, Settings):
             df = other_settings._df
         elif isinstance(other_settings, pd.DataFrame):
@@ -1000,7 +1000,8 @@ class Settings(object):
             # print(df_diffs)
             if raise_on_difference:
                 raise ValueError(message)
-            logger.warning(message)
+            if log_difference:
+                logger.warning(message)
         else:
             df_diffs = None
             summary['identical'] = True
@@ -1357,7 +1358,7 @@ def compare_settings_hash(application, name, settings_obj, n_output=1, skip_iden
                 hash_settings = ds.to_dataframe()
         except Exception as e:
             raise e
-        summary, df_diffs = settings_obj.compare_settings(hash_settings, raise_on_difference=False)
+        summary, df_diffs = settings_obj.compare_settings(hash_settings, raise_on_difference=False, log_difference=False)
         differences[hash_id] = df_diffs
         diff_table.loc[hash_id, ['n_same', 'n_changes', 'n_missing', 'n_different']] = (len(summary['same']),
                             len(settings_obj)-len(summary['same']), len(summary['missing']), len(summary['different']))
