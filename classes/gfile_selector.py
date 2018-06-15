@@ -28,12 +28,14 @@ class GFileSelector(object):
 
     def __init__(self, settings, fix_gfile=None, start_gfile=None, **kwargs):
         # TODO generalise to other origins other than scheduler and default
-        self.fixed_gfile = fix_gfile  # User supplied gfile to always return
-        self.last_gfile = start_gfile
         self.settings = Settings.get('GFileSelector', settings)
         self.settings.update_from_dict(kwargs)
         self.store = pd.DataFrame(index=pd.MultiIndex.from_product([[], []], names=['n', 't']),
                                   columns=['fn', 'i_path', 'scheduler', 'n', 't'])
+        # User supplied gfile to always return if not None
+        self.fixed_gfile = none_filter(self.settings['fixed_gfile'].value, fix_gfile)
+        # Remember previous gfile for easy recall
+        self.last_gfile = none_filter(self.fixed_gfile, start_gfile)
 
     def __repr__(self):
         class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
@@ -51,6 +53,8 @@ class GFileSelector(object):
                                  'fixed_gfile is None')
         s = self.settings
         store = self.store
+        pulse = int(pulse)
+        time = float(time)
         allow_scheduler_efit = none_filter(s['allow_scheduler_efit'].value, allow_scheduler_efit)
         dt_switch_gfile = none_filter(s['dt_switch_gfile'].value, dt_switch_gfile)
         if pulse not in self.store['n']:
@@ -69,12 +73,16 @@ class GFileSelector(object):
                 self.last_gfile = current_file
                 return (current_file)
         store = store.loc[pulse]
-        closest = store.iloc[np.argmin((store['t'] - time).abs().values)]
+        # Get file closest in time to that requested
+        closest = store.iloc[[np.argmin((store['t'] - time).abs().values)]]
         assert len(closest) == 1
-        fn_closest = closest['fn']
-        path_closest = self.path_index_to_path(closest['i_path'], scheduler=closest['scheduler'])
-        self.last_gfile = (path_closest, fn_closest)
-        return (path_closest, fn_closest)
+        fn_closest = closest['fn'].values[0]
+        path_closest = self.path_index_to_path(closest['i_path'], scheduler=closest['scheduler'].all()).format(
+                pulse=pulse, machine=machine)
+        new_file = (path_closest, fn_closest)
+        logger.debug('Closest gfile at t={} changed from \n"{}" to \n"{}"'.format(time, current_file, new_file))
+        self.last_gfile = new_file
+        return new_file
 
 
     def store_gfile_info(self, pulse, machine='MAST', scheduler=False):
@@ -101,7 +109,7 @@ class GFileSelector(object):
                     key = tuple([str_to_number(k) for k in key])
                     store.loc[key, ['fn', 'i_path', 'scheduler', 'n', 't']] = [value, i_path, False, key[0], key[1]]
 
-
+        self.store = store.astype({'n': int})
         self.store.sort_index()
 
     def save_scheduler_gfile(self, pulse, time, machine='MAST', fn_format=None, path=None):
@@ -122,7 +130,7 @@ class GFileSelector(object):
 
         paths = 'kinetic_gfile_paths' if not scheduler else 'scheduler_gfile_paths'
         try:
-            path = self.settings[paths].value[int(i)]
+            path = os.path.expanduser(self.settings[paths].value[int(i)])
             return path
         except IndexError as e:
             raise e
@@ -130,6 +138,7 @@ class GFileSelector(object):
 
     def path_to_path_index(self, path):
         path = os.path.expanduser(path)
+        path = re.sub('/\d{5}/', '/{pulse}/', path)
         for paths in ['kinetic_gfile_paths', 'scheduler_gfile_paths']:
             try:
                 i = [os.path.expanduser(v) for v in self.settings[paths].value].index(path)
