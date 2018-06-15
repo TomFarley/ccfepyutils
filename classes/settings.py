@@ -284,11 +284,16 @@ class Settings(object):
         return composite_settings
 
     @classmethod
-    def from_dict(cls, application, name, dictionary, **kwargs):
+    def from_dict(cls, application, name, dictionary, silent=False, **kwargs):
+        if silent:
+            old_log_level = logger.getEffectiveLevel()
+            logger.setLevel(logging.WARNING)
         s = Settings.get(application, name)
         s.delete_items(s.items)
         for key, value in dictionary.items():
             s(key, value, **kwargs)
+        if silent:
+            logger.setLevel(old_log_level)
         return s
 
     @in_state('init', 'modified')
