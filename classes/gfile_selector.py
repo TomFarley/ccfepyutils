@@ -20,7 +20,7 @@ from ccfepyutils.utils import none_filter, str_to_number
 
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 class GFileSelector(object):
@@ -62,7 +62,7 @@ class GFileSelector(object):
         if pulse not in self.store['n']:
             raise IOError('No gfiles located for pulse "{}"'.format(pulse))
         if current_file is not None:
-            assert len(current_file) == 2, '{}'.replace(current_file)
+            assert len(current_file) == 2, '{}'.format(current_file)
             current_path, current_fn = current_file
             icurrent_path = self.path_to_path_index(current_path)
             mask = (store['fn'] == current_fn) * (store['i_path'] == icurrent_path)

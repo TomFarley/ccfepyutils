@@ -2,8 +2,17 @@ import logging
 from logging.config import fileConfig
 import os, inspect, shutil
 import pandas as pd
+
+batch_mode = os.getenv('LOADL_ACTIVE', None)
+job_name = os.getenv('LOADL_JOB_NAME', None)
+execution_mode = os.getenv('LOADL_STEP_TYPE', None)
 import matplotlib
-matplotlib.use('qt5agg')
+if batch_mode == 'yes':
+    matplotlib.use('Agg')
+    print('In batch mode')
+else:
+    # matplotlib.use('qt5agg')
+    pass
 
 def script_directory(level=0):
     fn = os.path.abspath(inspect.getfile(inspect.currentframe()))  # Path to this file
