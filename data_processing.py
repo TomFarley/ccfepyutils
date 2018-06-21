@@ -10,8 +10,6 @@ from copy import deepcopy
 import numpy as np
 import scipy as sp
 from scipy import stats
-import matplotlib
-matplotlib.use('qt5agg')
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 
