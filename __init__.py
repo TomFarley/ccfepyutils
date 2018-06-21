@@ -2,6 +2,8 @@ import logging
 from logging.config import fileConfig
 import os, inspect, shutil
 import pandas as pd
+import matplotlib
+matplotlib.use('qt5agg')
 
 def script_directory(level=0):
     fn = os.path.abspath(inspect.getfile(inspect.currentframe()))  # Path to this file
