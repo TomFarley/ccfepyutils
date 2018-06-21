@@ -215,7 +215,7 @@ class Plot(object):
             assert np.array(ax).shape == self._ax_shape, 'Axis tuple selection of wrong shape: {} not {}'.format(
                     np.array(ax).shape, self._ax_shape)
         else:
-            raise TypeError()
+            raise TypeError('ax argument has unexpected type "{}": {}'.format(type(ax), ax))
 
         # Convert grid spec slice to axis instance
         if index in self._gs_slices:

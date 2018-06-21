@@ -70,7 +70,7 @@ class Fitter(object):
         x, y = self.x, self.y
         if window is None:
             return x, y
-        if isinstance(window, (str, unicode)):
+        if isinstance(window, string_types):
             if window == 'max->':
                 ind = np.arange(np.argmax(y), len(y))
             elif window == '<-max':
@@ -96,9 +96,11 @@ class Fitter(object):
                 ind = np.arange(ind, len(y))
         elif (not is_scalar(window)) and len(window) == 2:
             ind = sub_range(x, window, indices=True)
+        else:
+            raise ValueError('Window value "{}" not recognised'.format(window))
         return x[ind], y[ind]
 
-    def fit(self, func, p0=None, window=None, **kwargs):
+    def fit(self, func, p0=None, window=None, fix_guess=False, **kwargs):
         """Fit function to data
         func - function to fit, can be predefined string
         p0 - initial guess parameters for function
@@ -115,24 +117,35 @@ class Fitter(object):
                 func, popt, pcov, chi2r = self.auto_fit()
             else:
                 raise ValueError('Function name "{}" not recognised. \nOptions: {}'.format(func, functions.keys()))
-        if func is True:
+        if (func is True) or (func == 'auto'):
             func, popt, pcov, chi2r = self.auto_fit()
-        try:
-            kws = args_for(curve_fit, kwargs)
-            popt, pcov = curve_fit(func, x, y, p0=p0, maxfev=int(1e5), **kws)
-        except RuntimeError as e:  # Failed to converge
-            logger.debug('Failed to converge: {}'.format(e))
-            return func, None, None, None
-        except TypeError as e:  # Improper input: degrees of freedom must not exceed n_data
-            logger.debug('Improper input: degrees of freedom must not exceed n_data: {}'.format(e))
-            return func, None, None, None
-        except ValueError as e:
-            logger.debug('Improper input: function is not behaving correctly: {}'.format(e))
-            raise e
-            return func, None, None, None
-        except Exception as e:
-            logger.debug('Unexpected error in fitting: {}'.format(e))
-            raise e
+        if fix_guess:
+            popt, pcov = p0, None
+        else:
+            try:
+                kws = args_for(curve_fit, kwargs)
+                popt, pcov = curve_fit(func, x, y, p0=p0, maxfev=int(1e5), **kws)
+            except RuntimeError as e:  # Failed to converge
+                logger.debug('Failed to converge: {}'.format(e))
+                if True:
+                    logger.debug(p0)
+                    plt.figure('fit debug')
+                    plt.plot(x, y, label='data')
+                    plt.plot(x, func(x, *p0), label='initial guess')
+                    popt, pcov = curve_fit(func, x, y, p0=p0, maxfev=int(1e5), **kws)
+                    plt.plot(x, func(x, *popt), label='fit')
+                    plt.legend()
+                return func, None, None, None
+            except TypeError as e:  # Improper input: degrees of freedom must not exceed n_data
+                logger.debug('Improper input: degrees of freedom must not exceed n_data: {}'.format(e))
+                return func, None, None, None
+            except ValueError as e:
+                logger.debug('Improper input: function is not behaving correctly: {}'.format(e))
+                raise e
+                return func, None, None, None
+            except Exception as e:
+                logger.debug('Unexpected error in fitting: {}'.format(e))
+                raise e
 
         y0 = func(x, *popt)
         # chi2 = np.abs(np.sum((y-y0)**2/y0))  # correct version?
@@ -143,7 +156,7 @@ class Fitter(object):
         logger.debug('{} fitted with chi2: {:0.0f}, chi2r: {:0.0f}, popt: {}'.format(func.__name__, chi2, chi2r, popt))
         return func, popt, pcov, chi2r
 
-    def auto_fit(self, funcs=('linear', 'exp', 'normal', 'lognormal'), p0s=None, window=None, ax=None):
+    def auto_fit(self, funcs=('linear', 'exp', 'normal', 'lognormal', 'exp_a_c'), p0s=None, window=None):
         """Fit fuction with lowest chi^2"""
         if p0s is None:
             p0s = [None for func in funcs]
@@ -161,12 +174,14 @@ class Fitter(object):
         return best
 
     def plot_fit(self, func='auto', p0=None, window=None, extrapolate=[None, None], ax=None, show=False,
-                 fit_label='{Func} fit', color='repeat-10', **kwargs):
+                 fit_label='{Func} fit', color='repeat-10', plot_guess=False, **kwargs):
         """Plot fit
         Returns output from fit
         """
         if func is None:  # If None don't plot
             return
+        if func is True:
+            func = 'auto'
         if ax is None:
             fig, ax = self.get_fig_ax(ax)
 
@@ -187,6 +202,10 @@ class Fitter(object):
                                  **popt_dict)
         if isinstance(color, string_types) and 'repeat' in color:
             color = repeat_color(color, ax=ax)
+        
+        if plot_guess:
+            y_guess = func(x, *p0)
+            ax.plot(x, y_guess, ls='-.', label='initial guess', color='r', **kwargs)
 
         try:  # first try all keyword arguments in order to include **kwargs to ax.plot(**kwargs)
             ax.plot(x, y, ls='--', label=label, color=color, **kwargs)
@@ -209,41 +228,60 @@ class Fitter(object):
             ax.plot(x, y+i*sigma, ls='--', lw=0.5, color='grey', alpha=0.3)
             ax.plot(x, y-i*sigma, ls='--', lw=0.5, color='grey', alpha=0.3)
 
-    def plot(self, ax=None, data='scatter', envelope=True, fit=True, p0=None, legend=True, xlabel='x', ylabel='y',
+    def plot(self, ax=None, data='scatter', envelope=True, fit=True, p0=None, legend=True, xlabel=None, ylabel=None,
              show=True, fit_window=None, **kwargs):
         """Quick access to plotting methods"""
         fig, ax = self.get_fig_ax(ax)
 
+        if xlabel is None and ax.get_xlabel() == '':
+            xlabel = 'x'
+        if ylabel is None and ax.get_ylabel() == '':
+            ylabel = 'y'
+
         if envelope:
             nsigma = 3
-            self.plot_envelope(ax=ax, **kwargs)
+            kws = args_for(self.plot_envelope, kwargs)
+            self.plot_envelope(ax=ax, **kws)
 
         if data:
             if data == 'scatter':
                 ax.scatter(self.x, self.y, label='data', s=6)
 
         if fit:
-            if (fit is True) or isinstance(fit, (tuple, list)):
-                func, popt, pcov, chi2r = self.auto_fit()
+            if (fit is True):
+                func, p0, pcov, chi2r = self.auto_fit()
+            elif  isinstance(fit, (tuple, list)):
+                func, p0, pcov, chi2r = self.auto_fit(fit)
             elif callable(fit):  # fit is a function instance
-                func, popt, pcov, chi2r = self.fit(fit, p0=p0)
+                # func, popt, pcov, chi2r = self.fit(fit, p0=p0)
+                func = fit
             # elif fit in functions:
             #     func = functions[func]
             #     func, popt, pcov, chi2r = self.fit(func, p0=p0)
-            elif isinstance(fit, (str, unicode)):
-                func, popt, pcov, chi2r = self.fit(fit, p0=p0)
+            elif isinstance(fit, string_types):
+                func = fit
+                # func, popt, pcov, chi2r = self.fit(fit, p0=p0)
             else:
-                raise ValueError('Function {} not recognised/supported'.format(func))
+                raise ValueError('Function {} not recognised/supported'.format(fit))
 
-            self.plot_fit(func, p0=p0, ax=ax, window=fit_window, show=False)
+            kws = args_for(self.plot_fit, kwargs)
+            self.plot_fit(func, p0=p0, ax=ax, window=fit_window, show=False, **kws)
 
         if legend:
-            leg = ax.legend(loc='best', fancybox=True, title=None)
-            leg.draggable()
-            leg.get_frame().set_alpha(0.7)
+            try:
+                leg = ax.legend(loc='best', fancybox=True, title=None)
+                leg.draggable()
+                leg.get_frame().set_alpha(0.7)
+            except ValueError as e:
+                if 'The truth value of an array with more than one element is ambiguous' in str(e):
+                    logger.debug('Strange error in legend: {}'.format(e))
+                else:
+                    raise e
 
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
         plt.tight_layout()
 
         if show:

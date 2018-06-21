@@ -25,6 +25,7 @@ from numpy import exp as exp0
 from numpy import log as log0
 from numpy import sqrt as sqrt0
 from numpy import pi as pi0
+import scipy as sp
 import pandas as pd
 
 from ccfepyutils.utils import args_for, to_list
@@ -209,12 +210,16 @@ def exp(x, lamda, k):
     """y = e^( -(x-k)/lamda )"""
     return np.exp(-(x-k)/lamda)
 
+def exp_a(x, A, lamda, k):
+    """y = A e^( -(x-k)/lamda )"""
+    return A * np.exp(-(x-k)/lamda)
+
 def exp_c(x, lamda, k, c):
     """y = e^( -(x-k)/lamda ) + c"""
     return np.exp(-(x-k)/lamda) + c
 
 def exp_a_c(x, A, lamda, k, c):
-    """y = e^( -(x-k)/lamda ) + c"""
+    """y = A e^( -(x-k)/lamda ) + c"""
     return A * np.exp(-(x-k)/lamda) + c
 
 def exp_polly(x, a, m, c, str_eqn=False):
@@ -251,6 +256,9 @@ def gaussian_upright(x, A, mu, sigma, c):
 def lognormal(x, A, mu, sigma, c):
     """y = A / (sigma*sqrt(2*pi)*(x)) * exp(-(ln(x)-mu)**2/(sigma*sqrt(2)))"""
     return (A / (sigma*sqrt0(2*pi0)*x)) * exp0(-(log0(x)-mu)**2/(2*sigma**2)) + c
+
+def gamma(x, a, B):
+    return B**a * x**(a-1) * np.exp(-B*x) / sp.special.gamma(x)
 
 def distributions():
     def delta(value, size=1):
@@ -298,8 +306,8 @@ def distributions():
 
         return amp * np.exp(exponent)
 
-functions = {'poly': poly, 'linear': linear, 'exp': exp, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 'normal':
-    gaussian, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 'lognormal': lognormal}
+functions = {'poly': poly, 'linear': linear, 'exp': exp, 'exp_a': exp_a, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 'normal':
+    gaussian, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 'lognormal': lognormal, 'gamma': gamma}
 
 
 

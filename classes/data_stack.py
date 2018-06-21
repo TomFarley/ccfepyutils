@@ -118,7 +118,7 @@ class Stack(object):
     xyz2num = {'x': 0, 'y': 1, 'z': 2}  # axis index value of each coordinate
     num2xyz = {v: k for k, v in xyz2num.items()}  # reverse lookup direction
 
-    def __init__(self, x, y, z, values=None, name=None, quantity=None, stack_axis='x', meta=None):
+    def __init__(self, x, y, z, values=None, name=None, quantity=None, stack_axis='x', meta=None, meta_coords=None):
         #TODO: convert param objects to dict or vv
         self._reset_stack_attributes()
         self.x_obj = x  # dict or Param object containing at least name and values of x coordinate
@@ -132,6 +132,8 @@ class Stack(object):
         # If not initialised here, the xarray will be initialised when it is first accessed
         if values is not None:
             self.set_data(values)
+        if meta_coords is not None:
+            self._meta_coords = meta_coords
 
         # self.set_stack_axis()
         self._check_types()  # Check consistency of input types etc
@@ -144,6 +146,7 @@ class Stack(object):
         self._data = None  # xarray containing data values
         self._values = None
         self._meta = None  # Dataframe of meta data related to each slice
+        self._meta_coords = []  # Columns of _meta dataframe that should be treated as data coordinates
 
         self._name = None  # Name of stack
         self._quantity = None  # Quantity represented by data
@@ -218,6 +221,8 @@ class Stack(object):
             self._values = np.full(self.shape, np.nan)
         if self._data is None or refresh:
             self._data = xr.DataArray(self._values, coords=self.coords.values(), dims=self.dims, name=self.quantity)
+            for coord in self._meta_coords:
+                self._data.coords[coord] = (self.stack_dim, self._meta[coord].values)
         logger.debug('Initialised xarray values for {}'.format(repr(self)))
 
     def _fill_values(self, **kwargs):
@@ -415,9 +420,15 @@ class Stack(object):
         da = self.data
         reduction_funcs = {'std'}
         # Select the requested data
-        for arg in self.dims:
+        for arg in self.data.coords.keys():
+            if (arg in da.coords) and (arg not in da.dims):
+                da = da.swap_dims({da.coords[arg].dims[0]: arg})
             if arg in kws:
-                da = da.loc[{arg: kws[arg]}]
+                values = make_iterable(kws[arg])
+                mask = np.ones_like(da.coords[arg], dtype=bool)
+                for v in values:
+                    mask *= np.isclose(da.coords[arg], v)
+                da = da.loc[{arg: mask}]
                 kws.pop(arg)
             arg_range = '{}_range'.format(arg)
             if arg_range in kws:
@@ -428,11 +439,13 @@ class Stack(object):
                 kws.pop(arg_range)
         # Collapse dimensions by taking average or standard deviation etc along axis
         for kw in copy(kws):
-            for arg in self.dims:
+            for arg in self.data.coords.keys():
                 m = re.match('{}_(\w+)'.format(arg), kw)
                 if m:
                     func = m.groups()[0]
                     if hasattr(da, func):
+                        if arg not in da.dims:
+                            da = da.swap_dims({da.coords[arg].dims[0]: arg})
                         da = getattr(da, func)(dim=arg)
                         kws.pop(kw)
 

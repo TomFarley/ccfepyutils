@@ -8,7 +8,6 @@ from tkinter import Tk, filedialog as askopenfilename
 
 import numpy as np
 import xarray as xr
-from nested_dict import nested_dict
 from past.types import basestring
 
 from ccfepyutils.utils import string_types, signal_abbreviations, signal_sets, make_iterable, compare_dict, \
@@ -546,6 +545,7 @@ if __name__ == '__main__':
     fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(2,8))
 
     fn = os.path.expanduser('~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
+    from nested_dict import nested_dict
     file = nested_dict()
     file['Paths']['elzar_path'] = '~/elzar/:'
     file['Paths']['data'] = ''

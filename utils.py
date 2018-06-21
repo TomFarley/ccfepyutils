@@ -930,6 +930,14 @@ def str_to_number(string, cast=None):
         out = cast(out)
     return out
 
+def has_inflection(data):
+    """Return True if 1D data has point of inflection ie increasing and decreasing sections"""
+    diff = np.diff(data)
+    if (np.sum(diff > 0) > 0) and (np.sum(diff < 0) > 0):
+        return True
+    else:
+        return False
+
 class PartialFormatter(string.Formatter):
     """NOTE: Can use double braces for this! '{{no key passed to this}}'.format() -> '{no key passed to this}"""
     def __init__(self):

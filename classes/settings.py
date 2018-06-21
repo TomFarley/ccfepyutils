@@ -3,7 +3,6 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import os, itertools, gc, re, inspect, configparser, abc, numbers, time, shutil
 from collections import OrderedDict
-from nested_dict import nested_dict
 from copy import copy
 from pathlib import Path
 
@@ -27,6 +26,11 @@ import logging
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+try:
+    from nested_dict import nested_dict
+except ImportError as e:
+    logger.warning('Optional package not available: {}'.format(e))
 
 ## TODO: Load from config file
 settings_dir = os.path.expanduser('~/.ccfetools/settings/')
@@ -186,7 +190,10 @@ class Settings(object):
     """
 
 
-    instances = nested_dict()
+    try:
+        instances = nested_dict()
+    except Exception as e:
+        instances = {}
     t_formats = {'compressed': "%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S".format(dl=''),
                  'natural': "%H:%M:%S %d/%m/%y".format(dl='')}
 
@@ -958,7 +965,7 @@ class Settings(object):
                 raise ValueError('Setting item name {} is not unique so cannot be used to index {}'.format(
                         name, repr(self)))
             return item
-        elif (name in self.items):
+        elif (name in list(self.items)):
             return name
         else:
             return name

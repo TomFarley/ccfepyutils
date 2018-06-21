@@ -77,7 +77,7 @@ def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, load_sa
                 pickle_dump(d, fn_path, protocol=2)
                 logger.info('Saved data for {}; {} to {}'.format(pulse_str, signal, os.path.join(save_path, pulse_str, fn)))
         except ImportError as e:
-            logger.exception()
+            logger.error(e)
     if success:
         return d
     else:

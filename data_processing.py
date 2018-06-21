@@ -157,9 +157,10 @@ def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_lo
     diff = np.diff(x)               # differences between adjacent data
     av_gap = stats.mode(diff) if not av_diff else np.average(diff)       # average/modal separation
     ## Get indices of begining of gaps sufficiently greater than the average
-    igap = np.nonzero(diff>gap_length*av_gap)[0] # nonzero nested in tuple
+    igap = np.nonzero(diff > gap_length*av_gap)[0]  # nonzero nested in tuple
 
-    if verbose: print('data_split: {} gap(s) identified: {}'.format(len(igap), igap))
+    if verbose: 
+        print('data_split: {} gap(s) identified: {}'.format(len(igap), igap))
 
     xsplit = []
     if y is not None:
