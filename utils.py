@@ -120,11 +120,17 @@ def replace_in(values, reference, index=False, tol=1e-10):
     """Replace values with closest reference values if within tolerance"""
     reference = to_array(reference)
     def closest_index(value):
-        diff = np.isclose(value, reference, atol=tol, rtol=1e-20)
-        if np.any(diff):  # get value or index of closest value
-            out = reference[diff][0] if not index else np.nonzero(diff)[0][0]
-        else:  # Nan if no close value
-            out = np.nan
+        if tol is not None:
+            diff = np.isclose(value, reference, atol=tol, rtol=1e-20)
+            if np.sum(diff) == 1:
+                out = reference[diff][0] if not index else np.nonzero(diff)[0][0]
+                return out
+            elif not np.any(diff):  # Nan if no close value
+                out = np.nan
+                return out
+        # Find closest of several matches
+        ind = np.argmin(np.abs(reference-value))
+        out = ind if index else reference[ind]
         return out
     vfunc = np.vectorize(closest_index)  # apply to one value at a time
     out = vfunc(to_array(values))
