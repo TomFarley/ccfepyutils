@@ -11,6 +11,7 @@ from copy import deepcopy, copy
 
 from ccfepyutils.utils import isclose_within, make_iterable, class_name, args_for
 from ccfepyutils.data_processing import find_nearest
+from ccfepyutils.data_handling import extract
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, none_filter, lookup_from_dataframe
 
@@ -418,50 +419,7 @@ class Stack(object):
         """
         kws = copy(kwargs)
         da = self.data
-        reduction_funcs = {'std'}
-        # Select the requested data
-        for arg in self.data.coords.keys():
-            if (arg in da.coords) and (arg not in da.dims):
-                da = da.swap_dims({da.coords[arg].dims[0]: arg})
-            if arg in kws:
-                values = make_iterable(kws[arg])
-                mask = np.ones_like(da.coords[arg], dtype=bool)
-                for v in values:
-                    mask *= np.isclose(da.coords[arg], v)
-                da = da.loc[{arg: mask}]
-                kws.pop(arg)
-            arg_range = '{}_range'.format(arg)
-            if arg_range in kws:
-                limits = kws[arg_range]
-                assert len(limits) == 2, 'Range must have two elements'
-                mask = (limits[0] <= da.coords[arg]) * (da.coords[arg] <= limits[1])
-                da = da.loc[{arg: mask}]
-                kws.pop(arg_range)
-        # Collapse dimensions by taking average or standard deviation etc along axis
-        for kw in copy(kws):
-            for arg in self.data.coords.keys():
-                m = re.match('{}_(\w+)'.format(arg), kw)
-                if m:
-                    func = m.groups()[0]
-                    if hasattr(da, func):
-                        if arg not in da.dims:
-                            da = da.swap_dims({da.coords[arg].dims[0]: arg})
-                        da = getattr(da, func)(dim=arg)
-                        kws.pop(kw)
-
-            # arg_av = '{}_average'.format(arg)
-            # if (arg_av in kws) and (kws[arg_av]):
-            #     da = da.mean(dim=arg)
-            #     kws.pop(arg_av)
-            # arg_std = '{}_std'.format(arg)
-            # if (arg_std in kws) and (kws[arg_std]):
-            #     da = da.std(dim=arg)
-            #     kws.pop(arg_std)
-        if len(kws) > 0:
-            raise ValueError('Keyword arguments {} not recognised'.format(kws))
-        if squeeze:
-            # Remove redudanct dimensions with length 1
-            da = da.squeeze()
+        da = extract(da, squeeze=squeeze, **kwargs)
         return da
 
     def slice(self, **kwargs):
