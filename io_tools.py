@@ -11,7 +11,7 @@ import xarray as xr
 from past.types import basestring
 
 from ccfepyutils.utils import string_types, signal_abbreviations, signal_sets, make_iterable, compare_dict, \
-    is_number, is_subset
+    is_number, is_subset, str_to_number
 
 logger = logging.getLogger(__name__)
 try:
@@ -97,8 +97,8 @@ def getUserFile(type=""):
     return filename
 
 
-def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True, 
-                        **kwargs):
+def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True,
+                        raise_on_no_matches=True, **kwargs):
     """Return dict of filenames in given directory that match supplied regex pattern
 
     The keys of the returned dict are the matched groups for each file from the fn_pattern.
@@ -131,7 +131,7 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     for key, value in kwargs.items():
         if isinstance(value, (np.ndarray, list, tuple)):  # and is_number(value[0]):
             # List/array of numbers, so match any number in list
-            re_patterns[key] = '[{}]'.format('|'.join([str(v) for v in value]))
+            re_patterns[key] = '{}'.format('|'.join([str(v) for v in value]))
         if isinstance(value, str):
             # Replace python format codes eg {time:0.3f} with regex pattern eg ([.\d]{3,4})
             fmt_pattern = '{{{key:}[^_]*}}'.format(key=key).replace('{', '\{').replace('}', '\}')
@@ -154,21 +154,29 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
             key = i
         elif ngroups == 1:
             # Remove nesting tuple
-            key = m.groups()[0]
+            key = str_to_number(m.groups()[0])
         else:
             # Use tuple of elements from pattern matches as key
-            key = m.groups()
-        n = m.groups()  # Get frame number of match
+            key = tuple(str_to_number(v) for v in m.groups())
+        n = m.groups()  # Get eg frame number of match
         out[key] = fn
         i += 1
 
     if len(out) == 0:
-        raise IOError('Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, path))
+        message = 'Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, path)
+        if raise_on_no_matches:
+            raise IOError(message)
+        else:
+            logger.warning(message)
+            return {}
     for i, group_key in enumerate(group_keys):
         if (group_key not in kwargs) or (isinstance(kwargs[group_key], (str, type(None)))):
             continue
         # List of located values for group cast to same type
-        located_values = [type(kwargs[group_key][0])(key[i]) for key in out.keys()]
+        if ngroups == 1:
+            located_values = list(out.keys())
+        else:
+            located_values = [type(kwargs[group_key][0])(key[i]) for key in out.keys()]
         if not is_subset(kwargs[group_key], list(located_values)):
             message = 'Could not locate files with {} = {}'.format(group_key,
                                                                   set(kwargs[group_key]) - set(located_values))

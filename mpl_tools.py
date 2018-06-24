@@ -1,15 +1,15 @@
 ## Function from http://stackoverflow.com/questions/8247973/how-do-i-specify-an-arrow-like-linestyle-in-matplotlib
 
-import logging
-import warnings
+import logging, warnings, os
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
 
+from ccfepyutils.io_tools import mkdir
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
 
 def seg_line_plot(x, y, z, ax=None, z_out='color', in_range=None, out_range=None, fig=None, color='b', lw = 2, ls='-',
                   cmap='Spectral_r', label=None, alpha=1):
@@ -335,11 +335,17 @@ def set_yaxis_percent(ax, dp=0):
     ax.yaxis.set_major_formatter(formatter)
     return ax
 
-def save_fig(fn, fig=None, directory=None, transparent=True, bbox_inches='tight', dpi=90):
+def save_fig(fn, fig=None, directory=None, transparent=True, bbox_inches='tight', dpi=90, save=True, mkdir_depth=None,
+             mkdir_start=None):
+    if not save:
+        return
     if fig is None:
         fig = plt.gcf()
     if directory is not None:
         fn = os.path.join(directory, fn)
+    fn = os.path.expanduser(fn)
+    if (mkdir_depth is not None) or (mkdir_start is not None):
+        mkdir(os.path.dirname(fn), depth=mkdir_depth, start_dir=mkdir_start)
     fig.savefig(fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
 
 def color_shade(color, percentage):

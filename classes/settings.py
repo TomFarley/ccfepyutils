@@ -52,6 +52,9 @@ class Setting(abc.ABC):
     def __repr__(self):
         class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
         return '<{}: {}={}>'.format(class_name, self._item, str(self))
+    
+    def __str__(self):
+        return str(self.value)
 
     def __getitem__(self, item):
         if isinstance(item, slice):
