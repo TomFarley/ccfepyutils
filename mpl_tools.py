@@ -11,6 +11,15 @@ from ccfepyutils.io_tools import mkdir
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+def get_fig_ax(ax=None, num=None, subplot=111, **fig_kwargs):
+    """Return new/existing figure and axis instances"""
+    if ax is None:
+        fig = plt.figure(num=num, **fig_kwargs)
+        ax = fig.add_subplot(subplot)
+    else:
+        fig = ax.figure
+    return fig, ax
+
 def seg_line_plot(x, y, z, ax=None, z_out='color', in_range=None, out_range=None, fig=None, color='b', lw = 2, ls='-',
                   cmap='Spectral_r', label=None, alpha=1):
     """ Colour line plot. Plot 2D line with z value represented by colour of points on line
@@ -336,7 +345,7 @@ def set_yaxis_percent(ax, dp=0):
     return ax
 
 def save_fig(fn, fig=None, directory=None, transparent=True, bbox_inches='tight', dpi=90, save=True, mkdir_depth=None,
-             mkdir_start=None):
+             mkdir_start=None, description=''):
     if not save:
         return
     if fig is None:
@@ -347,6 +356,7 @@ def save_fig(fn, fig=None, directory=None, transparent=True, bbox_inches='tight'
     if (mkdir_depth is not None) or (mkdir_start is not None):
         mkdir(os.path.dirname(fn), depth=mkdir_depth, start_dir=mkdir_start)
     fig.savefig(fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
+    logger.info('Saved {} plot to: {}'.format(description, fn))
 
 def color_shade(color, percentage):
     """Crude implementation to make color darker or lighter until matplotlib function is available:

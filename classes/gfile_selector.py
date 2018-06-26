@@ -86,6 +86,7 @@ class GFileSelector(object):
 
 
     def store_gfile_info(self, pulse, machine='MAST', scheduler=False):
+        #TODO: Consolidate code
         s = self.settings
         store = self.store
         if scheduler:
@@ -106,7 +107,6 @@ class GFileSelector(object):
                 files = filter_files_in_dir(path, fn_pattern, group_keys=('pulse', 'time'),
                                             pulse='(\d{5})', gfile_time='([.\d]+)', raise_on_missing_dir=False)
                 for key, value in files.items():
-                    key = tuple([str_to_number(k) for k in key])
                     store.loc[key, ['fn', 'i_path', 'scheduler', 'n', 't']] = [value, i_path, False, key[0], key[1]]
 
         store = store.sort_index()

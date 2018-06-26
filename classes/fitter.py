@@ -126,8 +126,8 @@ class Fitter(object):
                 kws = args_for(curve_fit, kwargs)
                 popt, pcov = curve_fit(func, x, y, p0=p0, maxfev=int(1e5), **kws)
             except RuntimeError as e:  # Failed to converge
-                logger.debug('Failed to converge: {}'.format(e))
-                if True:
+                logger.debug('Fit failed to converge: {}'.format(e))
+                if False:
                     logger.debug(p0)
                     plt.figure('fit debug')
                     plt.plot(x, y, label='data')
