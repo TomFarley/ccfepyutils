@@ -348,6 +348,7 @@ class Movie(Stack):
                 for n in frames_user:
                     frames_all = set(frames_all).union(self.get_frame_list(n, limits=movie_range, **kws))
                 frames_all = np.sort(np.array(list(frames_all)))
+                frame_range_all = [np.min(frames_all), np.max(frames_all)]
                 logger.info('Added additional {} frames for enhancement "{}"'.format(
                                     len(frames_all) - nframes_user, enhancement))
             # Make sure extended frame range is within movie range
