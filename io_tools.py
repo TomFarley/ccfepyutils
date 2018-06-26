@@ -158,7 +158,6 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
         else:
             # Use tuple of elements from pattern matches as key
             key = tuple(str_to_number(v) for v in m.groups())
-        n = m.groups()  # Get eg frame number of match
         out[key] = fn
         i += 1
 

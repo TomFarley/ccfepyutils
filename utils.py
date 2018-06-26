@@ -189,6 +189,17 @@ def is_number(s):
         return False
     return True
 
+def ndarray_0d_to_num(array):
+    out = array
+    if isinstance(array, np.ndarray) and array.ndim == 0:
+        if array.dtype == np.float64:
+            out = float(array)
+        elif array.dtype == np.int32:
+            out = int(array)
+        else:
+            raise NotImplementedError(array.dtype)
+    return out
+
 def safe_len(var, scalar=1):
     """ Length of variable returning 1 instead of type error for scalars """
     if is_scalar(var): # checks if has atribute __len__
@@ -925,6 +936,9 @@ def str_to_number(string, cast=None):
     :param cast: type to cast output to eg always float
     :return: number
     """
+    if isinstance(string, (int, float)):
+        # leave unchanged
+        return string
     try:
         out = int(string)
     except ValueError as e:
