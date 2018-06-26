@@ -330,7 +330,8 @@ class Movie(Stack):
                 func_arg = '{func_name}::{arg}'.format(func_name=enhancement, arg=arg)
                 if func_arg in self.settings:
                     kws[arg] = self.settings[func_arg].value
-            if frame_stride == 1:
+            if np.all(np.diff(frames_user) == 1):
+                # Contiguous frame range so only consider adding frames to end of range
                 frame_range_all[0] = np.min(np.concatenate([self.get_frame_list(frame_range_user[0],
                                                             limits=movie_range, **kws),frame_range_user]))
                 frame_range_all[1] = np.max(np.concatenate([self.get_frame_list(frame_range_user[-1],
@@ -342,6 +343,8 @@ class Movie(Stack):
                 logger.info('Padded movie frame range with {}+{}={} additional frames for enhancement "{}"'.format(
                     len(buffer_front), len(buffer_end), len(frames_all) - nframes_user, enhancement))
             else:
+                # Non-contiguous frame range so only consider adding frames throughout
+                # TODO: improve efficiency - only consider jumps
                 for n in frames_user:
                     frames_all = set(frames_all).union(self.get_frame_list(n, limits=movie_range, **kws))
                 frames_all = np.sort(np.array(list(frames_all)))
