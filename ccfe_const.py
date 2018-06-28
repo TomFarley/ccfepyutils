@@ -241,6 +241,10 @@ def exp_polly(x, a, m, c, str_eqn=False):
 
         return val, str_eqn
 
+def auto_corr(t, tau, beta, k):
+    """Fit to autocorrelation function from Militello2013"""
+    return np.exp(-((t-k)/tau)**(beta-1))
+
 def gaussian(x, A, mu, sigma, c):
     """ Gaussian distribution with centre mu and width sigma """
 
@@ -307,7 +311,8 @@ def distributions():
         return amp * np.exp(exponent)
 
 functions = {'poly': poly, 'linear': linear, 'exp': exp, 'exp_a': exp_a, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 'normal':
-    gaussian, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 'lognormal': lognormal, 'gamma': gamma}
+    gaussian, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 'lognormal': lognormal, 'gamma': gamma,
+             'auto_corr': auto_corr}
 
 
 

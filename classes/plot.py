@@ -30,7 +30,7 @@ import mpl_toolkits
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
 
-from ccfepyutils.utils import make_iterable, make_iterables, args_for, to_array, is_scalar
+from ccfepyutils.utils import make_iterable, make_iterables, args_for, to_array, is_scalar, none_filter
 from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
@@ -291,7 +291,7 @@ class Plot(object):
         self.state('ready')
                 
     @in_state('plotting')
-    def plot(self, x=None, y=None, z=None, ax=None, mode=None, fit=None, smooth=None, **kwargs):
+    def plot(self, x=None, y=None, z=None, ax=None, mode=None, fit=None, smooth=None, fit_kwargs=None, **kwargs):
         """Common interface for plotting data, whether 1d, 2d or 3d. 
         
         Type of plotting is controlled by mode."""
@@ -311,13 +311,13 @@ class Plot(object):
             bin_edges, bin_centres, counts = plot_pdf(x, ax, **kws)
             self.return_values = bin_edges, bin_centres, counts
         elif mode == 'line':
-            kws = args_for(plot_1d, kwargs, include=self.plot_args, remove=True)
+            kws = args_for((plot_1d, matplotlib.lines.Line2D), kwargs, include=self.plot_args, remove=True)
             plot_1d(x, y, ax, **kws)
         elif mode == 'scatter':
-            kws = args_for(scatter_1d, kwargs, include=self.scatter_args, remove=True)
+            kws = args_for((scatter_1d, plt.scatter), kwargs, include=self.scatter_args, remove=True)
             scatter_1d(x, y, ax, **kws)
         elif mode == 'contourf':
-            kws = args_for(contourf, kwargs, remove=True)
+            kws = args_for((contourf, plt.contourf), kwargs, remove=True)
             contourf(x, y, z, ax, **kws)
         elif mode in ('image', 'imshow'):
             kws = args_for((imshow, plt.imshow), kwargs, remove=True)
@@ -334,53 +334,68 @@ class Plot(object):
             raise NotImplementedError('Mode={}'.format(mode))
 
         if fit is not None:
-            kws = args_for(Fitter.plot, kwargs, remove=True)
-            f = Fitter(x, y).plot(ax=ax, data=False, envelope=False, show=False, **kws)
+            kws = {'envelope': False}
+            kws.update(none_filter({}, fit_kwargs))
+            f = Fitter(x, y).plot(ax=ax, data=False, show=False, **kws)
 
         self.call_if_args(ax, kwargs)
         return self
 
-    def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, ax=None, tight_layout=False):
+    def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, label_fontsize=None, tick_fontsize=None,
+                        ax=None, tight_layout=False):
         assert isinstance(xlabel, (string_types, type(None)))
         assert isinstance(ylabel, (string_types, type(None)))
         if ax == 'all':
             for ax in self.axes:
-                self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, ax=ax)
-                return
+                self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, label_fontsize=label_fontsize,
+                                     tick_fontsize=tick_fontsize, tight_layout=tight_layout, ax=ax)
+            return
         ax = self.ax(ax)
-        if xlabel is not None:
-            ax.set_xlabel(xlabel)
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
-        if zlabel is not None:
-            ax.set_zlabel(zlabel)
+        if (xlabel is not None) or (label_fontsize is not None):
+            ax.set_xlabel(xlabel if xlabel is not None else ax.get_xlabel(), fontsize=label_fontsize)
+        if (ylabel is not None) or (label_fontsize is not None):
+            ax.set_ylabel(ylabel if ylabel is not None else ax.get_ylabel(), fontsize=label_fontsize)
+        if (zlabel is not None) or (label_fontsize is not None) and isinstance(ax, mpl_toolkits.mplot3d.axes3d.Axes3D):
+            ax.set_zlabel(zlabel if zlabel is not None else ax.get_zlabel(), fontsize=label_fontsize)
+        if tick_fontsize is not None:
+            if not isinstance(tick_fontsize, (tuple, list)):
+                tick_fontsize = (tick_fontsize, tick_fontsize)
+            ax.tick_params(axis='both', which='major', labelsize=tick_fontsize[0])
+            ax.tick_params(axis='both', which='minor', labelsize=tick_fontsize[1])
         if tight_layout:
-            plt.tight_layout()
+            self.fig.tight_layout()
 
     def set_axis_limits(self, xlim=None, ylim=None, ax=None):
         if ax == 'all':
             for ax in self.axes:
-                self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, ax=ax)
-                return
+                self.set_axis_limits(xlim=xlim, ylim=ylim, ax=ax)
+            return
         ax = self.ax(ax)
         if xlim is not None:
             ax.set_xlim(xlim)
         if ylim is not None:
             ax.set_ylim(ylim)
 
-    def legend(self):
+    def legend(self, ax=None, legend=True, legend_fontsize=14):
         """Finalise legends of each axes"""
-        if self._legend == 'each axis':
-            for ax in self.axes.flatten():
-                # TODO: check if more than one legend handels exist
-                try:
-                    handles, labels = ax.get_legend_handles_labels()
-                    if len(handles) > 1:  # Only produce legend if more than one artist has a label
-                        leg = ax.legend()
-                        leg.draggable()
-                except ValueError as e:
-                    #  https: // github.com / matplotlib / matplotlib / issues / 10053
-                    logger.error('Not sure how to avoid this error: {}'.format(e))
+        ax = none_filter(self._legend, ax)
+        if ax == 'each axis':
+            axes = self.axes.flatten()
+        else:
+            axes = [self.ax(ax)]
+        for ax in axes:
+            # TODO: check if more than one legend handels exist
+            try:
+                handles, labels = ax.get_legend_handles_labels()
+                if len(handles) > 1:  # Only produce legend if more than one artist has a label
+                    leg = ax.legend(fontsize=legend_fontsize)
+                    leg.draggable()
+            except ValueError as e:
+                #  https: // github.com / matplotlib / matplotlib / issues / 10053
+                logger.error('Not sure how to avoid this error: {}'.format(e))
+            if not legend:
+                leg = ax.legend()
+                leg.remove()
 
     @in_state('plotting')
     def plot_ellipses(self, ax=None, obj=None, convention='ellipse_axes', **kwargs):
@@ -446,10 +461,11 @@ class Plot(object):
         scipy.misc.toimage(z, cmin=0.0, cmax=2 ** bit_depth).save(fn)  # Ensure preserve resolution and bit depth
         logger  # TODO logger
 
-    def show(self, show=True, tight_layout=True):
+    def show(self, show=True, tight_layout=True, legend=True):
         if (not show) or (self.fig is None):
             return
-        self.legend()
+        if legend:
+            self.legend()
         if tight_layout:
             plt.tight_layout()
         plt.show()
@@ -469,13 +485,13 @@ class Plot(object):
 
 
 # TODO: Move functions to separate file
-def plot_1d(x, y, ax, **kwargs):
+def plot_1d(x, y, ax, ls=None, lw=None, alpha=None, **kwargs):
     # TODO: Add error bar plot functionality
     #
     if y is not None:
-        ax.plot(x, y, **kwargs)
+        ax.plot(x, y, ls=ls, lw=lw, alpha=alpha, **kwargs)
     else:
-        ax.plot(x, **kwargs)
+        ax.plot(x, ls=ls, lw=lw, alpha=alpha, **kwargs)
 
 def plot_pdf(x, ax, label=None, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
         max_resolution=None, density=False, max_1=False, **kwargs):

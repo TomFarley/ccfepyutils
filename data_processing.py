@@ -288,9 +288,12 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     return np.convolve( m[::-1], y, mode='valid')
 
 
-def moving_average (values, window):
+def moving_average (values, window, force_odd=False):
     """ Return moving average with window length
     """
+    # Make sure window odd
+    if force_odd and (window % 2 != 1):
+        window += 1
     weights = np.repeat(1.0, window)/window
     try:
         sma = np.convolve(values, weights, 'valid')
@@ -369,6 +372,16 @@ def smooth(x, window_len=10, window='hanning'):
     assert(len(y) == len(x))
     return y
 
+def auto_correlation(signal, detrend=False, norm=True):
+    """Return auto correlation function of signal"""
+    signal = np.array(signal)
+    if detrend:
+        signal = signal - np.mean(signal)
+    autocorr = np.correlate(signal, signal, mode='full')
+    autocorr = autocorr[signal.size - 1:]
+    if norm:
+        autocorr /= np.max(autocorr)
+    return autocorr
 
 def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
         max_resolution=None, density=False, max_1=False, filter_nans=True):

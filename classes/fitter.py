@@ -173,7 +173,7 @@ class Fitter(object):
             func.__name__, chi2, chi2r, popt))
         return best
 
-    def plot_fit(self, func='auto', p0=None, window=None, extrapolate=[None, None], ax=None, show=False,
+    def plot_fit(self, func='auto', p0=None, fit_window=None, extrapolate=[None, None], ax=None, show=False,
                  fit_label='{Func} fit', color='repeat-10', plot_guess=False, **kwargs):
         """Plot fit
         Returns output from fit
@@ -185,36 +185,41 @@ class Fitter(object):
         if ax is None:
             fig, ax = self.get_fig_ax(ax)
 
-        func, popt, pcov, chi2r = self.fit(func, p0=p0, window=window, **kwargs)
-        if popt is None:
-            logger.warning('Cannot plot fit. Failed to fit function {}'.format(func.__name__))
-            return
+        func, popt, pcov, chi2r = self.fit(func, p0=p0, window=fit_window, **kwargs)
 
-        x, y = self.data(window=window)  # get windowed x data
+        x, y = self.data(window=fit_window)  # get windowed x data
         xmin = np.min(x) if extrapolate[0] is None else np.min(np.append(x, extrapolate[0]))
         xmax = np.max(x) if extrapolate[1] is None else np.max(np.append(x, extrapolate[1]))
         x = np.linspace(xmin, xmax, 200)
-        y = func(x, *popt)
 
         func_name = func.__name__.replace('_', ' ')  # Function name
-        popt_dict = {'p{}'.format(i+1): p for i, p in enumerate(popt)}
-        label = fit_label.format(func=func_name, Func=func_name.capitalize(), chi2r=chi2r, chi2=chi2r*len(popt),
-                                 **popt_dict)
+
         if isinstance(color, string_types) and 'repeat' in color:
             color = repeat_color(color, ax=ax)
-        
-        if plot_guess:
-            y_guess = func(x, *p0)
-            ax.plot(x, y_guess, ls='-.', label='initial guess', color='r', **kwargs)
 
+        if plot_guess:
+            # if p0 is None:
+            y_guess = func(x, *p0)
+            ax.plot(x, y_guess, ls='-.', label='initial guess', color='r')
+
+        if popt is None:
+            logger.warning('Cannot plot fit. Failed to fit function {}'.format(func.__name__))
+            return ax, func, popt, pcov, chi2r
+        y = func(x, *popt)
+        popt_dict = {'p{}'.format(i+1): p for i, p in enumerate(popt)}
+        label = fit_label.format(func=func_name, Func=func_name.capitalize(), chi2r=chi2r, chi2=chi2r*len(popt),
+                                     **popt_dict) if fit_label is not None else None
         try:  # first try all keyword arguments in order to include **kwargs to ax.plot(**kwargs)
-            ax.plot(x, y, ls='--', label=label, color=color, **kwargs)
-        except:
-            kws = args_for(ax.plot, kwargs)
-            ax.plot(x, y, ls='--', label=label, color=color, **kws)
+            kws = {'ls': '--'}
+            kws.update(kwargs)
+            ax.plot(x, y, label=label, color=color, **kwargs)
+        except Exception as e:
+            kws = {'ls': '--'}
+            kws.update(args_for(ax.plot, kwargs))
+            ax.plot(x, y, label=label, color=color, **kws)
         if show:
             plt.show()
-        return func, popt, pcov, chi2r
+        return ax, func, popt, pcov, chi2r
 
     def plot_envelope(self, ax=None, y_err=None, show=True, env_label='{Func} fit ($\chi_r^2=${chi2r:0.0f})', nsigma=3, **kwargs):
         """Plot error envelope around data"""
@@ -250,7 +255,7 @@ class Fitter(object):
         if fit:
             if (fit is True):
                 func, p0, pcov, chi2r = self.auto_fit()
-            elif  isinstance(fit, (tuple, list)):
+            elif isinstance(fit, (tuple, list)):
                 func, p0, pcov, chi2r = self.auto_fit(fit)
             elif callable(fit):  # fit is a function instance
                 # func, popt, pcov, chi2r = self.fit(fit, p0=p0)
@@ -265,7 +270,9 @@ class Fitter(object):
                 raise ValueError('Function {} not recognised/supported'.format(fit))
 
             kws = args_for(self.plot_fit, kwargs)
-            self.plot_fit(func, p0=p0, ax=ax, window=fit_window, show=False, **kws)
+            func, popt, pcov, chi2r = self.plot_fit(func, p0=p0, ax=ax, fit_window=fit_window, show=False, **kws)
+        else:
+            func, popt, pcov, chi2r = None, None, None, None
 
         if legend:
             try:
@@ -287,7 +294,7 @@ class Fitter(object):
         if show:
             plt.show()
 
-        return ax
+        return ax, func, popt, pcov, chi2r
 
 if __name__ == '__main__':
     func_name = 'exp'

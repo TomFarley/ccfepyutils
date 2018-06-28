@@ -48,7 +48,7 @@ def get_threshold(data, thresh_method='sigma', thresh_value=2.5):
 def locate_peaks(data, peak_method='argrelmax', thresh_method='sigma', thresh_value=2.5, exclude_ends=True, **kwargs):
     """
     Return indices and coordinates of peaks in signal
-    :param data: xr.DataArray - 1D dataset in which to locate peaks
+    :param data: xr.DataArray - 1D DataArray in which to locate peaks
     :param peak_method: str - Peak detection method
     :param thresh_method: str - Peak amplitude threshold method
     :param thresh_value: - Peak amplitude threshold value
@@ -185,6 +185,8 @@ def conditional_average(x, y, x_peaks, window_width, return_average=True):
     if len(x_peaks) == 0:
         return [], []
     peak_shapes = []
+    # Avoid floating point comparison problems giving variable len for windows
+    window_width *= 1.001
     for x_centre in x_peaks:
         if x_centre - window_width >= np.min(x) and x_centre + window_width <= np.max(x):  # check not too close to boarders of data
             mask = (x > x_centre - window_width) * (x < x_centre + window_width)
