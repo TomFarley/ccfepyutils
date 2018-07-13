@@ -50,7 +50,7 @@ class Setting(abc.ABC):
             self._df = self._settings._df
 
     def __repr__(self):
-        class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
+        class_name = re.search(".*\.(\w+)'>", str(self.__class__)).groups()[0]
         return '<{}: {}={}>'.format(class_name, self._item, str(self))
     
     def __str__(self):
