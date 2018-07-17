@@ -442,10 +442,12 @@ class Settings(object):
         return out
 
     def __contains__(self, item):
-        if item in self._df.index:
-            return True
-        else:
-            return False
+        h = re.compile('{}:?\d+'.format(item))
+        for ind in self._df.index:
+            m = h.match(ind)
+            if m:
+                return True
+        return False
 
     @in_state('modifying', 'modified')
     def __setitem__(self, item, value):
