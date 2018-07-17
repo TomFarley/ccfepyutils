@@ -442,7 +442,7 @@ class Settings(object):
         return out
 
     def __contains__(self, item):
-        h = re.compile('{}:?\d+'.format(item))
+        h = re.compile('{}:?\d*'.format(item))
         for ind in self._df.index:
             m = h.match(ind)
             if m:
@@ -987,6 +987,7 @@ class Settings(object):
         return out
 
     def compare_settings(self, other_settings, include_missing=True, raise_on_difference=True, log_difference=True):
+        """Compare self to other settings object or dataframe"""
         if isinstance(other_settings, Settings):
             df = other_settings._df
         elif isinstance(other_settings, pd.DataFrame):

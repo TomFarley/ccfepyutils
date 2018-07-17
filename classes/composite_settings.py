@@ -208,7 +208,7 @@ class CompositeSettings(object):
         return out
     
     def __contains__(self, item):
-        h = re.compile('{}:?\d+'.format(item))
+        h = re.compile('{}:?\d*'.format(item))
         for ind in self._df.index:
             m = h.match(ind)
             if m:
