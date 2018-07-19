@@ -74,7 +74,7 @@ class Plot(object):
     other_args = ['show', 'xlabel', 'ylabel', 'legend', 'ax']
     args = plot_args + scatter_args + other_args # List of all possible args for use with external kwargs
 
-    def __init__(self, x=None, y=None, z=None, num=None, axes=(1,1), default_ax=0, ax=None, mode=None,
+    def __init__(self, x=None, y=None, z=None, num=None, axes=(1, 1), default_ax=(0, 0), ax=None, mode=None,
                  legend='each axis', save=False, show=False, fig_args={}, **kwargs):
         """
 
@@ -116,7 +116,7 @@ class Plot(object):
         self._num = None  # Name of figure window
         self._ax_shape = ()  # Shape of axes grid
         self._default_ax = None # Default axis for actions when no axis is specified
-        self._current_ax = None
+        self._current_ax = None # Current axis for when actions are chained together. None as soon as out of Plot scope.
         self._data = OrderedDict()  # Data used in plots stored for provenance
         self._log = []  # Log of method calls for provenance
         self._legend = None
@@ -143,6 +143,7 @@ class Plot(object):
             self._default_ax = np.where(self.axes == ax)[0][0]
             if len(self._ax_shape) == 1:
                 self._ax_shape = np.insert(self._ax_shape, 0, 1)
+                self.axes = np.array([self.axes])
         else:
             raise ValueError('Unexpected axis object! {}'.format(ax))
         self._num = self.fig.canvas.get_window_title()
@@ -201,7 +202,6 @@ class Plot(object):
         """Return axis object given axis index, grid spec slice or string name"""
         # Convert to gridspec slice
         if isinstance(ax, matplotlib.axes.Axes):  # TODO: improve this!
-            self._current_ax = ax  #???
             return ax  # already an axis instance
         ax_names = self._axes_names
         if isinstance(ax, numbers.Integral):
@@ -218,8 +218,10 @@ class Plot(object):
         else:
             raise TypeError('ax argument has unexpected type "{}": {}'.format(type(ax), ax))
 
+        if self.gs is None:
+            ax = self.axes[index]
         # Convert grid spec slice to axis instance
-        if index in self._gs_slices:
+        elif index in self._gs_slices:
             # Axis instance already exists
             ax = self._gs_slices[index]
             ax.ccfe_plot = self
