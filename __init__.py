@@ -43,14 +43,5 @@ logger.addHandler(logging.NullHandler())
 
 logger.debug('Created logger: {}'.format(logger))
 
-# TODO: Automatically add template settings files for core classes on first run
-settings_dir = os.path.expanduser('~/.ccfetools/settings/')
-if not os.path.isdir(settings_dir):
-    os.mkdir(settings_dir)
-    template_settings_dir = os.path.join(this_dir, 'template_settings')
-    for src_dir in next(os.walk(template_settings_dir))[1]:
-        new_dir = os.path.join(settings_dir, os.path.split(src_dir)[-1])
-        logger.debug('Copying {} to {}'.format(src_dir, new_dir))
-        print(src_dir, new_dir)
-        shutil.copytree(os.path.join(template_settings_dir, src_dir), new_dir)
-    logger.info('Created ~/.ccfetools directory and copied template settings to: {}'.format(settings_dir))
+from ccfepyutils.build_dir_struct import check_ccfepyutils_dir_struct
+check_ccfepyutils_dir_struct(template_settings_dirs=os.path.join(this_dir, 'template_settings/values'))

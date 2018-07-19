@@ -240,7 +240,7 @@ class Settings(object):
         else:
             self.init()
 
-        self.add_instance()
+        # self.add_instance()
 
     def _reset_settings_attributes(self):
         self.state = None
