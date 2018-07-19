@@ -201,6 +201,7 @@ class Plot(object):
         """Return axis object given axis index, grid spec slice or string name"""
         # Convert to gridspec slice
         if isinstance(ax, matplotlib.axes.Axes):  # TODO: improve this!
+            self._current_ax = ax  #???
             return ax  # already an axis instance
         ax_names = self._axes_names
         if isinstance(ax, numbers.Integral):

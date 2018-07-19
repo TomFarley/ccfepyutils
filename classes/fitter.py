@@ -12,7 +12,6 @@ from scipy.optimize import curve_fit
 import matplotlib
 import matplotlib.pyplot as plt
 
-from inference_tools.inference.gp_tools import GpRegressor
 from ccfepyutils.ccfe_const import functions  # fix import path ****
 from ccfepyutils.utils import is_scalar, sub_range, args_for  # fix import path ****
 from ccfepyutils.mpl_tools import repeat_color  # fix import path ****
@@ -52,6 +51,12 @@ class Fitter(object):
 
     def get_envelope(self, y_err=None):
         """Get error envelope around points"""
+        try:
+            from inference_tools.inference.gp_tools import GpRegressor
+        except ImportError as e:
+            logger.warning('Error envelope plotting not availble: Could not import inference_tools module '
+                           '(https://git.ccfe.ac.uk/bayesian_analysis/inference_tools).')
+            return [], [], None
         if y_err is None:
             y_err = np.full_like(self.y, 0.1*self.y)
             # y_err = np.full_like(self.y, 0.1*np.mean(self.y))

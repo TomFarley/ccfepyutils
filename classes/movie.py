@@ -34,7 +34,7 @@ def get_camera_data_path(machine, camera, pulse):
 
     camera_settings = Settings.get('Movie_data_locations', '{}_{}'.format(machine, camera))
     if len(camera_settings) == 0:
-        raise ValueError('No Movie_data_locations settings exist for "{}" on "{}"'.format(camera, machine))
+        raise ValueError('No Movie_data_locations settings exist for camera="{}", machine="{}"'.format(camera, machine))
     
     path_options = camera_settings['path_options']
     fn_options = camera_settings['fn_options']
