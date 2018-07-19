@@ -211,10 +211,12 @@ class Plot(object):
         elif isinstance(ax, string_types):
             assert ax in ax_names, 'Axis name "{}" not recognised. Options: {}'.format(ax, ax_names)
             index = ax_names[ax]
-            # raise NotImplementedError
         elif isinstance(ax, (tuple, list)):
-            assert np.array(ax).shape == self._ax_shape, 'Axis tuple selection of wrong shape: {} not {}'.format(
-                    np.array(ax).shape, self._ax_shape)
+            assert ax[0] < self._ax_shape[0], 'Axis index "{}" outside of axis_shape "{}"'.format(ax, self._ax_shape)
+            assert ax[1] < self._ax_shape[1]
+            index = ax
+            # assert np.array(ax).shape == self._ax_shape, 'Axis tuple selection of wrong shape: {} not {}'.format(
+            #         np.array(ax).shape, self._ax_shape)
         else:
             raise TypeError('ax argument has unexpected type "{}": {}'.format(type(ax), ax))
 
