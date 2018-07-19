@@ -27,11 +27,6 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-try:
-    from nested_dict import nested_dict
-except ImportError as e:
-    logger.warning('Optional package not available: {}'.format(e))
-
 ## TODO: Load from config file
 settings_dir = os.path.expanduser('~/.ccfetools/settings/')
 
@@ -192,11 +187,9 @@ class Settings(object):
             Settings.get_settings()
     """
 
+    # index = pd.MultiIndex(levels=[[], []], labels=[[], []], names=['application', 'name'])
+    instances = {}
 
-    try:
-        instances = nested_dict()
-    except Exception as e:
-        instances = {}
     t_formats = {'compressed': "%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S".format(dl=''),
                  'natural': "%H:%M:%S %d/%m/%y".format(dl='')}
 
@@ -229,7 +222,7 @@ class Settings(object):
         """
         assert isinstance(application, str)
         assert isinstance(name, str)
-        assert (application, name) not in self.instances.keys_flat(), ('Setting object {}:{} already exists.\n'
+        assert Settings.get_instance(application, name) is None, ('Setting object {}:{} already exists.\n'
                 'Use Settings.get(application, name) to ensure there is only one instance'.format(
                 application, name))
         # TODO: Fix deepcopy of Settings objects
@@ -242,12 +235,12 @@ class Settings(object):
         self._column_sets = Settings.default_column_sets   # Groups of columns with similar purposes
         self._column_sets_names = self.column_sets_names  # TODO: properly implement saving and loading of column sets
 
-        self.instances[application][name] = self
-
         if self.file_exists:
             self.load()
         else:
             self.init()
+
+        self.add_instance()
 
     def _reset_settings_attributes(self):
         self.state = None
@@ -269,8 +262,8 @@ class Settings(object):
             raise ValueError('No settings set name supplied to Settings,get().\n'
                              'Existing settings for application "{}": {}'.format(
                             application, cls.existing_settings(application)))
-        if (application, name) in cls.instances.keys_flat():
-            return cls.instances[application][name]
+        if Settings.get_instance(application, name) is not None:
+            return Settings.get_instance(application, name)
         else:
             return Settings(application, name)
         
@@ -454,7 +447,10 @@ class Settings(object):
         self(item, value)
 
     def __len__(self):
-        return len(self._df)
+        if self._df is not None:
+            return len(self._df)
+        else:
+            return 0
 
     def __iter__(self):
         for item in self._df.index:
@@ -985,6 +981,18 @@ class Settings(object):
             value = self[item]
             out[key] = value
         return out
+
+    def add_instance(self):
+        if self.application not in self.instances:
+            self.instances[self.application] = {}
+        self.instances[self.application][self.name] = self
+
+    @classmethod
+    def get_instance(self, application, name):
+        if application in self.instances:
+            if name in self.instances[application]:
+                return self.instances[application][name]
+        return None
 
     def compare_settings(self, other_settings, include_missing=True, raise_on_difference=True, log_difference=True):
         """Compare self to other settings object or dataframe"""

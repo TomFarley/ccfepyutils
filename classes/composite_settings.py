@@ -19,19 +19,11 @@ from ccfepyutils.classes.state import State
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-try:
-    from nested_dict import nested_dict
-except ImportError as e:
-    logger.warning('Optional package not available: {}'.format(e))
-
 ## TODO: Load from config file
 settings_dir = os.path.expanduser('~/.ccfetools/settings/')
 
 class CompositeSettings(object):
-    try:
-        instances = nested_dict()
-    except Exception as e:
-        instances = {}
+    instances = {}
     def __init__(self, application, name, blacklist=[], whitelist=[], include_children=True, exclude_if_col_true=()):
         """Settings must have an 'application' and a 'name'
         - The application is the context in which the settings are used e.g. my_code
