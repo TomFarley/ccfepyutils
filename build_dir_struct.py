@@ -19,15 +19,17 @@ def check_ccfepyutils_dir_struct(template_settings_dirs=()):
     copy_template_settings(template_settings_dirs=template_settings_dirs)
 
 def copy_template_settings(template_settings_dirs=()):
+    if isinstance(template_settings_dirs, str):
+        template_settings_dirs = (template_settings_dirs,)
     for template_settings_dir in template_settings_dirs:
         # Loop over folders in template settings dir
         updated = False
         for src_dir in next(os.walk(template_settings_dir))[1]:
             # If folder for this setting does not already exist, copy the template values
-            new_dir = os.path.join(settings_dir, os.path.split(src_dir)[-1])
+            new_dir = os.path.join(settings_dir, 'values', os.path.split(src_dir)[-1])
             if os.path.isdir(new_dir):
                 continue
-            logger.debug('Copying {} to {}'.format(src_dir, new_dir))
+            logger.info('Copying {} template files to {}'.format(src_dir, new_dir))
             shutil.copytree(os.path.join(template_settings_dir, src_dir), new_dir)
             updated = True
         if updated:
