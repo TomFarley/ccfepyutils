@@ -100,6 +100,7 @@ class Plot(object):
 
         self._default_ax = default_ax  # Default axis for actions when no axis is specified
         self._current_ax = ax
+        self._previous_ax = ax
         self._data = OrderedDict()  # Data used in plots stored for provenance
         self._log = []  # Log of method calls for provenance
         self._legend = legend
@@ -112,11 +113,29 @@ class Plot(object):
         self.show(show, **args_for(self.show, kwargs))
         self.save(save, **args_for(self.save, kwargs))
 
+    @classmethod
+    def get(cls, x=None, y=None, z=None, num=None, axes=(1, 1), default_ax=(0, 0), ax=None, mode=None,
+                 legend='each axis', save=False, show=False, fig_args={}, **kwargs):
+        if isinstance(ax, matplotlib.axes.Axes) and hasattr(ax, 'ccfe_plot'):
+            # Axis is from an exisiting ccfe_plot instance
+            plot = ax.ccfe_plot
+            logger.debug('Returning plot instance: {} {}'.format(plot, id(plot)))
+            plot.plot(x, y, z, mode=mode, show=show, **kwargs)
+            plot.show(show, **args_for(plot.show, kwargs))
+            plot.save(save, **args_for(plot.save, kwargs))
+            logger.debug('Returning from plot.get: {} {}'.format(plot, id(plot)))
+        else:
+            plot = Plot(x=x, y=y, z=z, num=num, axes=axes, default_ax=default_ax, ax=ax, mode=mode,
+                 legend=legend, save=save, show=show, fig_args=fig_args, **kwargs)
+        return plot
+
+
     def _reset_attributes(self):
         self._num = None  # Name of figure window
         self._ax_shape = ()  # Shape of axes grid
-        self._default_ax = None # Default axis for actions when no axis is specified
-        self._current_ax = None # Current axis for when actions are chained together. None as soon as out of Plot scope.
+        self._default_ax = None  # Default axis for actions when no axis is specified
+        self._current_ax = None  # Current axis for when actions are chained together. None as soon as out of Plot scope.
+        self._previous_ax = None  # Previously used axis, like plt.gca()
         self._data = OrderedDict()  # Data used in plots stored for provenance
         self._log = []  # Log of method calls for provenance
         self._legend = None
@@ -127,6 +146,7 @@ class Plot(object):
         self._gs_slices = None  # grid spec slices of existing axes
         self._axes_dict = None  # dict linking grid spec slices to existing axes
         self._axes_names = None  # dict linking string names for axes to their grid spec slices
+        self.ax_artists = {}  # Nested dict of mpl artists keyed by axis instance
         self.return_values = None  # values returned by internal function calls
 
     def set_figure_variables(self, ax=None, num=None, axes=None, **kwargs):
@@ -136,6 +156,7 @@ class Plot(object):
         elif hasattr(ax, 'ccfe_plot'):
             # Axis is from an exisiting ccfe_plot instance
             self = ax.ccfe_plot
+            # self.__dict__.update(ax.ccfe_plot.__dict__)
         elif isinstance(ax, matplotlib.axes.Axes):
             self.fig = ax.figure
             self.axes = np.array(self.fig.axes)
@@ -265,6 +286,8 @@ class Plot(object):
             # If no information supplied use current/default axis
             if self._current_ax is not None:
                 ax = self._current_ax
+            elif self._previous_ax is not None:
+                ax = self._previous_ax
             else:
                 ax = self._default_ax
         elif isinstance(ax, matplotlib.axes.Axes):
@@ -274,11 +297,13 @@ class Plot(object):
         # Convert axis index/name to axis instance
         ax = self._name2ax(ax, name=name)
         self._current_ax = ax
+        self._previous_ax = ax
         try:
             # Set as current axis for plt. calls
             plt.sca(ax)
         except ValueError as e:
             logger.error('Failed to set current plotting axis! {}'.format(e))
+        ax.ccfe_plot = self
         return ax
 
     def _use_data(self, x, y, z, mode):
@@ -304,7 +329,7 @@ class Plot(object):
             self.call_if_args(None, kwargs)
             return  # No data to plot
         ax = self.ax(ax)
-      
+        artists = {}
         if smooth is not None:
             raise NotImplementedError
 
@@ -323,7 +348,7 @@ class Plot(object):
             scatter_1d(x, y, ax, **kws)
         elif mode == 'contourf':
             kws = args_for((contourf, plt.contourf), kwargs, remove=True)
-            contourf(x, y, z, ax, **kws)
+            artists = contourf(x, y, z, ax, **kws)
         elif mode in ('image', 'imshow'):
             kws = args_for((imshow, plt.imshow), kwargs, remove=True)
             imshow(ax, x, y, z, **kws)
@@ -344,6 +369,9 @@ class Plot(object):
             f = Fitter(x, y).plot(ax=ax, data=False, show=False, **kws)
 
         self.call_if_args(ax, kwargs)
+        if ax not in self.ax_artists:
+            self.ax_artists[ax] = {}
+        self.ax_artists[ax].update(artists)
         return self
 
     def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, label_fontsize=None, tick_fontsize=None,
@@ -559,6 +587,8 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
             cbar_label = ''
         cbar = plt.colorbar(im, cax=cax, format=fmt)
         cbar.set_label(cbar_label)
+
+    return {'im': im, 'cbar': cbar}
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
            show_axes=False, fil_canvas=False, transpose=False, **kwargs):
