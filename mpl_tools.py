@@ -379,12 +379,16 @@ def repeat_color(string, ax=None):
         c = color_shade(color, percentage)
     return c
 
-def show_if(show, clear_all=False):
-    """If show is true show plot. If clear all is true clear all plot windows before showing."""
-    if clear_all:
+def close_all(close_all=True):
+    """Close all existing figure windows"""
+    if close_all:
         nums = plt.get_fignums()
         for n in nums[:-1]:
             plt.close(n)
+
+def show_if(show, close_all=False):
+    """If show is true show plot. If clear all is true clear all plot windows before showing."""
+    close_all(close_all)
     if show:
         plt.show()
 

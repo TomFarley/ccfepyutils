@@ -106,7 +106,9 @@ class Slice(object):
         axes = self.stack.slice_axes_names
         x, y = self.stack.slice_axes_values
         z = self.data.values
-        plot = Plot(x, y, z, ax=ax, num=repr(self), show=False, xlabel=axes[0], ylabel=axes[1], **kws)
+        plot = Plot.get(x, y, z, ax=ax, num=repr(self), show=False, xlabel=axes[0], ylabel=axes[1], **kws)
+        ax = plot.ax()
+
         logger.debug('Returned to Slice.plot')
         # plot.set_axis_labels(axes[0], axes[1])
         plot.show(**show)

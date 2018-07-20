@@ -166,7 +166,7 @@ class Frame(Slice):
         try:
             n_str = 'Frame: {:d}'.format(int(n))
             # TODO: implement time string in annotation
-            t_str = '  Time: {:0.5f}s'.format(t) if ((t is not None) and (t != np.nan)) else ''
+            t_str = '  Time: {:0.5f}s'.format(t) if ((t is not None) and (not np.isnan(t))) else ''
 
             text = n_str + t_str
             frametxt = ax.annotate(text, xy=xy, xycoords='axes fraction', color='white', fontsize=8)
@@ -235,6 +235,9 @@ class Movie(Stack):
 
         self._movie_meta = None
         self.movie_format = None
+
+        self.gui = None
+        self._current_frame = None
 
     def __repr__(self):
         enhanced = self._enhanced_movie is not None
@@ -968,6 +971,17 @@ class Movie(Stack):
             return self.fn_path.format(n=0)
         else:
             return None
+
+    @property
+    def current_frame(self):
+        return self._current_frame
+
+    @current_frame.setter
+    def current_frame(self, value):
+        assert value in self.frame_numbers
+        self._current_frame = value
+        if gui is not None:
+            gui.set_frame(n=value)
 
 class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""
