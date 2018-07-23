@@ -923,6 +923,8 @@ class Settings(object):
 
     def update_from_dict(self, dictionary, **kwargs):
         for item, value in dictionary.items():
+            if isinstance(value, Setting):
+                value = value.value
             self(item, value, **kwargs)
         return self
         # logger.debug('Updated {} with values: {}, cols: {}'.format(self, dictionary, kwargs))
@@ -973,6 +975,9 @@ class Settings(object):
                 raise ValueError('Setting item name {} is not unique so cannot be used to index {}'.format(
                         name, repr(self)))
             return item
+        else:
+            # Name not already in df so return as is to create new item
+            return name
     
     def to_dict(self):
         out = OrderedDict()
