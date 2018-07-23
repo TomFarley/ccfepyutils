@@ -36,6 +36,8 @@ class GFileSelector(object):
         self.fixed_gfile = none_filter(self.settings['fixed_gfile'].value, fix_gfile)
         # Remember previous gfile for easy recall
         self.last_gfile = none_filter(self.fixed_gfile, start_gfile)
+        if self.fixed_gfile is not None:
+            self.settings['gfile'] = os.path.basename(self.fixed_gfile)
 
     def __repr__(self):
         class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
@@ -70,6 +72,7 @@ class GFileSelector(object):
             assert len(t_current) == 1
             t_current = t_current.values[0]
             if np.abs(t_current - time) < dt_switch_gfile:
+                # No change
                 self.last_gfile = current_file
                 return (current_file)
         store = store.loc[pulse]
@@ -82,6 +85,7 @@ class GFileSelector(object):
         new_file = (path_closest, fn_closest)
         logger.debug('Closest gfile at t={} changed from \n"{}" to \n"{}"'.format(time, current_file, new_file))
         self.last_gfile = new_file
+        self.settings['gfile'] = new_file[1]
         return new_file
 
 
