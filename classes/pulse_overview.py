@@ -26,9 +26,10 @@ signal_keys = {
     'LPr': "arp_rp radius"  # (radial position of the reciprocating probe)
 }
 
-ylabels = {'ESM_NE_BAR': '$n_e$ [m$^{-3}$]',
+ylabels = {'ESM_NE_BAR': r'$n_e$ [$\times 10^{19}$ m$^{-3}$]',
            'amc_plasma current': '$I_p$ [kA]',
-           "ada_dalpha integrated": r'$D_{\alpha}$ [ph.$s^{-1}cm^{-2}sr^{-1}$]'}
+           "ada_dalpha integrated": r'$D_{\alpha}$ [ph.$s^{-1}cm^{-2}sr^{-1}$]',
+           'Pnbi': '$P_{NBI}$ [MW]'}
 
 class PulseOverivew:
 
@@ -36,7 +37,7 @@ class PulseOverivew:
         # self._pulses = pulses
         pass
 
-    def plot(self, pulses, signals, xlim=None):
+    def plot(self, pulses, signals, xlim=None, save=False):
 
         pulses = make_iterable(pulses)
         signals = make_iterable(signals)
@@ -47,15 +48,29 @@ class PulseOverivew:
                 if signal in signal_keys.keys():
                     signal = signal_keys[signal]
                 data = get_data(signal, pulse)
-                ylabel = '{} [{}]'.format(data['dlabel'], data['dunits']) if signal not in ylabels else ylabels[signal]
-                plot.plot(data['time'], data['data'], ax=i, xlabel='$t$ [s]', ylabel=ylabel, xlim=xlim, label=str(pulse))
+                try:
+                    ylabel = '{} [{}]'.format(data['dlabel'], data['dunits']) if signal not in ylabels else ylabels[signal]
+                    x, y = data['time'], data['data']
+                    if signal == 'ESM_NE_BAR':
+                        y /= 1e19
+                    plot.plot(x, y, ax=i, ylabel=ylabel, xlim=xlim, label=str(pulse))
+                except:
+                    print('Failed to plot {}:{}'.format(pulse, signal))
+
+        plot.set_axis_labels(xlabel='$t$ [s]', ax=len(signals)-1)
+        plot.set_axis_labels(label_fontsize=18, tick_fontsize=14, tight_layout=True, ax='all')
+        plt.setp(plot.ax(0).get_xticklabels(), visible=False)
+        plot.fig.subplots_adjust(hspace=0.015)
+
         plot.legend(ax=0)
-        plt.tight_layout()
-        plot.save(save='/home/tfarley/tmp/EPS_pulse.png')
-        plot.show()
+        if save:
+            plot.save(save=save)
+        plot.show(tight_layout=False, legend=False)
 
 
 if __name__ == '__main__':
     po = PulseOverivew()
-    po.plot([29840, 29023], ['Ip', 'ne'], xlim=[0, 0.6])
+    # po.plot([29840, 29023], ['Ip', 'ne'], xlim=[0, 0.6])
     # po.plot([29840, 29023], ['Ip', 'ne', 'Da'], xlim=[0, 0.6])
+    # po.plot([28996, 29835, 29825, 29767], ['Ip', 'ne', 'Da'], xlim=[0, 0.6], save='/home/tfarley/tmp/EPS_pulse_low_ne.png')
+    po.plot([28996, 29767], ['Ip', 'ne', 'Pnbi', 'Da'], xlim=[0, 0.6], save='/home/tfarley/tmp/EPS_pulse_low_ne.png')

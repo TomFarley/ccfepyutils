@@ -27,17 +27,20 @@ pulse_lists = ['../../misc/SA1_HDD_midplane_pulse_list-all.txt']
 # "dn_edge": {'range': None, 'mean': [0.3e21, 1e23], 'percent_fluct': None, 'smoothness': None}
 # }
 constraints = {
-"Ip": {'range': None, 'mean': [380, 440], 'percent_fluct': None, 'smoothness': None},
-"ne": {'range': None, 'mean': [1.4e19, 2.2e19], 'percent_fluct': None, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
-"Bphi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
+# "Ip": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
+"Ip": {'range': None, 'mean': [360, 440], 'percent_fluct': None, 'smoothness': None},
+"ne": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
+# "ne": {'range': None, 'mean': [0.8e19, 1.6e19], 'percent_fluct': None, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
+# "Bphi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
 "Pnbi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None, 'missing': True},
-"zmag": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
-"q0": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
-"q95": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
-"dn_edge": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None}
+# "zmag": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
+# "q0": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
+# "q95": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
+# "dn_edge": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None}
 }
 
-ft_sig = 'ne'  # 'Ip-4'
+# ft_sig = 'ne'  # 'Ip-4'
+ft_sig = 'Ip-2'  # 'Ip-4'
 
 ## Apply filter useing constraints dictionary and use flat top time window found from ft_sig='Ip-2'
 pf = PulseFilter(constraints, pulse_lists=pulse_lists, pulse_range=pulse_range, ft_sig=ft_sig)
@@ -46,7 +49,8 @@ pf = PulseFilter(constraints, pulse_lists=pulse_lists, pulse_range=pulse_range, 
 # path = 'plots/similar_Militello2013/'
 # path = 'plots/insteresting_pulses/'
 # path = 'plots/Militello2016_LP_pulses/'
-plots_path = '~/figures/pulse_filter/SA1_similar_to_29023/'
+# plots_path = '~/figures/pulse_filter/SA1_similar_to_29023/'
+plots_path = '~/figures/pulse_filter/SA1_similar_to_29029/'
 
 plots_path = os.path.expanduser(plots_path)
 

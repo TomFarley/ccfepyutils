@@ -17,7 +17,7 @@ from ccfepyutils.classes.settings import Settings
 from ccfepyutils.classes.state import State
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 ## TODO: Load from config file
 settings_dir = os.path.expanduser('~/.ccfetools/settings/')
@@ -364,8 +364,9 @@ class CompositeSettings(object):
                 dict_to_netcdf(root, 'meta', meta)
             logger.info('Created new settings hash file record: {}'.format(fn))
         else:
+            logger.debug('Updating hash_id file: {}'.format(fn_path))
             try:
-                with Dataset(fn_path, "a", format="NETCDF4") as root:
+                with Dataset(fn_path, "r+", format="NETCDF4") as root:
                     root['meta']['last_used'][0] = t0
             except IndexError as e:
                 logger.warning('Settings_hash_record file does not contain "meta/last_used" variable: {}'.format(fn))
