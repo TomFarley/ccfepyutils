@@ -191,7 +191,7 @@ class CompositeSettings(object):
     
     def __call__(self, item, value=None, create_columns=False, _save=False, **kwargs):
         """Call __call__ from appropriate settings object"""
-        item = self.name_to_item(item)
+        item = Settings.name_to_item(self, item)
         settings = self.get_settings_for_item(item)
         out = settings(item, value=value, create_columns=create_columns, _save=_save, **kwargs)
         # Update combined settings instance to reflect change
@@ -308,22 +308,6 @@ class CompositeSettings(object):
         """Save composite settings dataframe to hdf5 file group"""
         self._df.to_xarray().to_netcdf(fn, mode='a', group=group)
         logger.debug('Saved composite settings {} to file: {}'.format(repr(self), fn))
-
-    def name_to_item(self, name):
-        """Lookup item key given name"""
-        df = self._df
-        if name in df['name'].values:
-            mask = df['name'] == name  # boolian mask where name == 'item'
-            if np.sum(mask) == 1:
-                item = df.index[mask].values[0]
-            else:
-                raise ValueError('Setting item name {} is not unique so cannot be used to index {}'.format(
-                        name, repr(self)))
-            return item
-        elif (name in self.items):
-            return name
-        else:
-            return name
 
     def rename_items_with_pattern(self, pattern, replacement_string, force=False):
         """Replace all occurences of regex pattern in indices with 'replacement_string'"""

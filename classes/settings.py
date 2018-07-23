@@ -356,7 +356,10 @@ class Settings(object):
         """Set value of setting
         :item: name of setting to change
         :value: value to set the item to
-        :kwargs: Use to set non-value columns"""
+        :kwargs: Use to set non-value columns
+        TODO: Handle modifying list items columns
+        TODO: Enable setting existing item's value to None without '*None*'
+        """
         # Store a list as an enumerated set of items
         if isinstance(value, (list, tuple)):
             # scalar item being replaced by list item
@@ -958,7 +961,11 @@ class Settings(object):
     def name_to_item(self, name):
         """Lookup item key given name"""
         df = self._df
-        if name in df['name'].values:
+        if (name in list(self.items)):
+            return name
+        if self.is_list_item(self, name):
+            raise NotImplementedError
+        elif name in df['name'].values:
             mask = df['name'] == name  # boolian mask where name == 'item'
             if np.sum(mask) == 1:
                 item = df.index[mask].values[0]
@@ -966,10 +973,6 @@ class Settings(object):
                 raise ValueError('Setting item name {} is not unique so cannot be used to index {}'.format(
                         name, repr(self)))
             return item
-        elif (name in list(self.items)):
-            return name
-        else:
-            return name
     
     def to_dict(self):
         out = OrderedDict()

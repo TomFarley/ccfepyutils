@@ -153,7 +153,8 @@ class Frame(Slice):
         kws.update(kwargs)
         show = args_for(Plot.show, kws, exclude='tight_layout')
         show.update(args_for(Plot.show, kws, remove=False))  # pass tight layout to show and plot
-        if update_existing and hasattr(ax, 'ccfe_plot') and ('img' in ax.ccfe_plot.ax_artists[ax]):
+        if (update_existing and hasattr(ax, 'ccfe_plot') and (ax in ax.ccfe_plot.ax_artists) and
+                ('img' in ax.ccfe_plot.ax_artists[ax])):
             plot = ax.ccfe_plot
             plot.ax_artists[ax]['img'].set_data(self.data.T)
             logger.debug('Updated existing image artist')
