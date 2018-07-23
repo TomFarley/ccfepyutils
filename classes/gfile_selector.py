@@ -36,8 +36,8 @@ class GFileSelector(object):
         self.fixed_gfile = none_filter(self.settings['fixed_gfile'].value, fix_gfile)
         # Remember previous gfile for easy recall
         self.last_gfile = none_filter(self.fixed_gfile, start_gfile)
-        if self.fixed_gfile is not None:
-            self.settings['gfile'] = os.path.basename(self.fixed_gfile)
+
+        self.settings['gfile'] = os.path.basename(self.fixed_gfile[1]) if self.fixed_gfile is not None else None
 
     def __repr__(self):
         class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
