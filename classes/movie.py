@@ -22,7 +22,7 @@ from ccfepyutils.io_tools import pickle_load, locate_file
 from ccfepyutils.classes.plot import Plot
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 def get_camera_data_path(machine, camera, pulse):
     """Return path to movie file, looking up settings for camera"""
@@ -147,32 +147,46 @@ class Frame(Slice):
             return self.stack(raw=True, **{self.dim: self.value})
             # raise ValueError('Frame does not have a raw movie')
 
-    def plot(self, ax=None, annotate=True, **kwargs):
+    def plot(self, ax=None, annotate=True, update_existing=True, **kwargs):
         # TODO: Add automatic axis labeling once parameter class is complete
         kws = {'mode': 'image', 'cmap': 'gray', 'show': False}
         kws.update(kwargs)
         show = args_for(Plot.show, kws, exclude='tight_layout')
         show.update(args_for(Plot.show, kws, remove=False))  # pass tight layout to show and plot
-        plot = Slice.plot(self, ax=ax, show=False, **kws)
+        if update_existing and hasattr(ax, 'ccfe_plot') and ('img' in ax.ccfe_plot.ax_artists[ax]):
+            plot = ax.ccfe_plot
+            plot.ax_artists[ax]['img'].set_data(self.data.T)
+            logger.debug('Updated existing image artist')
+        else:
+            plot = Slice.plot(self, ax=ax, show=False, **kws)
         if annotate:
             t = self.stack.lookup('t', **{self.stack.stack_dim: self.value}) if 't' in self.stack._meta.columns else None
-            self._annotate_plot(plot.ax(), self.value, t=t)
+            self._annotate_plot(plot.ax(), self.value, t=t, update_existing=update_existing)
         plot.show(**show)
         return plot
 
     @classmethod
-    def _annotate_plot(cls, ax, n, t=None, xy=(0.05, 0.95)):
+    def _annotate_plot(cls, ax, n, t=None, xy=(0.05, 0.95), update_existing=True):
         """Add text annotation with frame number/time"""
         try:
             n_str = 'Frame: {:d}'.format(int(n))
             # TODO: implement time string in annotation
             t_str = '  Time: {:0.5f}s'.format(t) if ((t is not None) and (not np.isnan(t))) else ''
 
+            # TODO: Move to Plot class
             text = n_str + t_str
-            frametxt = ax.annotate(text, xy=xy, xycoords='axes fraction', color='white', fontsize=8)
-            frametxt.set_bbox(dict(color='k', alpha=0.5, edgecolor=None))
+            if update_existing and hasattr(ax, 'ccfe_plot') and ('text_frame_no' in ax.ccfe_plot.ax_artists[ax]):
+                # Keep record of text object for updating
+                ax.ccfe_plot.ax_artists[ax]['text_frame_no'].set_text(text)
+            else:
+                frametxt = ax.annotate(text, xy=xy, xycoords='axes fraction', color='white', fontsize=8)
+                frametxt.set_bbox(dict(color='k', alpha=0.5, edgecolor=None))
+            if hasattr(ax, 'ccfe_plot'):
+                # Keep record of text object for updating
+                ax.ccfe_plot.ax_artists[ax]['text_frame_no'] = frametxt
         except Exception as e:
             logger.exception('Cannot annotate frame plot. {}'.format(e))
+        return text
 
 class Movie(Stack):
     # compatibities = dict((
@@ -385,6 +399,7 @@ class Movie(Stack):
         self._meta['enhanced'] = False
         self._meta['user'] = False
         self._meta.loc[frames_user, 'user'] = True
+        self.current_frame = frames_user[0]
         pass
     
     def get_frame_range(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
@@ -979,9 +994,12 @@ class Movie(Stack):
     @current_frame.setter
     def current_frame(self, value):
         assert value in self.frame_numbers
+        if self.current_frame == value:
+            # Avoid cyclic call from gui
+            return
         self._current_frame = value
-        if gui is not None:
-            gui.set_frame(n=value)
+        if self.gui is not None:
+            self.gui.set_frame(n=value)
 
 class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""

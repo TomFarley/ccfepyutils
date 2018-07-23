@@ -351,7 +351,7 @@ class Plot(object):
             artists = contourf(x, y, z, ax, **kws)
         elif mode in ('image', 'imshow'):
             kws = args_for((imshow, plt.imshow), kwargs, remove=True)
-            imshow(ax, x, y, z, **kws)
+            artists = imshow(ax, x, y, z, **kws)
         elif mode == 'scatter_3d':
             ax = self.convert_ax_to_3d(ax)
             kws = args_for((plot_scatter_3d, plt.scatter), kwargs, remove=True)
@@ -568,27 +568,27 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
 
     try:
         if not any(v is None  for v in (x, y, z)):
-            im = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
-            im = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
+            img = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
+            img = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
         else:
-            im = ax.contour(z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
-            im = ax.contourf(z, levels, cmap=cmap, **kwargs)
+            img = ax.contour(z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
+            img = ax.contourf(z, levels, cmap=cmap, **kwargs)
     except ValueError as e:
         logger.exception('Failed to plot contour. min(z)={}, max(z)={}'.format(np.min(z), np.max(z)))
-        im = None
+        img = None
 
     # TODO: move to Plot class
-    if colorbar and im:
+    if colorbar and img:
         from mpl_toolkits.axes_grid1 import make_axes_locatable
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
         fmt = '%.2g' if colorbar != '%' else '%.2%'
         if cbar_label is None:
             cbar_label = ''
-        cbar = plt.colorbar(im, cax=cax, format=fmt)
+        cbar = plt.colorbar(img, cax=cax, format=fmt)
         cbar.set_label(cbar_label)
 
-    return {'im': im, 'cbar': cbar}
+    return {'img': img, 'cbar': cbar}
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
            show_axes=False, fil_canvas=False, transpose=False, **kwargs):
@@ -624,7 +624,7 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
     # if aspect:
     #     ax.set_aspect(aspect)
     img = ax.imshow(z, cmap=cmap, interpolation=interpolation, origin=origin, **kwargs)
-    return img
+    return {'img': img}
 
 def plot_2d(self, z, x, y, ax, raw=False, show=True, save=False, annotate=True,
          path='~/elzar/images/frames/', extension='.png',
