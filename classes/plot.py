@@ -312,7 +312,7 @@ class Plot(object):
 
     def call_if_args(self, ax, kwargs, raise_on_exception=True):
         kwargs['ax'] = ax
-        for func in (self.set_axis_labels, self.set_axis_limits, self.show):
+        for func in (self.set_axis_labels, self.set_axis_limits, self.show, self.save):
             kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
                 func(**kws)
@@ -477,11 +477,11 @@ class Plot(object):
                     return axes_subset[j]
         raise RuntimeError("2D axis wasn't replaced with 3D one")
 
-    def save(self, save=False, settings=None, prefix='', description=None,
+    def save(self, save=False, settings=None, prefix='', description=None, allow_relative=True,
              bbox_inches='tight', transparent=True, dpi=90):
         if save is False:  # Don't save!
             return
-        elif pos_path(save):  # string path
+        elif pos_path(save, allow_relative=allow_relative):  # string path
             path_fn = save
         else:
             assert settings is not None

@@ -615,16 +615,14 @@ class Settings(object):
         try:
             #TODO: delete/overwrite previous values? Use with?
             os.remove(self.fn_path)
-            root = Dataset(self.fn_path, "w", format="NETCDF4")
-            dict_to_netcdf(root, 'meta', meta)
-            dict_to_netcdf(root, 'column_sets_names', self.column_sets_names)
-            root.close()
+            with Dataset(self.fn_path, "w", format="NETCDF4") as root:
+                dict_to_netcdf(root, 'meta', meta)
+                dict_to_netcdf(root, 'column_sets_names', self.column_sets_names)
             self._df.to_xarray().to_netcdf(self.fn_path, mode='a', group='df')
 
         except PermissionError as e:
             logger.exception('Unable to write to file')
         except:
-            root.close()
             logger.exception('Failed to update Settings File for application "{app}": {path}'.format(
                     app=self.application, path=self.fn_path))
         else:
