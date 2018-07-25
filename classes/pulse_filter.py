@@ -155,7 +155,7 @@ class PulseFilter(object):  # collections.MutableMapping
             print(df)
 
         # print('Ip (Filtered):\n{}'.format(self.summary['Ip']))
-        return str(df)
+        return df
 
     def write_summary(self, path='./results/'):
         """ Write summary output to file

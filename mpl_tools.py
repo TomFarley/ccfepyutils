@@ -379,12 +379,14 @@ def repeat_color(string, ax=None):
         c = color_shade(color, percentage)
     return c
 
-def close_all_mpl_plots(close_all=True):
+def close_all_mpl_plots(close_all=True, verbose=True):
     """Close all existing figure windows"""
     if close_all:
         nums = plt.get_fignums()
         for n in nums[:-1]:
             plt.close(n)
+    if verbose:
+        logger.info('Closed all mpl plot windows')
 
 def show_if(show, close_all=False):
     """If show is true show plot. If clear all is true clear all plot windows before showing."""

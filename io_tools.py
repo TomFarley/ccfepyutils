@@ -527,16 +527,18 @@ def regexp_int_range(low, high, compile=False):
         return '(%s)' % '|'.join('{:d}'.format(i) for i in range(low, high + 1))
 
 
-def pos_path(value, require_dir_path=True):
+def pos_path(value, allow_relative=True):
     """Return True if value is a potential file path else False"""
     if not isinstance(value, string_types):
         return False
     value = os.path.expanduser(value)
+    if allow_relative:
+        value = os.path.abspath(value)
     path, fn = os.path.split(value)
     if os.path.isdir(path):
         return True
-    elif (not require_dir_path) and (path == ''):
-        return True
+    # elif (allow_relative) and (path == ''):
+    #     return True
     else:
         return False
 

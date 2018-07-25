@@ -37,7 +37,7 @@ class PulseOverivew:
         # self._pulses = pulses
         pass
 
-    def plot(self, pulses, signals, xlim=None, save=False):
+    def plot(self, pulses, signals, xlim=None, show=False, save=False):
 
         pulses = make_iterable(pulses)
         signals = make_iterable(signals)
@@ -65,7 +65,7 @@ class PulseOverivew:
         plot.legend(ax=0)
         if save:
             plot.save(save=save)
-        plot.show(tight_layout=False, legend=False)
+        plot.show(show=show, tight_layout=False, legend=False)
 
 
 if __name__ == '__main__':

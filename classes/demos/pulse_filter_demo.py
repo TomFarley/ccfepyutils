@@ -3,6 +3,9 @@
 import numpy as np
 import os
 from ccfepyutils.classes.pulse_filter import PulseFilter
+from ccfepyutils.classes.pulse_overview import PulseOverivew
+from ccfepyutils.mpl_tools import close_all_mpl_plots
+from ccfepyutils.classes.plot import Plot
 
 ## Range of pulses to analyse
 # pulse_range = [29737, 30021]
@@ -27,12 +30,13 @@ pulse_lists = ['../../misc/SA1_HDD_midplane_pulse_list-all.txt']
 # "dn_edge": {'range': None, 'mean': [0.3e21, 1e23], 'percent_fluct': None, 'smoothness': None}
 # }
 constraints = {
-# "Ip": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
-"Ip": {'range': None, 'mean': [360, 440], 'percent_fluct': None, 'smoothness': None},
+"Ip": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
+# "Ip": {'range': None, 'mean': [360, 460], 'percent_fluct': None, 'smoothness': None},
 "ne": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
 # "ne": {'range': None, 'mean': [0.8e19, 1.6e19], 'percent_fluct': None, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
 # "Bphi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
-"Pnbi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None, 'missing': True},
+# "Pnbi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None, 'missing': True},
+"Pnbi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
 # "zmag": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
 # "q0": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
 # "q95": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
@@ -62,4 +66,12 @@ pf.plot(['ne', 'Ip', 'q95'], info=['Ip', 'ne', 'q95', 'q0', 'Pnbi', 'Bphi', 'zma
 #         ft_sig='Ip-2', set='pass', save=True, show=False, path=path)
 
 ## Print a summary of the accepted pulses to the terminal
-pf.print_summary()
+df = pf.print_summary()
+
+close_all_mpl_plots()
+
+no_nbi_mask = np.isnan(df['Pnbi'].values)
+plot = Plot(df['ne'][~no_nbi_mask], df['Ip'][~no_nbi_mask], mode='scatter', show=False, xlabel='$n_e$', ylabel='$I_p$', xlim=[1e19, 4e19], label='NBI')
+plot.plot(df['ne'][no_nbi_mask], df['Ip'][no_nbi_mask], mode='scatter', label='No NBI', show=True, save='pulse_filter_param_space.png')
+
+# PulseOverivew().plot(pulses=list(df.index), signals=['ne', 'Ip'], show=True)
