@@ -47,6 +47,7 @@ class CompositeSettings(object):
     def _reset_settings_attributes(self):
         self.state = None
         self.core = None
+        self._hash_id = None
 
     def build_composite_df(self, include_children=True, exclude_if_col_true=()):
         """Expand settings items into full Settings objects"""
@@ -57,7 +58,7 @@ class CompositeSettings(object):
         self._df = self.core._df[0:0]  # Get emtpy dataframe with same column structure
         self._df = self.append_settings_file(self._application, self._name, self._df, self._settings, self._items,
                                              include_children=include_children, exclude_if_col_true=exclude_if_col_true)
-
+        self._hash_id = None
         pass
 
     def append_settings_file(self, application, name, df, settings, items,
@@ -197,6 +198,7 @@ class CompositeSettings(object):
         # Update combined settings instance to reflect change
         #TODO: Properly handle list settings
         self._df.loc[item, :] = settings._df.loc[item, :]
+        self._hash_id = None
         return out
     
     def __contains__(self, item):
@@ -260,11 +262,11 @@ class CompositeSettings(object):
     
     def set_value(self, **kwargs):
         """Set values of multiple items using keyword arguments"""
-
         for item, value, in copy(kwargs).items():
             if (item in self.items) and (value is not None):
                 self(item, kwargs.pop(item))
                 logger.debug('Set {}={} from kwargs'.format(item, value))
+        self._hash_id = None
 
     def set_column(self, col, value, items='all', apply_to_groups=False):
         """Set value of column for a group of items"""
@@ -315,7 +317,9 @@ class CompositeSettings(object):
             settings.rename_items_with_pattern(pattern, replacement_string, force=force)
         # TODO: Implement properly
         # self._df.loc[settings._df.index] = settings._df
-        logger.warning('Changes will not be reflected in composite settings df')
+        self._hash_id = None
+        self.refresh()
+        # logger.warning('Changes will not be reflected in composite settings df')
 
     def to_dict(self):
         """Return settings values as dict"""
@@ -331,6 +335,8 @@ class CompositeSettings(object):
 
     def hash_id(self):
         from ccfepyutils.io_tools import gen_hash_id
+        if self._hash_id is not None:
+            return self._hash_id
         mask = ~self._df['runtime']
         df = self._df.loc[mask, 'value']
         hash_id = gen_hash_id(df)
@@ -354,7 +360,7 @@ class CompositeSettings(object):
                     root['meta']['last_used'][0] = t0
             except IndexError as e:
                 logger.warning('Settings_hash_record file does not contain "meta/last_used" variable: {}'.format(fn))
-
+        self._hash_id = hash_id
         return hash_id
 
     @property
