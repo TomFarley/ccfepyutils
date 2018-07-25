@@ -433,7 +433,7 @@ class Stack(object):
         """Wibndow the data so return letterboxed subset of data perp to stack axis"""
         raise NotImplementedError
 
-    def lookup(self, output='slice_coord', **kwargs):
+    def lookup(self, output='slice_coord', _raise_on_missing=True, **kwargs):
         """Return meta data value corresponding to supplied meta data input
         :param value: value of inp to look up corresponding out value for
         :param inp: coordinate type of 'value'
@@ -441,7 +441,7 @@ class Stack(object):
         :return: out value"""
         if output == 'slice_coord':
             output = self.stack_dim
-        new_value = lookup_from_dataframe(self._meta, output, **kwargs)
+        new_value = lookup_from_dataframe(self._meta, output, _raise_on_missing=_raise_on_missing, **kwargs)
         return new_value
 
     def get(self, var, **kwargs):  # TODO: Need to extend to multiple kwargs

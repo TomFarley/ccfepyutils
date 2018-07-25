@@ -837,7 +837,7 @@ def sigma2fwhm(values):
     fwhm = 2*np.sqrt(2*np.log(2))
     return values * fwhm
 
-def lookup_from_dataframe(df, col, **kwargs):
+def lookup_from_dataframe(df, col, _raise_on_missing=True, **kwargs):
     """Lookup/extract column value based on other column in a dataframe"""
     if len(kwargs) == 0:
         raise ValueError('No input column values passed to lookup')
@@ -857,10 +857,13 @@ def lookup_from_dataframe(df, col, **kwargs):
         if key == 'i' and value < 0:
             value = df[key].values[value]
         values = df[key].values
-        if value not in values.astype(type(value)):
-            raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, df[key]))
+        if not isclose_within(value, values.astype(type(value))):
+            if _raise_on_missing:
+                raise ValueError('value {} is not a valid "{}" value. Options: {}'.format(value, key, df[key]))
+            else:
+                return None
         value = make_iterable(value)
-        mask *= df[key].isin(value)
+        mask *= isclose_within(df[key].values, value)
     new_value = df.loc[mask, col].values
     if len(new_value) == 1:
         new_value = new_value[0]

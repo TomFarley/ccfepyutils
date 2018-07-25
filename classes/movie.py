@@ -182,9 +182,9 @@ class Frame(Slice):
             else:
                 frametxt = ax.annotate(text, xy=xy, xycoords='axes fraction', color='white', fontsize=8)
                 frametxt.set_bbox(dict(color='k', alpha=0.5, edgecolor=None))
-            if hasattr(ax, 'ccfe_plot'):
-                # Keep record of text object for updating
-                ax.ccfe_plot.ax_artists[ax]['text_frame_no'] = frametxt
+                if hasattr(ax, 'ccfe_plot'):
+                    # Keep record of text object for updating
+                    ax.ccfe_plot.ax_artists[ax]['text_frame_no'] = frametxt
         except Exception as e:
             logger.exception('Cannot annotate frame plot. {}'.format(e))
         return text
@@ -400,7 +400,8 @@ class Movie(Stack):
         self._meta['enhanced'] = False
         self._meta['user'] = False
         self._meta.loc[frames_user, 'user'] = True
-        self.current_frame = frames_user[0]
+        if self.current_frame not in self.frame_numbers:
+            self.current_frame = frames_user[0]
         pass
     
     def get_frame_range(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
