@@ -166,7 +166,9 @@ def make_iterables(*args):
 
 def is_scalar(var):
     """ True if variable is scalar """
-    if hasattr(var, "__len__"):
+    if isinstance(var, str):
+        return True
+    elif hasattr(var, "__len__"):
         return False
     else:
         return True
@@ -188,6 +190,15 @@ def is_number(s):
     except TypeError as e:  # eg trying to convert an array
         return False
     return True
+
+def is_numeric(value):
+    """Return True if value is a number or numeric array object, else False"""
+    try:
+        np.sum(value)
+        numeric = True
+    except TypeError as e:
+        numeric = False
+    return numeric
 
 def ndarray_0d_to_num(array):
     out = array
