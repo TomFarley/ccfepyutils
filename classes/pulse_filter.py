@@ -173,7 +173,6 @@ class PulseFilter(object):  # collections.MutableMapping
             f.writelines('\n'.join(['\n{} pulses accepted'.format(len(self.results['pass'])),
                                     json.dumps(self.results['pass'])]))
 
-        print('Summary written to: {}'.format(fn))
 
         out = [(key, list) for key, list in self.summary.items()]
         out = [('Pulse', self.results['pass'])] + out
@@ -181,7 +180,8 @@ class PulseFilter(object):  # collections.MutableMapping
         if self.name is not None:
             df.to_csv(path + 'pulse-filter_data-summary_{}.csv'.format(self.name))
         else:
-            df.to_csv(path + 'pulse-filter_data-summary}.csv')
+            df.to_csv(path + 'pulse-filter_data-summary.csv')
+        logger.info('Summary written to: {}'.format(os.path.abspath(fn)))
 
         # df.to_excel()
 

@@ -19,7 +19,7 @@ import collections
 from collections import OrderedDict
 # import idlbridge as idl
 # getdata = idl.export_function("getdata")
-from elzar.tools.utils import get_data
+from ccfepyutils.mast_data.get_data import get_data
 # import idam
 # idam.setProperty("verbose")
 # idam.setProperty("verbose", False)
@@ -32,6 +32,7 @@ from ccfepyutils.utils import make_iterable
 from ccfepyutils.data_processing import smooth, data_split, savitzky_golay, conv_diff
 from ccfepyutils.io_tools import mkdir
 from ccfepyutils.string_formatting import str2tex
+from ccfepyutils.utils import is_scalar, is_in, is_numeric
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,9 @@ class PulseData(collections.MutableMapping):
     ## Short signal names (shorter and easier to remember!)
     signals = {
         'Ip': "amc_plasma current",
-        'ne': "ESM_NE_BAR",  # (electron line averaged density)
-        'ne2': "ane_density",  # Gives lower density - what is this?
+        'ne': 'ayc_ne',  # Core Thomson scattering data - Electron Density
+        'ne3': "ESM_NE_BAR",  # (electron line averaged density)
+        'ne2': "ane_density",  # Gives lower density - what is this? - CO2 Interferometry
         'Pnbi': "anb_tot_sum_power",  # Total NBI power
         'Pohm': "esm_pphi",  # Ohmic heating power (noisy due to derivatives!)
         'Ploss': "esm_p_loss",  # Total power crossing the separatrix
@@ -156,6 +158,12 @@ class PulseData(collections.MutableMapping):
         """ Return signal data within time window
         """
         d = self[sig]
+        if is_scalar(d['data']):
+            data = d['data']
+            if output == 'data':
+                return data
+            elif output == 'itd':
+                return None, None, data
         if twin == 'flattop':
             if self.twin_ft is None:
                 self.find_flattop(signal=self.ft_sig)
@@ -206,8 +214,9 @@ class PulseData(collections.MutableMapping):
             if not self.signal_has_data(sig):
                 params[sig] = np.nan
                 continue
-            data = self.t_win(sig, twin)
-            value = np.mean(data) if data is not None else None
+            value = self.t_win(sig, twin)
+            if is_numeric(value):
+                value = np.nanmean(value) if value is not None else None
             params[sig] = value
 
         for sig in proc_sigs:
@@ -366,44 +375,62 @@ class PulseData(collections.MutableMapping):
         return True
 
     def check_constraint(self, sig, constraint, twin='flattop'):
+        accept = True
+        if not isinstance(constraint, dict):
+            raise ValueError('Unexpected {} constraint format not dict: {}'.format(sig, constraint))
         if all((c is None for c in constraint.values())):
             # Return true if no constrains on this signal
             return True
         # get data over flat top region
         d = self[sig]
-        if self.store[sig]['erc'] != 0:
+        if d['erc'] != 0:
             if ('missing' in constraint) and constraint['missing'] is True:
                 return True
             else:
                 logger.warning('No {} data for pulse {}'.format(sig, self.pulse))
                 return np.nan
-        if twin == 'flattop':
-            d_ft = self.t_win(sig, self.twin_ft)
+        if is_scalar(d['data']):
+            data = d['data']
         else:
-            assert(type(twin) is list or type(twin) is np.ndarray)
-            d_ft = self.t_win(sig, twin)
-        if d_ft == []:
-            return 'No {} data in time window: {}'.format(sig, twin)
-        accept = True
+            if twin == 'flattop':
+                data = self.t_win(sig, self.twin_ft)
+            else:
+                assert(type(twin) is list or type(twin) is np.ndarray)
+                data = self.t_win(sig, twin)
+        if data == []:
+            logger.warning('No {} data in time window: {}'.format(sig, twin))
+            return False
         if 'missing' in constraint.keys() and constraint['missing'] is not None:
             accept = False
+        if 'equal' in constraint.keys():
+            if np.all(data != constraint['equal']):
+                accept = False
+        if 'not_equal' in constraint.keys():
+            if np.all(data == constraint['not_equal']):
+                accept = False
+        if 'is_in' in constraint.keys():
+            if is_in(data, constraint['is_in']):
+                accept = True
+        if 'contains' in constraint.keys():
+            if is_in(constraint['is_in'], data):
+                accept = True
         if 'range' in constraint.keys() and constraint['range'] is not None:
             try:
-                if not (np.min(d_ft) >= constraint['range'][0] and np.max(d_ft) <= constraint['range'][1]):
+                if not (np.min(data) >= constraint['range'][0] and np.max(data) <= constraint['range'][1]):
                     accept = False
             except:
                 pass
         if 'mean' in constraint.keys() and constraint['mean'] is not None:
-            if not (np.mean(d_ft) >= constraint['mean'][0] and np.mean(d_ft) <= constraint['mean'][1]):
+            if not (np.nanmean(data) >= constraint['mean'][0] and np.nanmean(data) <= constraint['mean'][1]):
                 accept = False
         ## Accept if range of values is less than given threshold percentage of mean value in the time window
         if 'percent_fluct' in constraint.keys() and constraint['percent_fluct'] is not None:
-            if not np.abs(np.max(d_ft)-np.min(d_ft)) >= constraint['percent_fluct'] * np.mean(d_ft):
+            if np.abs(np.nanmax(data)-np.nanmin(data)) >= (constraint['percent_fluct']/100. * np.nanmean(data)):
                 accept = False
         ## Accept if deviation from smoothed curve is less than the supplied smoothness value
         if 'smoothness' in constraint.keys() and constraint['smoothness'] is not None:
-            d_ft_norm = d_ft / np.max(np.abs(d_ft.min), np.abs(d_ft.max))  # set peak value to 1
-            smoothness = np.sum(np.abs(smooth(d_ft_norm, window='hanning', window_len=50)-d_ft_norm))
+            data_norm = data / np.max(np.abs(data.min), np.abs(data.max))  # set peak value to 1
+            smoothness = np.sum(np.abs(smooth(data_norm, window='hanning', window_len=50)-data_norm))
             if not smoothness < constraint['smoothness']:
                 accept = False
         return accept
@@ -411,9 +438,13 @@ class PulseData(collections.MutableMapping):
     def signal_has_data(self, signal, data=None):
         if data is None:
             data = self[signal]
-        if (data is not None) and ('time' in data) and ('data' in data) and (len(data['time']) > 10):
+        if data is None:
+            return False
+        elif ('time' in data) and ('data' in data) and (len(data['time']) > 10):
             exists = True
-        elif (data is None) or (data['erc'] == -1):
+        elif ('time' not in data) and ('data' in data) and is_scalar(data['data']):
+            exists = True
+        elif (data['erc'] == -1):
             exists = False
         else:
             logger.warning('Unexpected values for "{}" data dict: {}'.format(signal, data))
