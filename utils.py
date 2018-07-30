@@ -37,46 +37,6 @@ try:
 except Exception as e:
     string_types = (str,)  # python3
 
-signal_abbreviations = {
-    'Ip': "amc_plasma current",
-    'ne': "ESM_NE_BAR",  # (electron line averaged density)
-    'ne2': "ane_density",  # Gives lower density - what is this?
-    'Pnbi': "anb_tot_sum_power",  # Total NBI power
-    'Pohm': "esm_pphi",  # Ohmic heating power (noisy due to derivatives!)
-    'Ploss': "esm_p_loss",  # Total power crossing the separatrix
-    'q95': "efm_q_95",  # q95
-    'q0': "efm_q_axis",  # q0
-    'q952': "EFM_Q95",  # (q95)
-    'Da': "ada_dalpha integrated",
-    # 'Da-mp': 'ph/s/cm2/sr',
-    'sXray': 'xsx/tcam/1',
-    'Bphi': 'efm_bphi_rmag',
-    'zmag': "efm_magnetic_axis_z",  # Hight of magnetic axis (used to distinguish LSND and DND)
-    'dn_edge': "ADG_density_gradient",
-    'Bvac': "EFM_BVAC_VAL",  # (vacuum field at R=0.66m)
-    'LPr': "arp_rp radius"  # (radial position of the reciprocating probe)
-}
-signal_sets = {
-    'set1': [
-        "amc_plasma current",
-        "ESM_NE_BAR",  # (electron line averaged density)
-        "ane_density",  # Gives lower density - what is this?
-        "anb_tot_sum_power",  # Total NBI power
-        "esm_pphi",  # Ohmic heating power (noisy due to derivatives!)
-        "esm_p_loss",  # Total power crossing the separatrix
-        "efm_q_95",  # q95
-        "efm_q_axis",  # q0
-        "EFM_Q95",  # (q95)
-        "ada_dalpha integrated",
-        'xsx/tcam/1',  # soft xray 1
-        'efm_bphi_rmag',
-        "efm_magnetic_axis_z",  # Hight of magnetic axis (used to distinguish LSND and DND)
-        "ADG_density_gradient",
-        "EFM_BVAC_VAL",  # (vacuum field at R=0.66m)
-        "arp_rp radius"]   # (radial position of the reciprocating probe)
-    }
-
-
 def nsigfig(values, sig_figs=1):
     """Round input values to given number of significant digits"""
     arr = np.array(values)
@@ -138,18 +98,25 @@ def replace_in(values, reference, index=False, tol=1e-10):
         out = out[0]
     return out
 
-def make_iterable(obj, ndarray=False, cast=None):
+def make_iterable(obj, ndarray=False, cast_to=None, cast_dict=None, nest_types=None):
     """If object is a scalar nest it in a list so it can be iterated over
-    If ndarray is True, the object will be returned as an array (note avoids scalar ndarrays)"""
+    If ndarray is True, the object will be returned as an array (note avoids scalar ndarrays)
+    :param cast_to - output will be cast to this type
+    :param cast_dict - dict linking input types to the types they should be cast to
+    :param nest_types - iterable types that should still be nested (eg dict)"""
     if not hasattr(obj, '__iter__') or isinstance(obj, basestring):
         obj = [obj]
+    if (nest_types is not None) and isinstance(obj, nest_types):
+        obj = [obj]
+    if (type(obj) in cast_dict):
+        obj = cast_dict[type(obj)](obj)
     if ndarray:
         obj = np.array(obj)
-    if isinstance(cast, type):
-        if cast == np.ndarray:
+    if isinstance(cast_to, type):
+        if cast_to == np.ndarray:
             obj = np.array(obj)
         else:
-            obj = cast(obj)  # cast to new type eg list
+            obj = cast_to(obj)  # cast to new type eg list
     return obj
 
 def make_iterables(*args):
@@ -193,11 +160,14 @@ def is_number(s):
 
 def is_numeric(value):
     """Return True if value is a number or numeric array object, else False"""
-    try:
-        np.sum(value)
-        numeric = True
-    except TypeError as e:
+    if isinstance(value, bool):
         numeric = False
+    else:
+        try:
+            np.sum(value)
+            numeric = True
+        except TypeError as e:
+            numeric = False
     return numeric
 
 def ndarray_0d_to_num(array):
