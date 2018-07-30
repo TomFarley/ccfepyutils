@@ -108,7 +108,7 @@ def make_iterable(obj, ndarray=False, cast_to=None, cast_dict=None, nest_types=N
         obj = [obj]
     if (nest_types is not None) and isinstance(obj, nest_types):
         obj = [obj]
-    if (type(obj) in cast_dict):
+    if (cast_dict is not None) and (type(obj) in cast_dict):
         obj = cast_dict[type(obj)](obj)
     if ndarray:
         obj = np.array(obj)
