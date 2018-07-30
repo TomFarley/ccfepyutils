@@ -17,7 +17,8 @@ from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
 from ccfepyutils.classes.data_stack import Stack, Slice
 from ccfepyutils.classes.settings import Settings
-from ccfepyutils.utils import return_none, is_number, none_filter, to_array, make_iterable, args_for, is_subset, is_in
+from ccfepyutils.utils import return_none, is_number, is_numeric, none_filter, to_array, make_iterable, args_for, \
+    is_subset, is_in, replace_in
 from ccfepyutils.io_tools import pickle_load, locate_file
 from ccfepyutils.classes.plot import Plot
 
@@ -307,6 +308,7 @@ class Movie(Stack):
     def set_frames(self, frames_user=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
                    nframes_user=None, duration=None, frame_stride=1, all=False, transforms=None):
         """Set frame range in file to read"""
+        previously_loaded_frames = self._frame_range_info_all['frames']
         if self._movie_meta is None:
             assert RuntimeError('The movie file must be set before the frame range is set')
 
@@ -402,6 +404,10 @@ class Movie(Stack):
         self._meta.loc[frames_user, 'user'] = True
         if self.current_frame not in self.frame_numbers:
             self.current_frame = frames_user[0]
+        # TODO: recover useful data from previous_frames_data when extending frame range etc
+        self._data = None
+        self._values = None
+        self._enhanced_movie = None
         pass
     
     def get_frame_range(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
@@ -432,8 +438,8 @@ class Movie(Stack):
             start_frame, end_frame, nframes = frames.min(), frames.max(), len(frames)
         nframes = len(frames)
 
-        # tODO: change start stop to range list []
-        frame_range = np.array([start_frame, end_frame])
+        # TODO: change start stop to range list []
+        frame_range = np.array([np.min(frames), np.max(frames)])
         return frames, nframes, frame_range
 
     def check_user_frame_range(self):
@@ -603,12 +609,14 @@ class Movie(Stack):
 
         if n is None:
             # Loop over frames from start frame, including those in the frame set
+            # TODO: change to only loading files that haven't already been loaded?
             frames = self._frame_range_info_all['frames']
             n = self._frame_range_info_all['frame_range'][0]
             end = self._frame_range_info_all['frame_range'][1]
             i_meta = 0
             i_data = 0
         else:
+            assert is_numeric(n), 'frames to load are not numeric: {}'.format(n)
             frames = make_iterable(n)
             n = frames[0]
             end = frames[-1]
@@ -686,7 +694,7 @@ class Movie(Stack):
             self._meta.loc[n, 'set'] = True
         return data
 
-    def __getitem__(self, n, raw=False, load=True):
+    def __getitem__(self, n, raw=False, load=True, keep_raw=False):
         """Return data slices from the stack of data"""
         # If have enhaced data return that over raw data
         if n not in self._frame_range_info_all['frames']:
@@ -696,7 +704,7 @@ class Movie(Stack):
             is_set = movie.check_data(n)
             if not is_set:
                 enhancements = self.settings['enhancements']
-                self.enhance(enhancements=enhancements, frames=[n])
+                self.enhance(enhancements=enhancements, frames=[n], keep_raw=keep_raw)
         else:
             movie = self
             is_set = movie.check_data(n)
@@ -706,10 +714,10 @@ class Movie(Stack):
         # item = movie.lookup_slice_index(item)
         return movie.get_slice(n)
 
-    def __call__(self, raw=False, load=True, **kwargs):
+    def __call__(self, raw=False, load=True, keep_raw=False, **kwargs):
         assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
         item = self.lookup(self.stack_dim, **kwargs)
-        return self.__getitem__(item, raw=raw, load=load)
+        return self.__getitem__(item, raw=raw, load=load, keep_raw=keep_raw)
 
     @classmethod
     def get_frame_list(cls, n, current=True, n_backwards=10, n_forwards=0, step_backwards=1, step_forwards=1, skip_backwards=0,
@@ -842,6 +850,8 @@ class Movie(Stack):
             self._enhanced_movie._meta.loc[frames_not_set, 'set'] = True
         # TODO: Make parallel - threading?
         for n in frames:
+            if self._meta.loc[n, 'enhanced'] == True:
+                continue
             args.append(self._enhancer.prepare_arguments(enhancement, self, n))
             frame_arrays.append(self(n=n, raw=True)[:])
 
@@ -972,7 +982,16 @@ class Movie(Stack):
     @property
     def image_resolution(self):
         return self._movie_meta['frame_shape']
-    
+
+    @property
+    def enhancements(self):
+        """Return currently set enhancements (may not be applied yet)"""
+        try:
+            enhancements = self.settings['enhancements']
+        except KeyError as e:
+            enhancements = []
+        return enhancements
+
     @property
     def is_enhanced(self):
         return self._enhancements is not None
@@ -994,14 +1013,15 @@ class Movie(Stack):
         return self._current_frame
 
     @current_frame.setter
-    def current_frame(self, value):
-        assert value in self.frame_numbers
-        if self.current_frame == value:
+    def current_frame(self, n):
+        if n not in self.frame_numbers:
+            n = replace_in(n, self.frame_numbers, tol=1e10)
+        if self.current_frame == n:
             # Avoid cyclic call from gui
             return
-        self._current_frame = value
+        self._current_frame = n
         if self.gui is not None:
-            self.gui.set_frame(n=value)
+            self.gui.set_frame(n=n)
 
 class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""
