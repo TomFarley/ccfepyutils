@@ -7,9 +7,12 @@ import numpy as np
 from matplotlib.collections import LineCollection
 
 from ccfepyutils.io_tools import mkdir
+from ccfepyutils.utils import make_iterable, safe_len
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+colormap_names = sorted(m for m in plt.cm.datad if not m.endswith("_r"))
 
 def get_fig_ax(ax=None, num=None, subplot=111, **fig_kwargs):
     """Return new/existing figure and axis instances"""
@@ -306,6 +309,81 @@ def plot_density_contour(xy, xy0=False, nxny=(10,10), levels='range', points=Tru
     if show:
         plt.show()
 
+def set_cycler(properties, ax='current'):
+    """Set property cycler for given axis
+    Combine properties that change together in a signle dictionary and put properties that should be returned as a
+    product in separate dictionaries. Color can be passed as a tuple of (colormap_name, n_colors) which will split the
+    colormap range into n_colors and cycle over them.
+
+    Examples:
+        properties =
+            [{'color': ('r', 'g', 'b'), 'linestyle': ['-', '--', '-.']},]
+        -->
+        list(cycler_new) =
+            {'color': 'r', 'linestyle': '-'}
+            {'color': 'g', 'linestyle': '--'}
+            {'color': 'b', 'linestyle': '-.'}
+
+        properties =
+            [{'color': ('r', 'g', 'b')}, {'linestyle': ['-', '--', '-.']}]
+        -->
+        list(cycler_new) =
+            {'color': 'r', 'linestyle': '-'}
+            {'color': 'r', 'linestyle': '--'}
+            {'color': 'r', 'linestyle': '-.'}
+            {'color': 'g', 'linestyle': '-'}
+            {'color': 'g', 'linestyle': '--'}
+            {'color': 'g', 'linestyle': '-.'}
+            {'color': 'b', 'linestyle': '-'}
+            {'color': 'b', 'linestyle': '--'}
+            {'color': 'b', 'linestyle': '-.'}
+
+        properties =
+            [{'color': ('jet', 7)},]
+        -->
+            list(cycler_new) =
+            [{'color': array([ 0.        ,  0.        ,  0.53565062,  1.        ])},
+             {'color': array([ 0.        ,  0.19019608,  1.        ,  1.        ])},
+             {'color': array([ 0.        ,  0.84901961,  1.        ,  1.        ])},
+             {'color': array([ 0.49019608,  1.        ,  0.47754586,  1.        ])},
+             {'color': array([ 1.       ,  0.9157589,  0.       ,  1.       ])},
+             {'color': array([ 1.        ,  0.30573711,  0.        ,  1.        ])},
+             {'color': array([ 0.53565062,  0.        ,  0.        ,  1.        ])}]
+
+    """
+    from cycler import cycler
+    if ax == 'current':
+        ax = plt.gca()
+    properties = make_iterable(properties, nest_types=(dict,))
+
+    cycler_new = None
+    for prop_dict in properties:
+        prop_dict = {key: make_iterable(values) for key, values in prop_dict.items()}
+        length = max(map(len, prop_dict.values()))
+        for key, values in prop_dict.items():
+            if len(values) == 1:
+                prop_dict[key] = list(values) * length
+            if (key == 'color') and (len(values) == 2) and (values[0] in colormap_names):
+                cmap = plt.get_cmap(values[0])
+                prop_dict[key] = cmap(np.linspace(0.01, 0.99, values[1]))
+            elif len(values) != length:
+                raise ValueError('cycler properties must be all be same length or length 1: {}'.format(prop_dict))
+        # Multiple kwargs same as adding cyclers
+        cycler_tmp = cycler(**prop_dict)
+        if cycler_new is None:
+            cycler_new = cycler_tmp
+        else:
+            # Product of cyclers
+            cycler_new = cycler_new * cycler_tmp
+
+    if ax is None:
+        pass
+    elif ax == 'all':
+        plt.rc('axes', prop_cycle=cycler_new)
+    else:
+        ax.set_prop_cycle(cycler_new)
+    return cycler_new
+
 def axisEqual3D(ax):
     extents = np.array([getattr(ax, 'get_{}lim'.format(dim))() for dim in 'xyz'])
     sz = extents[:,1] - extents[:,0]
@@ -397,6 +475,10 @@ def show_if(show, close_all=False):
 if __name__ == '__main__':
     fig = plt.figure()
     axes = fig.add_subplot(111)
+
+    cycler = set_cycler([{'color': ('r', 'g', 'b')}, {'linestyle': ['-', '--', '-.']}])
+    cycler = set_cycler([{'color': ('r', 'g', 'b'), 'linestyle': ['-', '--', '-.']},])
+    cycler = set_cycler([{'color': ('jet', 7)},])
 
     # my random data
     scale = 10

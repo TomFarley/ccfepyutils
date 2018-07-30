@@ -35,6 +35,7 @@ from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 from ccfepyutils.data_processing import pdf
+from ccfepyutils.mpl_tools import set_cycler, colormap_names
 try:
     string_types = (basestring, unicode)  # python2
 except Exception as e:
@@ -312,7 +313,7 @@ class Plot(object):
 
     def call_if_args(self, ax, kwargs, raise_on_exception=True):
         kwargs['ax'] = ax
-        for func in (self.set_axis_labels, self.set_axis_limits, self.show, self.save):
+        for func in (self.set_axis_labels, self.set_axis_limits, self.set_axis_cycler, self.show, self.save):
             kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
                 func(**kws)
@@ -329,6 +330,9 @@ class Plot(object):
             self.call_if_args(None, kwargs)
             return  # No data to plot
         ax = self.ax(ax)
+        if 'color' in kwargs and isinstance(kwargs['color'], (tuple, list)) and kwargs['color'][0] in colormap_names:
+            self.set_axis_cycler([{'color': kwargs['color']}], ax=ax)
+            kwargs.pop('color')
         artists = {}
         if smooth is not None:
             raise NotImplementedError
@@ -408,6 +412,10 @@ class Plot(object):
             ax.set_xlim(xlim)
         if ylim is not None:
             ax.set_ylim(ylim)
+
+    def set_axis_cycler(self, cycler, ax=None):
+        """Set property eg color or linewidth cycler"""
+        return set_cycler(cycler, ax=ax)
 
     def legend(self, ax=None, legend=True, legend_fontsize=14):
         """Finalise legends of each axes"""
