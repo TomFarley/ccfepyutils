@@ -10,7 +10,7 @@ import numpy as np
 import xarray as xr
 from past.types import basestring
 
-from ccfepyutils.utils import string_types, signal_abbreviations, signal_sets, make_iterable, compare_dict, \
+from ccfepyutils.utils import string_types, make_iterable, compare_dict, \
     is_number, is_subset, str_to_number
 
 logger = logging.getLogger(__name__)
@@ -39,46 +39,6 @@ def create_config_file(fn, dic):
 def get_from_ini(config, setting, value):
     """Return value for setting from config ini file if value is None"""
     raise NotImplementedError
-
-def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, *args, **kwargs):
-    """Get data with IDL_bridge getdata if available, else load from pickle store."""
-    pulse = int(pulse)
-    if signal in signal_abbreviations:
-        signal = signal_abbreviations[signal]
-    save_path = os.path.expanduser(save_path)
-    if save:
-        pulse_str = '{pulse:d}'.format(pulse=pulse)
-        fn = signal.replace('/', '_').replace(' ', '_')+'.p'
-        mkdir(os.path.join(save_path, pulse_str), start_dir=save_path)
-    try:
-        import idlbridge as idl
-        getdata = idl.export_function("getdata")
-        d = getdata(signal, pulse, *args, **kwargs)
-        if d['erc'] != 0:
-            logger.warning('Failed to load data for {}: {}'.format(pulse_str, signal))
-        elif save:
-            pickle_dump(d, os.path.join(save_path, pulse_str, fn), protocol=2)
-            logger.info('Saved data for {}; {} to {}'.format(pulse_str, signal, os.path.join(save_path, pulse_str, fn)))
-        return d
-    except ImportError:
-        try:
-            d = pickle_load(os.path.join(save_path, pulse_str, fn))
-            return d
-        except IOError:
-            logger.warning('Cannot locate data for {}:{} in {}'.format(pulse_str, signal, save_path))
-
-
-def store_mast_signals(signals, pulses, save_path='~/data/MAST_signals/', *args, **kwargs):
-    if isinstance(signals, (str, basestring)) and signals in signal_sets:
-        signals = signal_sets[signals]
-    pulses = make_iterable(pulses)
-    signals = make_iterable(signals)
-    save_path = os.path.expanduser(save_path)
-    assert os.path.isdir(save_path), 'Save path does not exist'
-    for pulse in pulses:
-        for signal in signals:
-            get_data(signal, pulse, save_path=save_path, noecho=1, *args, **kwargs)
-
 
 def rm_files(path, pattern, verbose=True):
     path = str(path)
