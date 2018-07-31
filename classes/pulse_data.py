@@ -409,11 +409,11 @@ class PulseData(collections.MutableMapping):
             if np.all(data == constraint['not_equal']):
                 accept = False
         if 'is_in' in constraint.keys():
-            if is_in(data, constraint['is_in']):
-                accept = True
+            if data not in constraint['is_in']:
+                accept = False
         if 'contains' in constraint.keys():
-            if is_in(constraint['is_in'], data):
-                accept = True
+            if not is_in(constraint['is_in'], data):
+                accept = False
         if 'range' in constraint.keys() and constraint['range'] is not None:
             try:
                 if not (np.min(data) >= constraint['range'][0] and np.max(data) <= constraint['range'][1]):
@@ -422,6 +422,9 @@ class PulseData(collections.MutableMapping):
                 pass
         if 'mean' in constraint.keys() and constraint['mean'] is not None:
             if not (np.nanmean(data) >= constraint['mean'][0] and np.nanmean(data) <= constraint['mean'][1]):
+                accept = False
+        if 'max' in constraint.keys() and constraint['max'] is not None:
+            if not (np.nanmax(data) >= constraint['max'][0] and np.nanmax(data) <= constraint['max'][1]):
                 accept = False
         ## Accept if range of values is less than given threshold percentage of mean value in the time window
         if 'percent_fluct' in constraint.keys() and constraint['percent_fluct'] is not None:

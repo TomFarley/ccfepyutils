@@ -312,10 +312,10 @@ class Plot(object):
         raise NotImplementedError
 
     def call_if_args(self, ax, kwargs, raise_on_exception=True):
-        kwargs['ax'] = ax
         for func in (self.set_axis_labels, self.set_axis_limits, self.set_axis_cycler, self.show, self.save):
             kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
+                kws.update(args_for(func, {'ax': ax}))
                 func(**kws)
         if len(kwargs) > 0:
             raise TypeError('Invalid keyword argument(s): {}'.format(kwargs))
@@ -326,11 +326,13 @@ class Plot(object):
         """Common interface for plotting data, whether 1d, 2d or 3d. 
         
         Type of plotting is controlled by mode."""
-        if (x is None) and (y is None) and (z is None):
-            self.call_if_args(None, kwargs)
-            return  # No data to plot
         ax = self.ax(ax)
+        if (x is None) and (y is None) and (z is None):
+            self.call_if_args(ax, kwargs)
+            return  # No data to plot
+
         if 'color' in kwargs and isinstance(kwargs['color'], (tuple, list)) and kwargs['color'][0] in colormap_names:
+            # Set color cycler
             self.set_axis_cycler([{'color': kwargs['color']}], ax=ax)
             kwargs.pop('color')
         artists = {}
@@ -416,6 +418,7 @@ class Plot(object):
     def set_axis_cycler(self, cycler, ax=None):
         """Set property eg color or linewidth cycler"""
         if cycler is not None:
+            ax = self.ax(ax)
             return set_cycler(cycler, ax=ax)
 
     def legend(self, ax=None, legend=True, legend_fontsize=14):

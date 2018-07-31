@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 signal_abbreviations = {
     'Ip': "amc_plasma current",
     'ne': 'ayc_ne_core',  # Core Thomson scattering data - (peak?) Electron Density
-    'ne3': "ESM_NE_BAR",  # (electron line averaged density)
-    'ne2': "ane_density",  # Gives lower density - what is this? - CO2 Interferometry
+    'ne2': "ESM_NE_BAR",  # (electron line averaged density) - Gives better plots - same as session logs
+    'ne3': "ane_density",  # Gives lower density - what is this? - CO2 Interferometry
     'Pnbi': "anb_tot_sum_power",  # Total NBI power
     'Pohm': "esm_pphi",  # Ohmic heating power (noisy due to derivatives!)
     'Ploss': "esm_p_loss",  # Total power crossing the separatrix
@@ -29,6 +29,13 @@ signal_abbreviations = {
     'LPr': "arp_rp radius"  # (radial position of the reciprocating probe)
 }
 # TODO: Remove duplication of abbreviations in pulse_data.py
+
+signal_ylabels = {'ESM_NE_BAR': r'$n_e$ [$\times 10^{19}$ m$^{-3}$]',
+                  'ayc_ne_core': r'$n_e$ [$\times 10^{19}$ m$^{-3}$]',
+                   'amc_plasma current': '$I_p$ [kA]',
+                   "ada_dalpha integrated": r'$D_{\alpha}$ [ph.$s^{-1}cm^{-2}sr^{-1}$]',
+                   'anb_tot_sum_power': '$P_{NBI}$ [MW]',
+                   'xsx/tcam/1': '$I_{sXray}$ [V]'}
 
 session_log_columns = ['useful', 'shot_type', 'preshot', 'postshot', 'plasma_shape', 'ip_range', 'heating',
                        'divertor_config', 'rmptype', 'scenario', 'pellets']

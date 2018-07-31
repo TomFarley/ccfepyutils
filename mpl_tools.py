@@ -1,6 +1,6 @@
 ## Function from http://stackoverflow.com/questions/8247973/how-do-i-specify-an-arrow-like-linestyle-in-matplotlib
 
-import logging, warnings, os
+import logging, warnings, os, itertools
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -365,7 +365,8 @@ def set_cycler(properties, ax='current'):
                 prop_dict[key] = list(values) * length
             if (key == 'color') and (len(values) == 2) and (values[0] in colormap_names):
                 cmap = plt.get_cmap(values[0])
-                prop_dict[key] = cmap(np.linspace(0.01, 0.99, values[1]))
+                # Convert array of colors to lists for == comparison
+                prop_dict[key] = [list(v) for v in cmap(np.linspace(0.01, 0.99, values[1]))]
             elif len(values) != length:
                 raise ValueError('cycler properties must be all be same length or length 1: {}'.format(prop_dict))
         # Multiple kwargs same as adding cyclers
@@ -381,7 +382,17 @@ def set_cycler(properties, ax='current'):
     elif ax == 'all':
         plt.rc('axes', prop_cycle=cycler_new)
     else:
-        ax.set_prop_cycle(cycler_new)
+        cycler_old = ax._get_lines.prop_cycler
+        cycler_old_tmp, cycler_old = itertools.tee(cycler_old)
+        # compare next 3 items
+        next_items = [next(cycler_old_tmp) for i in np.arange(4)]
+        if np.all(np.array([item in cycler_new for item in next_items])):
+            # cycler already set - don't change
+            # ax.set_prop_cycle(cycler_old)
+            pass
+        else:
+            # New cycler is different
+            ax.set_prop_cycle(cycler_new)
     return cycler_new
 
 def axisEqual3D(ax):
