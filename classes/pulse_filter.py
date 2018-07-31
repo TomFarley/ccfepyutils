@@ -150,7 +150,7 @@ class PulseFilter(object):  # collections.MutableMapping
 
         out = [(key, list) for key, list in self.summary.items()]
         out = [('Pulse', self.results['pass'])] + out
-        df = pd.DataFrame.from_items(out)
+        df = pd.DataFrame.from_dict(dict(out))
         if stdout:
             print(df)
 

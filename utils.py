@@ -307,7 +307,7 @@ def compare_dict(dict1, dict2, tol=1e-12, top=True):
         if isinstance(dict1[key], dict) or isinstance(dict2[key], dict):
 
             if not (isinstance(dict1[key], dict) and isinstance(dict2[key], dict)):
-                print('Dictionaries are different - One value is a dict while the other is not')
+                logger.debug('Dictionaries are different - One value is a dict while the other is not')
                 return False
             if compare_dict(dict1[key], dict2[key], top=False) is False:
                 return False
