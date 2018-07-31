@@ -410,6 +410,17 @@ class Movie(Stack):
         self._enhanced_movie = None
         pass
     
+    def set_enhancements(self, enhancements):
+        """Set image processing enhancements"""
+        # TODO change to property?
+        if self.settings['enhancements'] != enhancements:
+            self.settings['enhancements'] = enhancements
+            self._meta.loc[:, 'enhanced'] == False
+            self._enhanced_movie = None
+            self._enhancements = None  # Enhancements applied to _ENHANCED_movie
+        else:
+            pass
+    
     def get_frame_range(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
                    nframes=None, duration=None, stride=1, all_=False):
         if all_:
@@ -694,17 +705,21 @@ class Movie(Stack):
             self._meta.loc[n, 'set'] = True
         return data
 
-    def __getitem__(self, n, raw=False, load=True, keep_raw=False):
+    def __getitem__(self, n, raw=None, load=True, keep_raw=False):
         """Return data slices from the stack of data"""
         # If have enhaced data return that over raw data
         if n not in self._frame_range_info_all['frames']:
             raise IndexError('{} is not a valid frame number. Options: {}'.format(n, self._frame_range_info_all['frames']))
-        if self._enhanced_movie is not None and not raw:
+        if (raw is False):
+            if (self._enhanced_movie is None):
+                # Force enhanced, so make sure  _enhanced_movie is not None
+                self._setup_enhanced_movie(self.enhancements)
+            is_set = self._enhanced_movie.check_data(n)
+            if (not is_set):
+                self.enhance(enhancements=self.enhancements, frames=[n], keep_raw=keep_raw)
+        if (not raw) and (self._enhanced_movie is not None) and (self._enhanced_movie.check_data(n)):
+            # Return enhanced frame if it is already available
             movie = self._enhanced_movie
-            is_set = movie.check_data(n)
-            if not is_set:
-                enhancements = self.settings['enhancements']
-                self.enhance(enhancements=enhancements, frames=[n], keep_raw=keep_raw)
         else:
             movie = self
             is_set = movie.check_data(n)
@@ -714,7 +729,7 @@ class Movie(Stack):
         # item = movie.lookup_slice_index(item)
         return movie.get_slice(n)
 
-    def __call__(self, raw=False, load=True, keep_raw=False, **kwargs):
+    def __call__(self, raw=None, load=True, keep_raw=False, **kwargs):
         assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
         item = self.lookup(self.stack_dim, **kwargs)
         return self.__getitem__(item, raw=raw, load=load, keep_raw=keep_raw)
@@ -792,9 +807,9 @@ class Movie(Stack):
             frame_stack = self.extract_frame_stack(frames)
         return frame_stack
 
-    def _setup_enhanced_movie(self, enhancements):
+    def _setup_enhanced_movie(self, enhancements, force=False):
         """Reset enhanced movie if enhancements are to change"""
-        if not self.is_enhanced or self._enhancements != enhancements:
+        if (not self.is_enhanced) or (self._enhancements != enhancements) or force:
             # Update attributes of self
             self._enhancer = Enhancer(setting=self.settings['Enhancer'])  # TODO: specify enhancement settings
             self._enhancements = []  # Enhancements applied to _ENHANCED_movie
@@ -815,6 +830,9 @@ class Movie(Stack):
             enhanced_movie._enhancements = None
             enhanced_movie.name = self.name + '_enhanced'
             enhanced_movie._meta = deepcopy(self._meta)
+            
+            enhanced_movie._meta[['set']] = False
+            
             enhanced_movie._meta[['enhanced']] = False
 
             self._enhanced_movie = enhanced_movie
@@ -861,26 +879,31 @@ class Movie(Stack):
             if self._meta.loc[n, 'enhanced'] == True:
                 continue
             # NOTE: movie and n args only needed for fg and bg extraction
-            self._enhanced_movie(n=n, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
+            self._enhanced_movie(n=n, raw=True, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
             self._meta.loc[n, 'enhanced'] = True
             pass
 
-    def enhance(self, enhancements, frames='all', keep_raw=False, **kwargs):
+    def enhance(self, enhancements, frames='all', keep_raw=True, **kwargs):
         """Apply mutiple enhancements to a set of frames in order"""
         # TODO: make t ect valid input
         self._init_xarray()
         if frames == 'all':
             frames = self.frame_numbers
+        frames = to_array(frames)
         enhancements = make_iterable(enhancements)
         if not self._setup_enhanced_movie(enhancements) and is_subset(frames, self.enhanced_frames):
             logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
             return
-        frames = to_array(frames)
         # TODO: check all frame values in stack axis
-        for enhancement in enhancements:
-            self._apply_enhancement(frames, enhancement)
+        if len(enhancements) > 0:
+            for enhancement in enhancements:
+                self._apply_enhancement(frames, enhancement)
+        else:
+            # No enhancements so reset enhanced frames equal to raw frames
+            for n in frames:
+                self._enhanced_movie(n=n, raw=True)[:] = self(n=n, raw=True, load=True)[:]
         # # Set frames as having been enhanced
-        # self._enhancements = enhancements
+        self._enhancements = enhancements
         # mask = self._meta['n'].isin(frames)
         # self._meta.loc[mask, 'enhanced'] = True
         if not keep_raw:
@@ -986,10 +1009,14 @@ class Movie(Stack):
     @property
     def enhancements(self):
         """Return currently set enhancements (may not be applied yet)"""
+        if self.settings is None:
+            return []
         try:
-            enhancements = self.settings['enhancements']
+            enhancements = self.settings['enhancements'].value
         except KeyError as e:
             enhancements = []
+        except Exception as e:
+            raise e
         return enhancements
 
     @property
