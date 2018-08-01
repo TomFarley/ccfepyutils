@@ -30,7 +30,7 @@ class PulseOverivew:
                     x, y = data['time'], data['data']
                     if signal == 'ESM_NE_BAR':
                         y /= 1e19
-                    plot.plot(x, y, ax=i, ylabel=ylabel, xlim=xlim, label=str(pulse), alpha=0.75)
+                    plot.plot(x, y, ax=i, ylabel=ylabel, xlim=xlim, label=str(pulse), alpha=0.75, grid=True)
                 except:
                     print('Failed to plot {}:{}'.format(pulse, signal))
                 if signal == 'ESM_NE_BAR':
@@ -38,6 +38,7 @@ class PulseOverivew:
 
         plot.set_axis_labels(xlabel='$t$ [s]', ax=len(signals)-1)
         plot.set_axis_labels(label_fontsize=18, tick_fontsize=14, tight_layout=True, ax='all')
+        plot.set_axis_appearance(grid=True, grid_which='both', ax='all')
         plt.setp(plot.ax(0).get_xticklabels(), visible=False)
         plot.fig.subplots_adjust(hspace=0.015)
 
@@ -55,4 +56,5 @@ if __name__ == '__main__':
     # po.plot([28996, 29767], ['Ip', 'ne', 'Pnbi', 'Da'], xlim=[0, 0.6], save='/home/tfarley/tmp/EPS_pulse_low_ne.png')
     # po.plot([29811, 29815, 29827, 29852, 29834, 29808, 29823], ['Ip', 'ne2', 'Pnbi', 'sXray'], xlim=[0, 0.6], show=True)
     # po.plot([29761], ['Ip', 'ne', 'ne2', 'ne3', 'Pnbi', 'sXray'], xlim=[0, 0.6], show=True)
-    po.plot([29754, 29761, 29763, 29764, 29785, 29848, 29849, 29852, 29902, 29958, 29960, 29972, 29993, 29994], ['Ip', 'ne3', 'Pnbi', 'sXray'], xlim=[0, 0.6], show=True)
+    # po.plot([29754, 29761, 29763, 29764, 29785, 29848, 29849, 29852, 29902, 29958, 29960, 29972, 29993, 29994], ['Ip', 'ne3', 'Pnbi', 'q0'], xlim=[0, 0.6], show=True)
+    po.plot([29840, 29991], ['Ip', 'ne3', 'Pnbi', 'q0'], xlim=[0, 0.6], show=True)
