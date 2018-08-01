@@ -312,7 +312,8 @@ class Plot(object):
         raise NotImplementedError
 
     def call_if_args(self, ax, kwargs, raise_on_exception=True):
-        for func in (self.set_axis_labels, self.set_axis_limits, self.set_axis_cycler, self.show, self.save):
+        for func in (self.set_axis_labels, self.set_axis_limits, self.set_axis_appearance, self.set_axis_cycler,
+                     self.show, self.save):
             kws = args_for(func, kwargs, remove=True)
             if len(kws) > 0:
                 kws.update(args_for(func, {'ax': ax}))
@@ -414,6 +415,17 @@ class Plot(object):
             ax.set_xlim(xlim)
         if ylim is not None:
             ax.set_ylim(ylim)
+
+    def set_axis_appearance(self, ax=None, grid=None, grid_axes='both', grid_which='major', tick_spacing=None):
+        if ax == 'all':
+            for ax in self.axes:
+                self.set_axis_appearance(ax=ax, grid=grid, grid_axes=grid_axes, grid_which=grid_which,
+                                         tick_spacing=tick_spacing)
+            return
+        if grid is not None:
+            ax.grid(grid, axis=grid_axes, which=grid_which)
+        if tick_spacing is not None:
+            raise NotADirectoryError
 
     def set_axis_cycler(self, cycler, ax=None):
         """Set property eg color or linewidth cycler"""
