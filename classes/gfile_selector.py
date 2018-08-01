@@ -60,7 +60,9 @@ class GFileSelector(object):
         allow_scheduler_efit = none_filter(s['allow_scheduler_efit'].value, allow_scheduler_efit)
         dt_switch_gfile = none_filter(s['dt_switch_gfile'].value, dt_switch_gfile)
         if pulse not in self.store['n']:
-            self.store_gfile_info(pulse, machine=machine)
+            if allow_scheduler_efit:
+                self.save_scheduler_gfile(pulse, time, machine)
+            self.store_gfile_info(pulse, machine=machine, scheduler=allow_scheduler_efit)
         if pulse not in self.store['n']:
             raise IOError('No gfiles located for pulse "{}"'.format(pulse))
         if current_file is not None:
@@ -119,7 +121,7 @@ class GFileSelector(object):
     def save_scheduler_gfile(self, pulse, time, machine='MAST', fn_format=None, path=None):
         from pyEquilibrium import equilibrium as eq
         if fn_format is None:
-            fn = self.settings['scheduler_gfile_fn_formats'][0]
+            fn_format = self.settings['scheduler_gfile_fn_formats'][0]
         if path is None:
             path = self.settings['scheduler_gfile_paths'][0]
 
