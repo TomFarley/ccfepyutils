@@ -10,11 +10,30 @@ from ccfepyutils.classes.plot import Plot
 
 logger = logging.getLogger(__name__)
 
-def threshold(image, thresh, value=0):
+def to_grayscale(image):
+    image_out = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return image_out
+
+def to_8bit(image):
+    image = np.array(image)
+    original_max = float(np.max(image))
+    original_type = image.dtype
+    if not image.dtype == np.uint8:
+        image = (image * 255.0 / original_max).astype(np.uint8)
+    return image, original_max, original_type
+
+def to_original_type(image, original_max, original_type):
+    image_out =  (image * original_max / 255.0).astype(type)
+    return image_out
+
+def threshold(image, thresh_abs=None, thresh_frac=0.25, fill_value=0):
     """Set elements of data bellow the value to threshold_value"""
-    mask = np.where(image < thresh)
+    if thresh_abs is not None:
+        mask = np.where(image < thresh_abs)
+    elif thresh_frac is not None:
+        mask = np.where(image < (np.min(image) + thresh_frac * (np.max(image)-np.min(image))))
     out = copy(image)
-    out[mask] = value
+    out[mask] = fill_value
     return out
 
 def reduce_noise(image, diameter=5, sigma_color=75, sigma_space=75):
@@ -28,9 +47,7 @@ def reduce_noise(image, diameter=5, sigma_color=75, sigma_space=75):
     :param: sigmaSpace: Filter sigma in the coordinate space. A larger value of the parameter means that farther pixels
             will influence each other as long as their colors are close enough (see sigmaColor ). When d>0 , it
             specifies the neighborhood size regardless of sigmaSpace . Otherwise, d is proportional to sigmaSpace ."""
-    i_max = float(np.max(image))
-    image = (image * 255.0 / i_max).astype(np.uint8)  # convert frame data to 8 bit bitmap for cv2
-
+    image, original_max, original_type = to_8bit(image)
     # try:
     #     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # except:
@@ -44,7 +61,7 @@ def reduce_noise(image, diameter=5, sigma_color=75, sigma_space=75):
     #     image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     # except:
     #     pass
-    image = image * i_max / 255.0  # convert frame data to 8 bit bitmap for cv2
+    image = to_original_type(image, original_max, original_type)
     return image
 
 def sharpen(image, ksize_x=15, ksize_y=15, sigma=16, alpha=1.5, beta=-0.5, gamma=0.0):
@@ -59,6 +76,37 @@ def sharpen(image, ksize_x=15, ksize_y=15, sigma=16, alpha=1.5, beta=-0.5, gamma
     ## Subtract gaussian blur from image - sharpens small features
     sharpened = cv2.addWeighted(image, alpha, blured_image, beta, gamma)
     return sharpened
+
+def hist_equalisation(image, adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8)):
+    """Apply histogram equalisation to image"""
+    image_out, original_max, original_type = to_8bit(image)
+    if adaptive:
+        clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+        image_out = clahe.apply(image_out)
+    else:
+        image_out = cv2.equalizeHist(image_out)
+    image_out = to_original_type(image_out, original_max, original_type)
+    return image_out
+
+def gamma_enhance(image, gamma=1.1):
+    """Apply gamma enhancement to image"""
+    image_out = image ** gamma
+    return image_out
+
+def canny_edge_detection(image, canny_threshold1=50, canny_threshold2=250, canny_edges=True):
+    image_out, original_max, original_type = to_8bit(image)
+    image_out = cv2.Canny(image_out, canny_threshold1, canny_threshold2, canny_edges)  # 500, 550
+    image_out = to_original_type(image_out, original_max, original_type)
+    return image_out
+
+def invert_image(image, bit_depth=255):
+    convert_to_8bit = True if bit_depth == 255 and np.max(image) > bit_depth else False
+    if convert_to_8bit:
+        image_out, original_max, original_type = to_8bit(image)
+    image_out = bit_depth - image_out
+    if convert_to_8bit:
+        image_out = to_original_type(image_out, original_max, original_type)
+    return image_out
 
 def extract_bg(image, frame_stack, method='min'):
     """Extract slowly varying background from range of frames"""
@@ -191,3 +239,10 @@ def contour_info(mask, image=None, extract_number=None, x_values=None, y_values=
 #     # Subtract background to leave foreground
 #     out = frame - bg
 #     return out
+
+image_enhancement_functions = {
+            'threshold': threshold, 'reduce_noise': reduce_noise, 'sharpen': sharpen, 'threshold': threshold,
+             'gamma_enhance': gamma_enhance, 'hist_equalisation': hist_equalisation, 'invert_image': invert_image,
+             'canny_edge_detection': canny_edge_detection,
+             'extract_bg': extract_bg, 'extract_fg': extract_fg,
+             'add_abs_gauss_noise': add_abs_gauss_noise}
