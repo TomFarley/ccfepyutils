@@ -35,7 +35,9 @@ signal_ylabels = {'ESM_NE_BAR': r'$n_e$ [$\times 10^{19}$ m$^{-3}$]',
                    'amc_plasma current': '$I_p$ [kA]',
                    "ada_dalpha integrated": r'$D_{\alpha}$ [ph.$s^{-1}cm^{-2}sr^{-1}$]',
                    'anb_tot_sum_power': '$P_{NBI}$ [MW]',
-                   'xsx/tcam/1': '$I_{sXray}$ [V]'}
+                   'xsx/tcam/1': '$I_{sXray}$ [V]',
+                   'efm_q_axis': '$q_0$',
+                  }
 
 session_log_columns = ['useful', 'shot_type', 'preshot', 'postshot', 'plasma_shape', 'ip_range', 'heating',
                        'divertor_config', 'rmptype', 'scenario', 'pellets']
