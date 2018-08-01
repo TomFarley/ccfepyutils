@@ -154,6 +154,9 @@ class SettingList(Setting, list):  # TODO: implement SettingsList  !
         for x in self.value:
             yield x
 
+    def __getitem__(self, item):
+        return self.value[item]
+
     def __contains__(self, item):
         return (item in self.value)
 
