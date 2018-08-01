@@ -462,7 +462,8 @@ class Settings(object):
         return out
 
     def __contains__(self, item):
-        h = re.compile('{}:?\d*'.format(item))
+        # Includes list items
+        h = re.compile('^{}:?\d*$'.format(item))
         for ind in self._df.index:
             m = h.match(ind)
             if m:
