@@ -161,14 +161,15 @@ class Frame(Slice):
             logger.debug('Updated existing image artist')
         else:
             plot = Slice.plot(self, ax=ax, show=False, **kws)
-        if annotate:
-            t = self.stack.lookup('t', **{self.stack.stack_dim: self.value}) if 't' in self.stack._meta.columns else None
-            self._annotate_plot(plot.ax(), self.value, t=t, update_existing=update_existing)
+
+        t = self.stack.lookup('t', **{self.stack.stack_dim: self.value}) if 't' in self.stack._meta.columns else None
+        self._annotate_plot(plot.ax(), self.value, t=t, annotate=annotate, update_existing=update_existing)
+
         plot.show(**show)
         return plot
 
     @classmethod
-    def _annotate_plot(cls, ax, n, t=None, xy=(0.05, 0.95), update_existing=True):
+    def _annotate_plot(cls, ax, n, t=None, annotate=True, xy=(0.05, 0.95), update_existing=True):
         """Add text annotation with frame number/time"""
         try:
             n_str = 'Frame: {:d}'.format(int(n))
@@ -179,13 +180,19 @@ class Frame(Slice):
             text = n_str + t_str
             if update_existing and hasattr(ax, 'ccfe_plot') and ('text_frame_no' in ax.ccfe_plot.ax_artists[ax]):
                 # Keep record of text object for updating
-                ax.ccfe_plot.ax_artists[ax]['text_frame_no'].set_text(text)
+                artist = ax.ccfe_plot.ax_artists[ax]['text_frame_no']
+                if annotate:
+                    artist.set_text(text)
+                    artist.set_visible(True)
+                else:
+                    artist.set_visible(False)
             else:
-                frametxt = ax.annotate(text, xy=xy, xycoords='axes fraction', color='white', fontsize=8)
-                frametxt.set_bbox(dict(color='k', alpha=0.5, edgecolor=None))
-                if hasattr(ax, 'ccfe_plot'):
-                    # Keep record of text object for updating
-                    ax.ccfe_plot.ax_artists[ax]['text_frame_no'] = frametxt
+                if annotate:
+                    frametxt = ax.annotate(text, xy=xy, xycoords='axes fraction', color='white', fontsize=8)
+                    frametxt.set_bbox(dict(color='k', alpha=0.5, edgecolor=None))
+                    if hasattr(ax, 'ccfe_plot'):
+                        # Keep record of text object for updating
+                        ax.ccfe_plot.ax_artists[ax]['text_frame_no'] = frametxt
         except Exception as e:
             logger.exception('Cannot annotate frame plot. {}'.format(e))
         return text
@@ -410,6 +417,18 @@ class Movie(Stack):
         self._enhanced_movie = None
         pass
     
+    def set_enhancements(self, enhancements):
+        """Set image processing enhancements"""
+        # TODO change to property?
+        if self.settings['enhancements'] != enhancements:
+            self.settings['enhancements'] = enhancements
+        if self._enhancements != enhancements:
+            self._meta.loc[:, 'enhanced'] == False
+            self._enhanced_movie = None
+            self._enhancements = None  # Enhancements already applied to _ENHANCED_movie
+        else:
+            pass
+    
     def get_frame_range(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
                    nframes=None, duration=None, stride=1, all_=False):
         if all_:
@@ -486,6 +505,7 @@ class Movie(Stack):
         movie_meta['t_range'] = [mraw_files.loc[0, 'StartTime'], mraw_files.loc[n-1, 'EndTime']]
         movie_meta['frame_shape'] = (int(header['ImageHeight'].strip()), int(header['ImageWidth'].strip()))
         movie_meta['fps'] = int(header['RecordRate(fps)'].strip())
+        logger.info('Readimg mraw movie file {}:\n{}'.format(fn_path, mraw_files))
         return movie_meta
 
     @classmethod
@@ -694,17 +714,23 @@ class Movie(Stack):
             self._meta.loc[n, 'set'] = True
         return data
 
-    def __getitem__(self, n, raw=False, load=True, keep_raw=False):
-        """Return data slices from the stack of data"""
+    def __getitem__(self, n, raw=None, load=True, keep_raw=False):
+        """Return data slices from the stack of data
+        :param raw: True=return unenhanced data, False=return enhanced data (applying enhancements if nessecary),
+                    None=Return existing enhanced data if available (without enhancing) else raw data"""
         # If have enhaced data return that over raw data
         if n not in self._frame_range_info_all['frames']:
             raise IndexError('{} is not a valid frame number. Options: {}'.format(n, self._frame_range_info_all['frames']))
-        if self._enhanced_movie is not None and not raw:
+        if (raw is False):
+            if (self._enhanced_movie is None):
+                # Force enhanced, so make sure  _enhanced_movie is not None
+                self._setup_enhanced_movie(self.enhancements, force=True)
+            is_set = self._enhanced_movie.check_data(n)
+            if (not is_set):
+                self.enhance(enhancements=self.enhancements, frames=[n], keep_raw=keep_raw)
+        if (not raw) and (self._enhanced_movie is not None) and (self._enhanced_movie.check_data(n)):
+            # Return enhanced frame if it is already available
             movie = self._enhanced_movie
-            is_set = movie.check_data(n)
-            if not is_set:
-                enhancements = self.settings['enhancements']
-                self.enhance(enhancements=enhancements, frames=[n], keep_raw=keep_raw)
         else:
             movie = self
             is_set = movie.check_data(n)
@@ -714,7 +740,7 @@ class Movie(Stack):
         # item = movie.lookup_slice_index(item)
         return movie.get_slice(n)
 
-    def __call__(self, raw=False, load=True, keep_raw=False, **kwargs):
+    def __call__(self, raw=None, load=True, keep_raw=False, **kwargs):
         assert len(kwargs) > 0, 'Stack.__call__ requires keyword arg meta data to select frame'
         item = self.lookup(self.stack_dim, **kwargs)
         return self.__getitem__(item, raw=raw, load=load, keep_raw=keep_raw)
@@ -792,9 +818,9 @@ class Movie(Stack):
             frame_stack = self.extract_frame_stack(frames)
         return frame_stack
 
-    def _setup_enhanced_movie(self, enhancements):
+    def _setup_enhanced_movie(self, enhancements, force=False):
         """Reset enhanced movie if enhancements are to change"""
-        if not self.is_enhanced or self._enhancements != enhancements:
+        if (not self.is_enhanced) or (self._enhancements != enhancements) or force:
             # Update attributes of self
             self._enhancer = Enhancer(setting=self.settings['Enhancer'])  # TODO: specify enhancement settings
             self._enhancements = []  # Enhancements applied to _ENHANCED_movie
@@ -815,6 +841,9 @@ class Movie(Stack):
             enhanced_movie._enhancements = None
             enhanced_movie.name = self.name + '_enhanced'
             enhanced_movie._meta = deepcopy(self._meta)
+            
+            enhanced_movie._meta[['set']] = False
+            
             enhanced_movie._meta[['enhanced']] = False
 
             self._enhanced_movie = enhanced_movie
@@ -840,12 +869,12 @@ class Movie(Stack):
         frame_arrays = []
         # If this is the first enhancement to be applied make sure the enhanced data has been set to the raw data
         frames = np.array(frames)
-        frames_not_set = frames[~self._meta.loc[frames, 'set'].values]
+        frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
         if len(frames_not_set) > 0:
             # Make sure raw data has been loaded for all the relevant fames
             self.load_movie_data(n=frames_not_set)
             # Make sure enhanced movie starts out with all relevent frames set to raw data
-            frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
+            # frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
             self._enhanced_movie._data.loc[{'n': frames_not_set}] = self._data.loc[{'n': frames_not_set}]
             self._enhanced_movie._meta.loc[frames_not_set, 'set'] = True
         # TODO: Make parallel - threading?
@@ -853,7 +882,10 @@ class Movie(Stack):
             if self._meta.loc[n, 'enhanced'] == True:
                 continue
             args.append(self._enhancer.prepare_arguments(enhancement, self, n))
-            frame_arrays.append(self(n=n, raw=True)[:])
+            # Get current state of enhanced frame, so enhancements are applied sequentially
+            # Will return enhanced frame if available but will not try to apply all enhancements before returning
+            frame_arrays.append(self(n=n, raw=None)[:])
+            # frame_arrays.append(self._enhanced_movie._data.sel(n=n).values)
 
         # TODO: Make parallel - processes
         for j, n in enumerate(frames):
@@ -861,28 +893,36 @@ class Movie(Stack):
             if self._meta.loc[n, 'enhanced'] == True:
                 continue
             # NOTE: movie and n args only needed for fg and bg extraction
-            self._enhanced_movie(n=n, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
-            self._meta.loc[n, 'enhanced'] = True
+            # self._enhanced_movie(n=n, raw=True, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
+            self(n=n, raw=None, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
+            # self._meta.loc[n, 'enhanced'] = True
             pass
 
-    def enhance(self, enhancements, frames='all', keep_raw=False, **kwargs):
+    def enhance(self, enhancements, frames='all', keep_raw=True, **kwargs):
         """Apply mutiple enhancements to a set of frames in order"""
         # TODO: make t ect valid input
         self._init_xarray()
         if frames == 'all':
             frames = self.frame_numbers
+        frames = to_array(frames)
         enhancements = make_iterable(enhancements)
+        self.set_enhancements(enhancements)
         if not self._setup_enhanced_movie(enhancements) and is_subset(frames, self.enhanced_frames):
             logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
             return
-        frames = to_array(frames)
         # TODO: check all frame values in stack axis
-        for enhancement in enhancements:
-            self._apply_enhancement(frames, enhancement)
+        if len(enhancements) > 0:
+            for enhancement in enhancements:
+                self._apply_enhancement(frames, enhancement)
+        else:
+            # No enhancements so reset enhanced frames equal to raw frames
+            # TODO: Redundant if set up right
+            for n in frames:
+                self._enhanced_movie(n=n, raw=True)[:] = self(n=n, raw=True, load=True)[:]
         # # Set frames as having been enhanced
-        # self._enhancements = enhancements
-        # mask = self._meta['n'].isin(frames)
-        # self._meta.loc[mask, 'enhanced'] = True
+        mask = self._meta['n'].isin(frames)
+        self._meta.loc[mask, 'enhanced'] = True
+        self._enhancements = enhancements
         if not keep_raw:
             self._data = None
         # raise NotImplementedError
@@ -986,10 +1026,14 @@ class Movie(Stack):
     @property
     def enhancements(self):
         """Return currently set enhancements (may not be applied yet)"""
+        if self.settings is None:
+            return []
         try:
-            enhancements = self.settings['enhancements']
+            enhancements = self.settings['enhancements'].value
         except KeyError as e:
             enhancements = []
+        except Exception as e:
+            raise e
         return enhancements
 
     @property
@@ -1027,9 +1071,7 @@ class Enhancer(object):
     """Class to apply image enhancements to arrays of data"""
     desciptions = {'bgsub': {'requires_window': True}}
     default_settings = {}
-    from ccfepyutils.image import threshold, reduce_noise, sharpen, extract_bg, extract_fg, add_abs_gauss_noise
-    functions = {'threshold': threshold, 'reduce_noise': reduce_noise, 'sharpen': sharpen, 'extract_bg': extract_bg,
-                 'extract_fg': extract_fg, 'add_abs_gauss_noise': add_abs_gauss_noise}
+    from ccfepyutils.image import image_enhancement_functions
 
     def __init__(self, setting='default'):
         self.settings = Settings.get('Enhancer', setting)
@@ -1061,7 +1103,7 @@ class Enhancer(object):
 
     def __call__(self, enhancements, data, **kwargs):
         out = copy(data)
-        funcs = self.functions
+        funcs = self.image_enhancement_functions
         enhancements = make_iterable(enhancements)
         if np.max(data) == 0:
             logging.warning('Enhancement(s) {} is being applied to an empty frame'.format(enhancements))
@@ -1078,7 +1120,7 @@ class Enhancer(object):
     def prepare_arguments(self, enhancement, movie, n):
         """Prepare arguments for enhancement function. Get inputs ready for parallel processing."""
         kwargs = {}
-        func = self.functions[enhancement]
+        func = self.image_enhancement_functions[enhancement]
         func_name = func.__name__
         sig = inspect.signature(func).parameters.keys()
         if 'frame_stack' in sig:

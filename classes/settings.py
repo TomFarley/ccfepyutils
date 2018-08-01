@@ -137,24 +137,36 @@ class SettingBool(Setting, int):
 class SettingList(Setting, list):  # TODO: implement SettingsList  !
     type = list
     # value_column = 'value_num'
-    def __new__(cls, settings, item):
-        value = settings.list_items(settings, item)
-        return list.__new__(cls, value)
+    # def __new__(cls, settings, item):
+    #     value = settings.list_item_values(settings, item)
+    #     return list.__new__(cls, value)
 
     def __init__(self, settings, item):
         list.__init__(self)
         Setting.__init__(self, settings, item)
+        value = settings.list_item_values(settings, item)
+        self += value
 
     def __str__(self):
         return str(self.value)
 
-    @property
-    def value(self):
-        return self.type(self._settings.list_items(self._settings, self._item))
-
     def __iter__(self):
         for x in self.value:
             yield x
+
+    def __contains__(self, item):
+        return (item in self.value)
+
+    def __len__(self):
+        return len(self.value)
+
+    def __eq__(self, other):
+        return self.value == other
+
+    @property
+    def value(self):
+        return self.type(self._settings.list_item_values(self._settings, self._item))
+
 
 class Settings(object):
     """Object to store, save, load and interact with collections of settings for other classes
@@ -369,11 +381,18 @@ class Settings(object):
                 kws.update(kwargs)
                 kwargs = kws
                 self.delete_items(item)
+            if len(value) == 0:
+                value = ['[<empty>]']
             for i, v in enumerate(value):
                 item_i = '{}:{}'.format(item, i)
                 if i == 0:
                     if item_i in self.items:
+                        # Existing list item being updated
                         order = self._df.loc[item_i, 'order']
+                        if self._df.loc[item_i, 'value'] == str(v):
+                            # No change
+                            # TODO: deal with columns changing value
+                            continue
                         kws = {k: self._df.loc[item_i, k] for k in ['description', 'runtime']}
                         kws.update(kwargs)
                         kwargs = kws
@@ -384,6 +403,10 @@ class Settings(object):
                     order += 1
                 self(item_i, v, create_columns=create_columns, **kwargs)
                 self.reorder_item(item_i, order, save=False)
+            while '{}:{}'.format(item, i+1) in self.items:
+                # If new list is shorter, delete old additional items
+                self.delete_items('{}:{}'.format(item, i+1))
+                i += 1
             return
         assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
         df = self._df
@@ -399,6 +422,7 @@ class Settings(object):
             df.loc[item, 'value'] = str(value)
             logger.info('Existing item of {} set: "{}" = {}'.format(repr(self), col, value))
         for k, v in kwargs.items():
+            # TODO: Deal with setting columns for list item
             if k in self.columns:
                 df.loc[item, k] = v
             elif create_columns:
@@ -438,7 +462,8 @@ class Settings(object):
         return out
 
     def __contains__(self, item):
-        h = re.compile('{}:?\d*'.format(item))
+        # Includes list items
+        h = re.compile('^{}:?\d*$'.format(item))
         for ind in self._df.index:
             m = h.match(ind)
             if m:
@@ -831,12 +856,24 @@ class Settings(object):
             return False
 
     @staticmethod
-    def list_items(settings, item):
+    def list_item_values(settings, item):
         """Return df items that are part of the item list. Return False if not a list."""
         r = re.compile(r'^{}:\d'.format(item))
-        newlist = list(filter(r.match, settings.items))
-        if len(newlist) > 0:
-            return [settings[i].value for i in newlist]
+        list_items = list(filter(r.match, settings.items))
+        if (len(list_items) == 1) and (settings[list_items[0]].value == '[<empty>]'):
+            return []
+        elif len(list_items) > 0:
+            return [settings[i].value for i in list_items]
+        else:
+            return False
+
+    @staticmethod
+    def list_item_indices(settings, item):
+        """Return df items that are part of the item list. Return False if not a list."""
+        r = re.compile(r'^{}:\d'.format(item))
+        list_items = list(filter(r.match, settings.items))
+        if len(list_items) > 0:
+            return sorted(list_items)
         else:
             return False
 
@@ -963,8 +1000,8 @@ class Settings(object):
         df = self._df
         if (name in list(self.items)):
             return name
-        if self.is_list_item(self, name):
-            raise NotImplementedError
+        if Settings.is_list_item(self, name):
+            return name
         elif name in df['name'].values:
             mask = df['name'] == name  # boolian mask where name == 'item'
             if np.sum(mask) == 1:

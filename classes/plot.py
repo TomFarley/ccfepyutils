@@ -111,8 +111,8 @@ class Plot(object):
         self = self.set_figure_variables(ax=ax, num=num, axes=axes, **fig_args)  # TODO: Add axis naming? .set_axis_names - replace defaults?
         # kws = args_for(self.plot, kwargs, include=self.plot_args)
         self.plot(x, y, z, mode=mode, **kwargs)
-        self.show(show, **args_for(self.show, kwargs))
-        self.save(save, **args_for(self.save, kwargs))
+        # self.show(show, **args_for(self.show, kwargs))
+        # self.save(save, **args_for(self.save, kwargs))
 
     @classmethod
     def get(cls, x=None, y=None, z=None, num=None, axes=(1, 1), default_ax=(0, 0), ax=None, mode=None,
@@ -445,8 +445,9 @@ class Plot(object):
 
     def set_axis_cycler(self, cycler, ax=None):
         """Set property eg color or linewidth cycler"""
-        ax = self.ax(ax)
-        return set_cycler(cycler, ax=ax)
+        if cycler is not None:
+            ax = self.ax(ax)
+            return set_cycler(cycler, ax=ax)
 
     def legend(self, ax=None, legend=True, legend_fontsize=14):
         """Finalise legends of each axes"""
