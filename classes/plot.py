@@ -383,8 +383,8 @@ class Plot(object):
 
     def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, label_fontsize=None, tick_fontsize=None,
                         ax=None, tight_layout=False):
-        assert isinstance(xlabel, (string_types, type(None)))
-        assert isinstance(ylabel, (string_types, type(None)))
+        assert isinstance(xlabel, (string_types, type(None))), '{}'.format(xlabel)
+        assert isinstance(ylabel, (string_types, type(None))), '{}'.format(xlabel)
         if ax == 'all':
             for ax in self.axes:
                 self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, label_fontsize=label_fontsize,

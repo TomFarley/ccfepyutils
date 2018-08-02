@@ -7,11 +7,11 @@ from pathlib import Path
 from tkinter import Tk, filedialog as askopenfilename
 
 import numpy as np
-import xarray as xr
 from past.types import basestring
 
 from ccfepyutils.utils import string_types, make_iterable, compare_dict, \
     is_number, is_subset, str_to_number
+from ccfepyutils.debug import get_traceback_location
 
 logger = logging.getLogger(__name__)
 try:
@@ -207,25 +207,25 @@ def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
             for i in np.arange(depth):  # walk up directory by given depth
                 d_up = os.path.dirname(d_up)
             if not os.path.isdir(d_up):
-                print('Directory {} was not created as start directory {} (depth={}) does not exist.'.format(
+                logger.info('Directory {} was not created as start directory {} (depth={}) does not exist.'.format(
                     d, d_up, depth))
                 continue
         if not os.path.isdir(d):  # Only create if it doesn't already exist
             if (start_dir is not None) and (start_dir not in d):  # Check dir stems from start_dir
-                print('Directory {} was not created as does not start at {} .'.format(dirs,
+                logger.info('Directory {} was not created as does not start at {} .'.format(dirs,
                                                                                           os.path.relpath(start_dir)))
                 continue
             try:
                 os.makedirs(d)
-                print('Created directory: ' + d)
+                logger.info('Created directory: {}   ({})'.format(d, get_traceback_location(level=2)))
                 if info:  # Write file describing purpose of directory etc
                     with open(os.path.join(d, 'DIR_INFO.txt'), 'w') as f:
                         f.write(info)
             except FileExistsError as e:
-                logging.warning('Directory already created in parallel thread/process: {}'.format(e))
+                logger.warning('Directory already created in parallel thread/process: {}'.format(e))
         else:
             if verbose:
-                print('Directory "' + d + '" already exists')
+                logger.info('Directory "' + d + '" already exists')
     return 0
 
 
@@ -504,6 +504,7 @@ def pos_path(value, allow_relative=True):
 
 
 def read_netcdf_group(fn_path, group):
+    import xarray as xr
     with xr.open_dataset(fn_path, group=group, autoclose=True) as match_data:
             match_data = match_data.copy(deep=True)
     return match_data
