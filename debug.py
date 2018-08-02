@@ -112,13 +112,6 @@ class Debug:
         print("line {}: {} <Debug> ON, {} <Debug>: OFF".format(self.line, Debug.ndebug_ON, Debug.nOFF))
         for line, debug_ON in self.lines.items():
             print(' ', line, debug_ON, ((debug_ON and ' <--') or ''))
-        
-def get_verbose_prefix():
-    """Returns an informative prefix for verbose Debug output messages"""
-    s = inspect.stack()
-    module_name = inspect.getmodulename(s[1][1])
-    func_name = s[1][3]
-    return '%s->%s' % (module_name, func_name)
 
 def func_name(level=0):
     return inspect.stack()[level+1][3]
@@ -152,6 +145,13 @@ def line_no(level=0):
             print("inspect module doesn't seem to be working at all!")
         line = '*UNKNOWN*'
     return line
+
+def get_traceback_location(level=0, format='{module_name}:{func_name}:{line_no} '):
+    """Returns an informative prefix for verbose Debug output messages"""
+    module = module_name(level=level)
+    func = func_name(level=level)
+    line = line_no(level=level)
+    return format.format(module_name=module, func_name=func, line_no=line)
 
 def whereami(level=0):
     """ Return a string detailing the line number, function name and filename from level relative to where this
@@ -291,7 +291,7 @@ def debug_demo():
     print('Line number (~206):', line_no(level=0))
     print('Function name (debug_demo):', func_name(level=0))
     print('Module name (tf_debug.py):', module_name(level=0))
-    print(get_verbose_prefix(), '<Message>')
+    print(get_traceback_location(), '<Message>')
     print(whereami())
     print()
     print('debug_print tests:')
