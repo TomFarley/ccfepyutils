@@ -80,6 +80,8 @@ class CompositeSettings(object):
             s._df.loc[:, 'parent'] = '{}:{}'.format(application, name)
         assert application not in settings.keys(), 'Application names must be unique: {}'.format(application)
         settings[application] = s
+        if self not in s._composite_settings:
+            s._composite_settings[self] = s.log_file(s.name, 'modified')
         df_nest = s._df
         for item in s.items:
             exclude = False
