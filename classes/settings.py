@@ -304,15 +304,15 @@ class Settings(object):
         return composite_settings
 
     @classmethod
-    def from_dict(cls, application, name, dictionary, silent=False, **kwargs):
-        if silent:
+    def from_dict(cls, application, name, dictionary, _silent=False, **kwargs):
+        if _silent:
             old_log_level = logger.getEffectiveLevel()
             logger.setLevel(logging.WARNING)
         s = Settings.get(application, name)
         s.delete_items(s.items)
         for key, value in dictionary.items():
-            s(key, value, **kwargs)
-        if silent:
+            s(key, value, _silent=_silent, **kwargs)
+        if _silent:
             logger.setLevel(old_log_level)
         return s
 
@@ -371,7 +371,7 @@ class Settings(object):
         return out
 
     @in_state('modifying', 'modified')
-    def __call__(self, item, value=None, create_columns=False, _save=False, **kwargs):
+    def __call__(self, item, value=None, create_columns=False, _save=False, _silent=False, **kwargs):
         """Set value of setting
         :item: name of setting to change
         :value: value to set the item to
@@ -437,7 +437,7 @@ class Settings(object):
             # new = item not in list(self.items)
             if item not in list(self.items):
                 # add item setting type columns appropriately
-                self.add_item(item, value)
+                self.add_item(item, value, _silent=_silent)
             elif value is not None:
                 # set value given we already know type
                 col = self.get_value_column(self._df, item)
@@ -473,7 +473,7 @@ class Settings(object):
                 self.save()
         else:
             # Don't register modification in state
-            self.state.reverse()
+            self.state.reverse(_ignore_state=True)
 
     @in_state('accessing')
     def __getitem__(self, item):
@@ -524,7 +524,7 @@ class Settings(object):
             yield item
 
     @in_state('modifying', 'modified')
-    def add_item(self, item, value):
+    def add_item(self, item, value, _silent=False):
         assert item not in list(self.items), 'Item {} already exists'.format(item)
         type_to_col = {'bool': 'value_num', 'int': 'value_num', 'float': 'value_num', 'str': 'value_str'}
         if isinstance(value, bool):
@@ -550,7 +550,8 @@ class Settings(object):
         df.loc[item, 'value'] = str(value)
         df.loc[item, 'name'] = item.split(':')[0].replace('_', ' ')  # Default name to item key without underscores
 
-        logger.info('Added new item to settings: {} = {}'.format(item, value))
+        if not _silent:
+            logger.info('Added new item to settings: {} = {}'.format(item, value))
 
     @in_state('modifying', 'modified')
     def add_items(self, items):
@@ -596,7 +597,7 @@ class Settings(object):
             self.state('modified')
 
     @in_state('modifying', 'modified')
-    def delete_items(self, items):
+    def delete_items(self, items, _siltent=False):
         """Remove item(s) from settings"""
         items = make_iterable(items)
         for item in copy(items):
@@ -609,8 +610,10 @@ class Settings(object):
                 if i == 0:
                     raise ValueError('Item "{}" not in {}'.format(item, repr(self)))
                 items.pop(items.index(item))
-        self._df = self._df.drop(items)
-        logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
+        if len(items) > 0:
+            self._df = self._df.drop(items)
+            if not _siltent:
+                logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
 
     @in_state('modifying', 'modified')
     def clear(self):
@@ -637,6 +640,7 @@ class Settings(object):
                 self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
             except OSError as e:
                 if attempt == 2:
+                    logger.warning('Failed on 2nd attempt')
                     raise e
                     # TODO: restore backup if corrupted?
                 time.sleep(0.5)
@@ -995,11 +999,11 @@ class Settings(object):
             kwargs.pop('value')
             self(item, value, **kwargs)
 
-    def update_from_dict(self, dictionary, **kwargs):
+    def update_from_dict(self, dictionary, _silent=False, **kwargs):
         for item, value in dictionary.items():
             if isinstance(value, Setting):
                 value = value.value
-            self(item, value, **kwargs)
+            self(item, value, _silent=_silent, **kwargs)
         return self
         # logger.debug('Updated {} with values: {}, cols: {}'.format(self, dictionary, kwargs))
 

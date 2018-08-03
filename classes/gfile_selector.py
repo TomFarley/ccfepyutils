@@ -128,9 +128,16 @@ class GFileSelector(object):
             path = os.path.expanduser(self.settings['scheduler_gfile_paths'][0])
         e = eq.equilibrium(device=machine, shot=pulse, time=time)
         gfile_time = e._time
+        if gfile_time != time:
+            logger.info('Closest scheduler equilibrium time to {:0.6f} s is {:0.5f} s (diff {:0.3} ms)'.format(
+                time, gfile_time, (gfile_time-time)*1e3))
         fn = fn_format.format(pulse=pulse, gfile_time=gfile_time, machine=machine)
         path = path.format(pulse=pulse, gfile_time=gfile_time, machine=machine)
         fn_path = os.path.join(path, fn)
+        if os.path.isfile(fn_path):
+            logger.debug('Closest scheduler equilibrium file to time {:0.6f} s already exists for {:0.5f} s'.format(
+                time, gfile_time))
+            return
         mkdir(path, depth=3)
         e.dump_geqdsk(fn_path)
         if os.path.isfile(fn_path):

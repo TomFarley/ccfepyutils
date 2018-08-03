@@ -180,7 +180,10 @@ class State(object):
         else:
             return None
 
-    def check_accessible(self, new_state, raise_ex=True):
+    def check_accessible(self, new_state, raise_ex=True, _ignore_state=False):
+        if _ignore_state:
+            # Ignore state transisiton table rules, so return True
+            return True
         if self.core_state is None:
             return True
         if new_state in self.accessible_states:
@@ -231,12 +234,12 @@ class State(object):
     def state_in_group(self, state, group):
         return state in self.state_group(group)
 
-    def set_state(self, new_state, call=None, ignore=False, *args, **kwargs):
+    def set_state(self, new_state, call=None, _ignore_state=False, *args, **kwargs):
         old_state = self.current_state
         if new_state == old_state:
             return False
         # Check new state is accessible
-        self.check_accessible(new_state, raise_ex=True)
+        self.check_accessible(new_state, raise_ex=True, _ignore_state=_ignore_state)
 
         if new_state is not None:
             # Set the value of the appropriate state group and set lower level state values to None
@@ -265,10 +268,10 @@ class State(object):
                 owner=repr(self._owner), old=old_state, new=self.current_state))
         return new_state != old_state
 
-    def __call__(self, new_state, call=None, ignore=False, *args, **kwargs):
+    def __call__(self, new_state, call=None, _ignore_state=False, *args, **kwargs):
         """Change state to new_state. Return True if call lead to a state change, False if already in new_state.
         :param new_state: name of state to change to"""
-        return self.set_state(new_state, call=None, ignore=False, *args, **kwargs)
+        return self.set_state(new_state, call=None, _ignore_state=_ignore_state, *args, **kwargs)
 
     def __getitem__(self, item):
         """Get state name from history
@@ -298,13 +301,13 @@ class State(object):
         """Return True if last state change call was to the same state"""
         return self == self.previous_state
 
-    def reverse(self, steps=1):
+    def reverse(self, steps=1, _ignore_state=True):
         """Reverse to past state if past state is different to current state
         :param steps: number of steps in history_all to reverse"""
         assert steps > 0 and steps < len(self._history_all)
         # new_state = self._history_all[-(steps+1)]['state']
         new_state = self._history[self.current_group][-(steps+1)]
-        self(new_state)
+        self(new_state, _ignore_state=_ignore_state)
 
     def undo(self, n):
         """Undo n state changes"""

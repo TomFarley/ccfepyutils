@@ -621,6 +621,8 @@ class Movie(Stack):
             self.set_data(data, reset=True)  # whole dataset
         else:
             n = make_iterable(n)
+            if len(n) == 0:
+                return
             self._data.loc[{'n': n}] = data
         # logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
 
@@ -841,7 +843,8 @@ class Movie(Stack):
             enhanced_movie._enhancements = None
             enhanced_movie.name = self.name + '_enhanced'
             enhanced_movie._meta = deepcopy(self._meta)
-            
+
+            # TODO: leave raw values set to avoid them needing to be reloaded? Rely on raw['enhanced']?
             enhanced_movie._meta[['set']] = False
             
             enhanced_movie._meta[['enhanced']] = False
@@ -869,17 +872,21 @@ class Movie(Stack):
         frame_arrays = []
         # If this is the first enhancement to be applied make sure the enhanced data has been set to the raw data
         frames = np.array(frames)
-        frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
-        if len(frames_not_set) > 0:
-            # Make sure raw data has been loaded for all the relevant fames
-            self.load_movie_data(n=frames_not_set)
+        frames_not_set_enhanced = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
+        frames_not_set_raw = frames[~self._meta.loc[frames, 'set'].values]
+        if len(frames_not_set_enhanced) > 0:
+            if frames_not_set_raw > 0:
+                # Make sure raw data has been loaded for all the relevant fames
+                self.load_movie_data(n=frames_not_set_raw)
             # Make sure enhanced movie starts out with all relevent frames set to raw data
             # frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
-            self._enhanced_movie._data.loc[{'n': frames_not_set}] = self._data.loc[{'n': frames_not_set}]
-            self._enhanced_movie._meta.loc[frames_not_set, 'set'] = True
+            self._enhanced_movie._data.loc[{'n': frames_not_set_enhanced}] = self._data.loc[
+                                                                                {'n': frames_not_set_enhanced}]
+            self._enhanced_movie._meta.loc[frames_not_set_enhanced, 'set'] = True
         # TODO: Make parallel - threading?
         for n in frames:
             if self._meta.loc[n, 'enhanced'] == True:
+                # Already enhanced
                 continue
             args.append(self._enhancer.prepare_arguments(enhancement, self, n))
             # Get current state of enhanced frame, so enhancements are applied sequentially

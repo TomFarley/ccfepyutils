@@ -1,0 +1,12 @@
+,Pulse,heating,ne,t_ft,postshot,useful,rmptype,Ip,reference
+0,29741,Ohmic,,0.2097999947000062, No Beam ,No,,419.560791015625,
+1,29840,Ohmic,,0.2097999947000062, EFCC worked ok. Shot survived. ,Yes,No,420.11859130859375,
+2,29889,Ohmic,,0.2097999947000062, No beam - ngv trip. All ECC energised. ,No,,404.7126159667969,
+3,29962,Ohmic,,0.2097999947000062, Ok. ,Yes,No,-0.214821919798851,
+4,29963,Ohmic,,0.2097999947000062, Ok. FA2 failed so only half current on P6. Runcheck ok. Only known faults. ,Yes,No,3.9058806896209717,
+5,29974,Ohmic,,0.2097999947000062, Good shot  ,Yes,No,617.7545776367188,
+6,29986,Ohmic,,0.2097999947000062, Runcheck reports all OK! ,Yes,No,3.752607583999634,
+7,29987,Ohmic,,0.2097999947000062, Interferometer didn't seem to work. Shot dies at about 270ms after entering density feedback at 200ms. ,No,,408.4373474121094,
+8,29988,Ohmic,,0.2097999947000062," plasma looks OK, landed well. Got the pellet at ~450ms. ",Yes,No,412.69927978515625,
+9,29989,Ohmic,,0.2097999947000062," Plasma looks good, nice landing again. ",Yes,No,415.4744873046875,
+10,29991,Ohmic,,0.2097999947000062," good plasma, did what it was asked to do. ",Yes,No,570.5572509765625,
