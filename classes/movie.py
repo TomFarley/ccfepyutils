@@ -1131,6 +1131,9 @@ class Enhancer(object):
         func_name = func.__name__
         sig = inspect.signature(func).parameters.keys()
         if 'frame_stack' in sig:
+
+            # NOTE: Currently only extracts raw frames for frame stack - ie frame stack enhancement must come first
+
             # TODO: Add extract_frame_stack_window args to enhancer settings
             kws = self.settings.get_func_args(movie.extract_frame_stack_window)
 
@@ -1141,7 +1144,7 @@ class Enhancer(object):
                 if func_arg in self.settings:
                     kws[arg] = self.settings[func_arg]
 
-            frame_stack = movie._enhanced_movie.extract_frame_stack_window(n, raw=True, **kws)
+            frame_stack = movie.extract_frame_stack_window(n, raw=True, **kws)
             kwargs['frame_stack'] = frame_stack
 
         return kwargs

@@ -100,13 +100,13 @@ class Slice(object):
         # TODO: Add automatic axis labeling once parameter class is complete
         # NOTE: data is stored in format x, y whereas imshow and contourf expect arrays ordered (y, x)
         logger.debug('In Slice.plot')
-        kws = {'mode': 'contourf', 'cmap': 'viridis', 'show': False, 'transpose': True}
+        kws = {'mode': 'contourf', 'cmap': 'viridis', 'show': False, 'transpose': True, 'num': repr(self)}
         kws.update(kwargs)
         show = args_for(Plot.show, kws)
         axes = self.stack.slice_axes_names
         x, y = self.stack.slice_axes_values
         z = self.data.values
-        plot = Plot.get(x, y, z, ax=ax, num=repr(self), show=False, **kws)#, xlabel=axes[0], ylabel=axes[1], **kws)
+        plot = Plot.get(x, y, z, ax=ax, show=False, **kws)#, xlabel=axes[0], ylabel=axes[1], **kws)
         ax = plot.ax()
 
         logger.debug('Returned to Slice.plot')
