@@ -383,8 +383,8 @@ class Plot(object):
 
     def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, label_fontsize=None, tick_fontsize=None,
                         ax=None, tight_layout=False):
-        assert isinstance(xlabel, (string_types, type(None)))
-        assert isinstance(ylabel, (string_types, type(None)))
+        assert isinstance(xlabel, (string_types, type(None))), '{}'.format(xlabel)
+        assert isinstance(ylabel, (string_types, type(None))), '{}'.format(xlabel)
         if ax == 'all':
             for ax in self.axes:
                 self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, label_fontsize=label_fontsize,
@@ -416,14 +416,30 @@ class Plot(object):
         if ylim is not None:
             ax.set_ylim(ylim)
 
-    def set_axis_appearance(self, ax=None, grid=None, grid_axes='both', grid_which='major', tick_spacing=None):
+    def set_axis_appearance(self, ax=None, grid=None, grid_axes='both', grid_which='major', sharex=None, sharey=None,
+                            tick_spacing=None):
         if ax == 'all':
             for ax in self.axes:
                 self.set_axis_appearance(ax=ax, grid=grid, grid_axes=grid_axes, grid_which=grid_which,
-                                         tick_spacing=tick_spacing)
+                                         tick_spacing=tick_spacing, sharex=sharex, sharey=sharey)
             return
         if grid is not None:
             ax.grid(grid, axis=grid_axes, which=grid_which)
+        # Share axes
+        for share, func in zip((sharex, sharey), ('get_shared_x_axes', 'get_shared_y_axes')):
+            if share is not None:
+                if share == 'all':
+                    ax1 = None
+                    for ax2 in self.axes:
+                        if ax1 is None:
+                            ax1 = ax2
+                        else:
+                            getattr(ax1, func)().join(ax1, ax2)
+                else:
+                    for ax1, ax2 in share.items():
+                        ax1, ax2 = self.ax(ax1), self.ax(ax2)
+                        getattr(ax1, func)().join(ax1, ax2)
+
         if tick_spacing is not None:
             raise NotADirectoryError
 

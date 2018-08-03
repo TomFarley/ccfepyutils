@@ -154,6 +154,9 @@ class SettingList(Setting, list):  # TODO: implement SettingsList  !
         for x in self.value:
             yield x
 
+    def __getitem__(self, item):
+        return self.value[item]
+
     def __contains__(self, item):
         return (item in self.value)
 
@@ -263,6 +266,8 @@ class Settings(object):
         self.log_file = None
         self._column_sets = None
         self._column_sets_names = None
+        self._hash_id = None
+        self._composite_settings = {}  # dict of composite settings instances that these settings currently belong to
 
     @classmethod
     def get(cls, application=None, name=None, default_repeat=False):
@@ -350,6 +355,8 @@ class Settings(object):
             df = self._df.sort_index(ascending=ascending)
         elif order == 'custom':
             df = self._df.sort_values('order', ascending=ascending)
+        else:
+            raise ValueError('Order "{}" not recognised'.format(order))
         out = df.loc[items, col_set]
         return out
 
@@ -1084,7 +1091,7 @@ class Settings(object):
     
     def __str__(self):
         # TODO: set ordering
-        df = self.view()
+        df = self.view() if self._df is not None else None
         return '{}:\n{}'.format(repr(self)[1:-1], str(df))
 
     def __repr__(self):
@@ -1436,7 +1443,7 @@ def compare_settings_hash(application, name, settings_obj, n_output=1, skip_iden
         hash_id = diff_table.index[i]
         if skip_identical and (diff_table.loc[hash_id, 'n_changes'] == 0):
             continue
-        logger.info('{}th closest match: {}\n{}'.format(i+1, hash_id, differences[hash_id]))
+        logger.info('Rank {} closest match: {}\n{}'.format(i+1, hash_id, differences[hash_id]))
     return diff_table, differences
 
 if __name__ == '__main__':

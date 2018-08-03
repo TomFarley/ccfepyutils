@@ -80,6 +80,8 @@ class CompositeSettings(object):
             s._df.loc[:, 'parent'] = '{}:{}'.format(application, name)
         assert application not in settings.keys(), 'Application names must be unique: {}'.format(application)
         settings[application] = s
+        if self not in s._composite_settings:
+            s._composite_settings[self] = s.log_file(s.name, 'modified')
         df_nest = s._df
         for item in s.items:
             exclude = False
@@ -264,12 +266,18 @@ class CompositeSettings(object):
         
     
     def set_value(self, **kwargs):
-        """Set values of multiple items using keyword arguments"""
+        """Set values of multiple existing items using keyword arguments"""
+        updated = False
         for item, value, in copy(kwargs).items():
             if (item in self.items) and (value is not None):
-                self(item, kwargs.pop(item))
-                logger.debug('Set {}={} from kwargs'.format(item, value))
-        self._hash_id = None
+                if self[item] != value:
+                    self(item, kwargs.pop(item))
+                    updated = True
+                    logger.debug('Set {}={} from kwargs'.format(item, value))
+            else:
+                raise KeyError('Item {} does not exist in {} to update value to {}'.format(item, self, value))
+        if updated:
+            self._hash_id = None
 
     def set_column(self, col, value, items='all', apply_to_groups=False):
         """Set value of column for a group of items"""

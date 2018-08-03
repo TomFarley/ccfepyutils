@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from ccfepyutils.classes.settings import Settings
-from ccfepyutils.io_tools import filter_files_in_dir, locate_file
+from ccfepyutils.io_tools import filter_files_in_dir, locate_file, mkdir
 from ccfepyutils.utils import none_filter, str_to_number
 
 # fileConfig('../logging_config.ini')
@@ -59,10 +59,14 @@ class GFileSelector(object):
         time = float(time)
         allow_scheduler_efit = none_filter(s['allow_scheduler_efit'].value, allow_scheduler_efit)
         dt_switch_gfile = none_filter(s['dt_switch_gfile'].value, dt_switch_gfile)
+        if allow_scheduler_efit and ((pulse not in self.store['n']) or
+                                     (np.min(np.abs(store.loc[pulse, 't']-time)) > dt_switch_gfile)):
+            self.save_scheduler_gfile(pulse, time, machine)
+            self.store_gfile_info(pulse, machine=machine, scheduler=allow_scheduler_efit)
+
         if pulse not in self.store['n']:
-            self.store_gfile_info(pulse, machine=machine)
-        if pulse not in self.store['n']:
-            raise IOError('No gfiles located for pulse "{}"'.format(pulse))
+            raise IOError('No gfiles located for pulse "{}" (allow_scheduler_efit={})'.format(
+                pulse, allow_scheduler_efit))
         if current_file is not None:
             assert len(current_file) == 2, '{}'.format(current_file)
             current_path, current_fn = current_file
@@ -119,16 +123,20 @@ class GFileSelector(object):
     def save_scheduler_gfile(self, pulse, time, machine='MAST', fn_format=None, path=None):
         from pyEquilibrium import equilibrium as eq
         if fn_format is None:
-            fn = self.settings['scheduler_gfile_fn_formats'][0]
+            fn_format = self.settings['scheduler_gfile_fn_formats'][0]
         if path is None:
-            path = self.settings['scheduler_gfile_paths'][0]
-
+            path = os.path.expanduser(self.settings['scheduler_gfile_paths'][0])
         e = eq.equilibrium(device=machine, shot=pulse, time=time)
-        fn = fn_format.format(pulse=pulse, time=time, machine=machine)
-        path = path.format(pulse=pulse, time=time, machine=machine)
+        gfile_time = e._time
+        fn = fn_format.format(pulse=pulse, gfile_time=gfile_time, machine=machine)
+        path = path.format(pulse=pulse, gfile_time=gfile_time, machine=machine)
         fn_path = os.path.join(path, fn)
+        mkdir(path, depth=3)
         e.dump_geqdsk(fn_path)
-        logger.info('Saved gfile "{}" to {}'.format(fn, path))
+        if os.path.isfile(fn_path):
+            logger.info('Saved gfile "{}" to {}'.format(fn, path))
+        else:
+            raise IOError('Failed to produce scheduler gfile: {}'.format(fn))
 
     def path_index_to_path(self, i, scheduler=False):
 
@@ -144,12 +152,11 @@ class GFileSelector(object):
         path = os.path.expanduser(path)
         path = re.sub('/\d{5}/', '/{pulse}/', path)
         for paths in ['kinetic_gfile_paths', 'scheduler_gfile_paths']:
-            try:
-                i = [os.path.expanduser(v) for v in self.settings[paths].value].index(path)
+            index_paths = [os.path.expanduser(v) for v in self.settings[paths].value]
+            if path in index_paths:
+                i = index_paths.index(path)
                 return i
-            except IndexError as e:
-                pass
-        raise ValueError
+        raise ValueError('Path {} is not in settings options: {}'.format(path, index_paths))
 
 if __name__ == '__main__':
     pass

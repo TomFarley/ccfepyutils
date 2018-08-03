@@ -38,7 +38,7 @@ class PulseOverivew:
 
         plot.set_axis_labels(xlabel='$t$ [s]', ax=len(signals)-1)
         plot.set_axis_labels(label_fontsize=18, tick_fontsize=14, tight_layout=True, ax='all')
-        plot.set_axis_appearance(grid=True, grid_which='both', ax='all')
+        plot.set_axis_appearance(grid=True, grid_which='both', ax='all', sharex='all')
         plt.setp(plot.ax(0).get_xticklabels(), visible=False)
         plot.fig.subplots_adjust(hspace=0.015)
 
