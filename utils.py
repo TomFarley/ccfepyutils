@@ -204,7 +204,7 @@ def safe_arange(start, stop, step):
     Replacement for np.arange that always includes stop.
     Normally np.arange should not include stop, but due to floating point precision sometimes it does, so output is
     unpredictable"""
-    n = np.abs(stop - start) / step
+    n = np.abs((stop - start) / step)
     if np.isclose(n, np.round(n)):
         # If n only differs from an integer by floating point precision, round it
         n = int(np.round(n))+1

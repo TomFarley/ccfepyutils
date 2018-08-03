@@ -1,5 +1,5 @@
 import configparser
-import os
+import os, time
 import logging
 import pickle
 import re
@@ -438,6 +438,31 @@ def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, r
         if verbose:
             logger.warning('Failed to locate file in paths "{}" with formats: {}'.format(paths, fns))
         return None, None
+
+def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOError,), sleep_invterval=0.5,
+                    error_message='Call to {func} failed after {n_attempts} attempts', verbose=True):
+    """Attempt I/O call multiple times with pauses in between to avoid read/write clashes etc."""
+    if args is None:
+        args = ()
+    if kwargs is None:
+        kwargs = {}
+    attempt = 1
+    success = False
+    while (success is False):
+        try:
+            out = func(*args, **kwargs)
+            success = True
+        except exceptions as e:
+            logger.warning('Attempt {} to call function "{}" failed'.format(attempt, func.__name__))
+            if attempt <= n_attempts:
+                time.sleep(sleep_invterval)
+                attempt += 1
+            else:
+                if error_message is not None:
+                    logger.error(error_message.format(func=func.__name__, n_attempts=n_attempts))
+                raise e
+    return out
+
 
 def gen_hash_id(obj, mode='ripemd160'):
     import hashlib

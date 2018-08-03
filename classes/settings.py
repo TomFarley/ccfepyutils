@@ -267,7 +267,7 @@ class Settings(object):
         self._column_sets = None
         self._column_sets_names = None
         self._hash_id = None
-        self._composite_settings = {}  # dict of composite settings instances that these settings currently belong to
+        self._composite_settings = []  # list of composite settings instances that these settings currently belong to
 
     @classmethod
     def get(cls, application=None, name=None, default_repeat=False):
@@ -304,15 +304,15 @@ class Settings(object):
         return composite_settings
 
     @classmethod
-    def from_dict(cls, application, name, dictionary, silent=False, **kwargs):
-        if silent:
+    def from_dict(cls, application, name, dictionary, _silent=False, **kwargs):
+        if _silent:
             old_log_level = logger.getEffectiveLevel()
             logger.setLevel(logging.WARNING)
         s = Settings.get(application, name)
         s.delete_items(s.items)
         for key, value in dictionary.items():
-            s(key, value, **kwargs)
-        if silent:
+            s(key, value, _silent=_silent, **kwargs)
+        if _silent:
             logger.setLevel(old_log_level)
         return s
 
@@ -371,18 +371,26 @@ class Settings(object):
         return out
 
     @in_state('modifying', 'modified')
-    def __call__(self, item, value=None, create_columns=False, _save=False, **kwargs):
+    def __call__(self, item, value=None, create_columns=False, _save=False, _silent=False, **kwargs):
         """Set value of setting
         :item: name of setting to change
         :value: value to set the item to
         :kwargs: Use to set non-value columns
-        TODO: Handle modifying list items columns
+        TODO: Replace list setting modification with recursive __call__ for sub setting items
         TODO: Enable setting existing item's value to None without '*None*'
         """
-        # Store a list as an enumerated set of items
+        modified = False
+        assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
+        item, category = self.get_item_index(self, item, _raise=False)
+        if (category is not None) and (self[item] == value) and (len(kwargs) == 0):
+            # No changes
+            return
+        # Item doesn't exist or updating value or columns
         if isinstance(value, (list, tuple)):
-            # scalar item being replaced by list item
+            # Create setting item/Update settings value
+            # Store a list as an enumerated set of items
             if item in self.items:
+                # scalar item being replaced by list item
                 order = self._df.loc[item, 'order']
                 kws = {k: self._df.loc[item, k] for k in ['description', 'runtime']}
                 kws.update(kwargs)
@@ -410,38 +418,62 @@ class Settings(object):
                     order += 1
                 self(item_i, v, create_columns=create_columns, **kwargs)
                 self.reorder_item(item_i, order, save=False)
+                for com_setting in self._composite_settings:
+                    # Update composite settings objects referencing these settings
+                    com_setting._df.loc[item_i] = seld.df.loc[item_i]
+                    com_setting._subsetting_mod_times[self] = t_now_str('natural')
+                    com_setting._hash_id = None
             while '{}:{}'.format(item, i+1) in self.items:
                 # If new list is shorter, delete old additional items
                 self.delete_items('{}:{}'.format(item, i+1))
                 i += 1
             return
-        assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
-        df = self._df
-        item_from_name = self.name_to_item(item)
-        if item_from_name is not False:
-            item = item_from_name
-        # new = item not in list(self.items)
-        if item not in list(self.items):  # add item setting type columns appropriately
-            self.add_item(item, value)
-        elif value is not None:  # set value given we already know type
-            col = self.get_value_column(self._df, item)
-            df.loc[item, col] = value
-            df.loc[item, 'value'] = str(value)
-            logger.info('Existing item of {} set: "{}" = {}'.format(repr(self), col, value))
-        for k, v in kwargs.items():
-            # TODO: Deal with setting columns for list item
-            if k in self.columns:
-                df.loc[item, k] = v
-            elif create_columns:
-                df.loc[item, k] = v
-                logger.info('Added column {} to {}'.format(k, repr(self)))
-                # TODO: Made sure state modified appropriately for save when columns changed
-            else:
-                raise IndexError('{} is not a valid Settings column. Possible values: {}'.format(k, self.columns))
-        cols = self.column_sets_names['type']
-        df.loc[:, cols] = df.loc[:, cols].fillna(False)
-        if _save:
-            self.save()
+        else:
+            # Scalar value
+            df = self._df
+            item_from_name = self.name_to_item(item)
+            if item_from_name is not False:
+                item = item_from_name
+            # new = item not in list(self.items)
+            if item not in list(self.items):
+                # add item setting type columns appropriately
+                self.add_item(item, value, _silent=_silent)
+            elif value is not None:
+                # set value given we already know type
+                col = self.get_value_column(self._df, item)
+                df.loc[item, col] = value
+                df.loc[item, 'value'] = str(value)
+                logger.info('Existing item of {} set: "{}" = {}'.format(repr(self), col, value))
+            for k, v in kwargs.items():
+                # TODO: Deal with setting columns for list item
+                if (k in self.columns) and (df.loc[item, k] == v):
+                    # No change
+                    continue
+                elif (k in self.columns):
+                    # Modify existing value
+                    df.loc[item, k] = v
+                    modified = True
+                elif create_columns:
+                    # New column
+                    df.loc[item, k] = v
+                    logger.info('Added column {} to {}'.format(k, repr(self)))
+                    modified = True
+                    # TODO: Made sure state modified appropriately for save when columns changed
+                else:
+                    raise IndexError('{} is not a valid Settings column. Possible values: {}'.format(k, self.columns))
+            cols = self.column_sets_names['type']
+            df.loc[:, cols] = df.loc[:, cols].fillna(False)
+            for com_setting in self._composite_settings:
+                # Update composite settings objects referencing these settings
+                com_setting._df.loc[item] = self._df.loc[item]
+                com_setting._subsetting_mod_times[self] = t_now_str('natural')
+                com_setting._hash_id = None
+        if modified:
+            if _save:
+                self.save()
+        else:
+            # Don't register modification in state
+            self.state.reverse(_ignore_state=True)
 
     @in_state('accessing')
     def __getitem__(self, item):
@@ -492,7 +524,7 @@ class Settings(object):
             yield item
 
     @in_state('modifying', 'modified')
-    def add_item(self, item, value):
+    def add_item(self, item, value, _silent=False):
         assert item not in list(self.items), 'Item {} already exists'.format(item)
         type_to_col = {'bool': 'value_num', 'int': 'value_num', 'float': 'value_num', 'str': 'value_str'}
         if isinstance(value, bool):
@@ -518,7 +550,8 @@ class Settings(object):
         df.loc[item, 'value'] = str(value)
         df.loc[item, 'name'] = item.split(':')[0].replace('_', ' ')  # Default name to item key without underscores
 
-        logger.info('Added new item to settings: {} = {}'.format(item, value))
+        if not _silent:
+            logger.info('Added new item to settings: {} = {}'.format(item, value))
 
     @in_state('modifying', 'modified')
     def add_items(self, items):
@@ -564,7 +597,7 @@ class Settings(object):
             self.state('modified')
 
     @in_state('modifying', 'modified')
-    def delete_items(self, items):
+    def delete_items(self, items, _siltent=False):
         """Remove item(s) from settings"""
         items = make_iterable(items)
         for item in copy(items):
@@ -577,8 +610,10 @@ class Settings(object):
                 if i == 0:
                     raise ValueError('Item "{}" not in {}'.format(item, repr(self)))
                 items.pop(items.index(item))
-        self._df = self._df.drop(items)
-        logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
+        if len(items) > 0:
+            self._df = self._df.drop(items)
+            if not _siltent:
+                logger.info('Deleted items {} from settings: {}'.format(items, repr(self)))
 
     @in_state('modifying', 'modified')
     def clear(self):
@@ -605,6 +640,7 @@ class Settings(object):
                 self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
             except OSError as e:
                 if attempt == 2:
+                    logger.warning('Failed on 2nd attempt')
                     raise e
                     # TODO: restore backup if corrupted?
                 time.sleep(0.5)
@@ -963,11 +999,11 @@ class Settings(object):
             kwargs.pop('value')
             self(item, value, **kwargs)
 
-    def update_from_dict(self, dictionary, **kwargs):
+    def update_from_dict(self, dictionary, _silent=False, **kwargs):
         for item, value in dictionary.items():
             if isinstance(value, Setting):
                 value = value.value
-            self(item, value, **kwargs)
+            self(item, value, _silent=_silent, **kwargs)
         return self
         # logger.debug('Updated {} with values: {}, cols: {}'.format(self, dictionary, kwargs))
 

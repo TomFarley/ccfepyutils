@@ -17,7 +17,8 @@ from ccfepyutils.classes.settings import Settings
 from ccfepyutils.classes.state import State
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 ## TODO: Load from config file
 settings_dir = os.path.expanduser('~/.ccfetools/settings/')
@@ -47,7 +48,11 @@ class CompositeSettings(object):
     def _reset_settings_attributes(self):
         self.state = None
         self.core = None
+        self._settings = None
         self._hash_id = None
+        self._t_created = None
+        self._t_modified = None
+        self._subsetting_mod_times = {}
 
     def build_composite_df(self, include_children=True, exclude_if_col_true=()):
         """Expand settings items into full Settings objects"""
@@ -81,7 +86,12 @@ class CompositeSettings(object):
         assert application not in settings.keys(), 'Application names must be unique: {}'.format(application)
         settings[application] = s
         if self not in s._composite_settings:
-            s._composite_settings[self] = s.log_file(s.name, 'modified')
+            s._composite_settings.append(self)
+        # Record time settings file was last modified and update modification time for this composite settings
+        t = t_now_str('natural')
+        self._t_created = t
+        self._t_modified = t
+        self._subsetting_mod_times[application] = s.log_file(s.name, 'modified')
         df_nest = s._df
         for item in s.items:
             exclude = False
@@ -197,13 +207,14 @@ class CompositeSettings(object):
         item = Settings.name_to_item(self, item)
         settings = self.get_settings_for_item(item)
         out = settings(item, value=value, create_columns=create_columns, _save=_save, **kwargs)
+
         # Update combined settings instance to reflect change
-        if Settings.is_list_item(settings, item):
-            for item0 in Settings.list_item_indices(settings, item):
-                self._df.loc[item0, :] = settings._df.loc[item0, :]
-        else:
-            self._df.loc[item, :] = settings._df.loc[item, :]
-        self._hash_id = None
+        # if Settings.is_list_item(settings, item):
+        #     for item0 in Settings.list_item_indices(settings, item):
+        #         self._df.loc[item0, :] = settings._df.loc[item0, :]
+        # else:
+        #     self._df.loc[item, :] = settings._df.loc[item, :]
+        # self._hash_id = None
         return out
     
     def __contains__(self, item):
@@ -266,11 +277,15 @@ class CompositeSettings(object):
         
     
     def set_value(self, **kwargs):
-        """Set values of multiple existing items using keyword arguments"""
+        """Set values of multiple existing items using keyword arguments. The set kwargs are removed from the dict."""
         updated = False
         for item, value, in copy(kwargs).items():
-            if (item in self.items) and (value is not None):
-                if self[item] != value:
+            if (item in self.items):
+                if (value is None):
+                    # Ignore None values
+                    pass
+                elif self[item] != value:
+                    # Remove item from original dictionary
                     self(item, kwargs.pop(item))
                     updated = True
                     logger.debug('Set {}={} from kwargs'.format(item, value))
@@ -386,4 +401,13 @@ class CompositeSettings(object):
     @property
     def columns(self):
         return list(self._df.columns.values)
+
+    def __del__(self):
+        # Clear up references to self in constituent settings objects
+        for setting in self._settings.values():
+            try:
+                i = setting._composite_settings.index(self)
+                setting._composite_settings.pop(i)
+            except Exception as e:
+                raise e
 
