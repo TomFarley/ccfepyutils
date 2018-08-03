@@ -664,7 +664,7 @@ class Movie(Stack):
                 i_data += 1
             else:
                 # TODO: Increment vid frame number without reading data
-                vid._current_frame += 1
+                vid._skip_frame()
                 # ret, frame, header = vid.read(transforms=self._transforms)
             n += 1
         vid.release()

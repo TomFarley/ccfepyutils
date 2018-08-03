@@ -88,7 +88,7 @@ def hist_equalisation(image, adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8
     image_out = to_original_type(image_out, original_max, original_type)
     return image_out
 
-def gamma_enhance(image, gamma=1.1):
+def gamma_enhance(image, gamma=1.2):
     """Apply gamma enhancement to image"""
     image_out = image ** gamma
     return image_out
