@@ -1,6 +1,7 @@
+.idea/
+tmp/
 .directory
 .profile
-.idea/
 *__pycache__
 *.pyc
 *.log
