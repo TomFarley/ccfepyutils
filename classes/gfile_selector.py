@@ -127,6 +127,9 @@ class GFileSelector(object):
         if path is None:
             path = os.path.expanduser(self.settings['scheduler_gfile_paths'][0])
         e = eq.equilibrium(device=machine, shot=pulse, time=time)
+        if not e._loaded:
+            logger.error('Failed to load equilibrium gfile for pulse {}, time {}'.format(pulse, time))
+            return
         gfile_time = e._time
         if gfile_time != time:
             logger.info('Closest scheduler equilibrium time to {:0.6f} s is {:0.5f} s (diff {:0.3} ms)'.format(
