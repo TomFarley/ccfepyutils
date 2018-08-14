@@ -632,18 +632,18 @@ class Settings(object):
     def load(self):
         assert self.file_exists
         # Make two attempts - sometimes inexplicably fails on first attempt
-        for attempt in [1,2]:
+        for attempt in [1,2,3]:
             try:
                 with Dataset(self.fn_path) as root:
                     # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
                     self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
                 self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
             except OSError as e:
-                if attempt == 2:
-                    logger.warning('Failed on 2nd attempt')
-                    raise e
+                if attempt == 3:
+                    logger.warning('Failed on 3rd attempt')
+                    raise e 
                     # TODO: restore backup if corrupted?
-                time.sleep(0.5)
+                time.sleep(1)
             else:
                 break
         self.log_file.loaded(self.name)
@@ -689,7 +689,7 @@ class Settings(object):
             self._df.to_xarray().to_netcdf(self.fn_path, mode='a', group='df')
 
         except PermissionError as e:
-            logger.exception('Unable to write to file')
+            logger.exception('Unable to write to settings log file')
         except:
             logger.exception('Failed to update Settings File for application "{app}": {path}'.format(
                     app=self.application, path=self.fn_path))
@@ -712,7 +712,9 @@ class Settings(object):
                 app=self.application, name=self.name, path=fn_path))
 
     def create_file(self):
-        assert not self.file_exists, 'Settings file already exists: {}'.format(self.fn_path)
+        if self.file_exists:
+            logger.debug('Settings file already exists: {}'.format(self.fn_path))
+            return
         # meta = {key: self.__dict__[key] for key in ['_t_created', '_t_modified', '_t_accessed']}
         self.log_file.created(self.name)
         meta = {'t_created': self.t_created, 't_modified': self.t_modified, 't_accessed': self.t_accessed}
@@ -1492,4 +1494,4 @@ if __name__ == '__main__':
     # print(s.columns)
     # print(s.items)
     print(s)
-    pass
+    pas

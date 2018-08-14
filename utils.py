@@ -745,6 +745,20 @@ def in_freia_batch_mode():
     batch_mode = os.getenv('LOADL_ACTIVE', None)
     return batch_mode == 'yes'
 
+def ask_input_yes_no(message, suffix=' ([Y]/n)? ', message_format='{message}{suffix}', default_yes=True):
+    """Ask yes/no question to raw input"""
+    question = message_format.format(message=message, suffix=suffix)
+    answer = input(question)
+    accept = ['y', 'yes']
+    if default_yes:
+        accept.append('')
+    if answer.lower() in accept:
+        out = True
+    else:
+        out = False
+    return out
+
+
 def set_windowless_matplotlib_backend():
     try:
         import matplotlib
