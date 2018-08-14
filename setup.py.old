@@ -1,13 +1,14 @@
 from setuptools import setup
 import os
-
+from .. import ccfepyutils
+setup.py
 setup(name='ccfepyutils',
-      version='0.1',
+      version=ccfepyutils.__version__,
       description='General purpose python tools',
       url='git@git.ccfe.ac.uk:tfarley/ccfepyutils.git',
-      author='tfarley',
-      author_email='tfarley@ukaea.uk',
-      # license=ccfepyutils.__license__,
+      author=ccfepyutils.__author__,
+      author_email=ccfepyutils.__email__,
+      license=ccfepyutils.__license__,
       packages=['ccfepyutils', 'ccfepyutils.tests'],
       install_requires=["numpy >= 1.12.0", "scipy", "matplotlib", "pandas", "xarray", "cv2", "natsort", "PyQt5"],
       python_requires='>=3',
