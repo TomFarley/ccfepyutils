@@ -5,8 +5,6 @@ Micelanious general purpose functions
 """
 
 import numbers
-from Tkinter import Tk
-from tkFileDialog import askopenfilename
 from matplotlib.widgets import RectangleSelector
 import numpy as np
 import itertools
@@ -107,6 +105,8 @@ def to_array(obj, silent=True):
     return obj
 
 def getUserFile(type=""):
+    from Tkinter import Tk
+    from tkFileDialog import askopenfilename
     Tk().withdraw()
     filename = askopenfilename(message="Please select "+type+" file:")
     return filename

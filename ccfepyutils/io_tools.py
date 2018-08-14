@@ -4,7 +4,6 @@ import logging
 import pickle
 import re
 from pathlib import Path
-from tkinter import Tk, filedialog as askopenfilename
 
 import numpy as np
 from past.types import basestring
@@ -69,6 +68,7 @@ def rm_files(path, pattern, verbose=True, match=True, ignore_exceptions=()):
 
 
 def getUserFile(type=""):
+    from tkinter import Tk, filedialog as askopenfilename
     Tk().withdraw()
     filename = askopenfilename(message="Please select "+type+" file:")
     return filename
