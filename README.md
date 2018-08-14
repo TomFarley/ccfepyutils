@@ -1,4 +1,6 @@
-# ccfepyutils
+# ccfepyutils 
+[![pipeline status](https://git.ccfe.ac.uk/tfarley/ccfepyutils/badges/master/pipeline.svg)](https://git.ccfe.ac.uk/tfarley/ccfepyutils/commits/python3)
+[![coverage report](https://git.ccfe.ac.uk/tfarley/ccfepyutils/badges/master/coverage.svg)](https://git.ccfe.ac.uk/tfarley/ccfepyutils/commits/python3)
 Central repository for general purpose python classes and functions used at CCFE.
 
 This repository will be updated soon.
