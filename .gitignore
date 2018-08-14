@@ -1,6 +1,10 @@
 .idea/
 tmp/
 .directory
+.coverage
+.eggs/
+.pytest_cache/
+ccfepyutils.egg-info/
 .profile
 *__pycache__
 *.pyc
