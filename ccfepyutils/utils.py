@@ -12,12 +12,12 @@ Utility functions used in the filament tracker program
 from past.builtins import basestring  # pip install future
 from pprint import pprint
 import string
-try:
-    from Tkinter import Tk  # python2 freia
-    from tkFileDialog import askopenfilename
-except:
-    from tkinter import Tk  # python3 freia
-    from tkinter import filedialog as askopenfilename
+# try:
+#     from Tkinter import Tk  # python2 freia
+#     from tkFileDialog import askopenfilename
+# except:
+#     from tkinter import Tk  # python3 freia
+#     from tkinter import filedialog as askopenfilename
 import numpy as np
 import pandas as pd
 from copy import copy
