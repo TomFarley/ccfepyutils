@@ -11,6 +11,8 @@ ccfepyutils.egg-info/
 *.log
 *.iml
 *.xml
+*.xlsx
+~*
 *.so
 *.txt
 *.data

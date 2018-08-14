@@ -44,4 +44,5 @@ logger.addHandler(logging.NullHandler())
 logger.debug('Created logger: {}'.format(logger))
 
 from ccfepyutils.build_dir_struct import check_ccfepyutils_dir_struct
-check_ccfepyutils_dir_struct(template_settings_dirs=os.path.join(this_dir, '../../template_settings/values'))
+template_settings_dirs = os.path.abspath(os.path.join(this_dir, '../../template_settings/values'))
+check_ccfepyutils_dir_struct(template_settings_dirs=template_settings_dirs)

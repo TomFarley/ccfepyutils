@@ -22,6 +22,7 @@ def copy_template_settings(template_settings_dirs=()):
     if isinstance(template_settings_dirs, str):
         template_settings_dirs = (template_settings_dirs,)
     for template_settings_dir in template_settings_dirs:
+        assert os.path.isdir(template_settings_dir), 'Path "" does not exist'.format(template_settings_dir)
         # Loop over folders in template settings dir
         updated = False
         for src_dir in next(os.walk(template_settings_dir))[1]:
