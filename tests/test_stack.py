@@ -16,7 +16,7 @@ from ccfepyutils.classes.data_stack import Stack, Slice
 
 import logging
 from logging.config import fileConfig, dictConfig
-fileConfig('../logging_config.ini')
+# fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.INFO)
 
