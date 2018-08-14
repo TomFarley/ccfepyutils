@@ -43,8 +43,13 @@ logger.addHandler(logging.NullHandler())
 
 logger.debug('Created logger: {}'.format(logger))
 
+# TODO: get base path from config file?
+settings_dir = os.path.expanduser('~/.ccfetools/settings/')
+
 from ccfepyutils.build_dir_struct import check_ccfepyutils_dir_struct
 template_settings_dirs = os.path.abspath(os.path.join(this_dir, '../template_settings/values'))
-logger.info(template_settings_dirs)
-print(template_settings_dirs)
-check_ccfepyutils_dir_struct(template_settings_dirs=template_settings_dirs)
+
+try:
+    check_ccfepyutils_dir_struct(template_settings_dirs=template_settings_dirs)
+except FileNotFoundError as e:
+    settings_dir = os.path.abspath(os.path.join(this_dir, '.ccfetools/settings'))

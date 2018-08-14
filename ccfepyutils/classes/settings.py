@@ -11,6 +11,7 @@ import pandas as pd
 import xarray as xr
 from netCDF4 import Dataset
 
+import ccfepyutils
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.utils import make_iterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str, \
     to_list
@@ -27,8 +28,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-## TODO: Load from config file
-settings_dir = os.path.expanduser('~/.ccfetools/settings/')
+settings_dir = ccfepyutils.settings_dir
 
 # TODO: Fix deepcopy of Setting objects
 class Setting(abc.ABC):
@@ -1365,7 +1365,7 @@ class SettingsLogFile(object):
         """Backup current application settings configurations file to backup folder"""
         self.save()
         # TODO: Load path setttings from config file
-        backup_path = '~/.ccfetools/settings/backups/'
+        backup_path = os.path.join(settings_dir, 'backups')
         backup_fn = 'settings_backup-{app}-{time}.nc'.format(app=self.application, time=t_now_str())
         fn_path = os.path.join(backup_path, backup_fn)
         shutil.copyfile(self.fn_path, fn_path)

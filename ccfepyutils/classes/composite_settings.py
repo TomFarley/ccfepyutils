@@ -10,6 +10,7 @@ import re
 
 from netCDF4 import Dataset
 
+import ccfepyutils
 from ccfepyutils.utils import make_iterable, t_now_str, get_methods_class
 from ccfepyutils.io_tools import mkdir
 from ccfepyutils.netcdf_tools import dict_to_netcdf
@@ -20,8 +21,7 @@ logger = logging.getLogger(__name__)
 # logger.setLevel(logging.DEBUG)
 logger.setLevel(logging.INFO)
 
-## TODO: Load from config file
-settings_dir = os.path.expanduser('~/.ccfetools/settings/')
+settings_dir = ccfepyutils.settings_dir
 
 class CompositeSettings(object):
     instances = {}

@@ -6,19 +6,16 @@ Author: T. Farley
 import logging, os, shutil
 logger = logging.getLogger(__name__)
 
-# TODO: get base path from config file?
-settings_dir = os.path.expanduser('~/.ccfetools/settings/')
-
-def check_ccfepyutils_dir_struct(template_settings_dirs=()):
+def check_ccfepyutils_dir_struct(template_settings_dirs=(), settings_dir='~/.ccfetools/settings/'):
     if not os.path.isdir(settings_dir):
         os.mkdir(settings_dir)
         os.mkdir(settings_dir+'values')
         os.mkdir(settings_dir+'log_files')
         os.mkdir(settings_dir+'hash_records')
         logger.info('Created ~/.ccfetools directory')
-    copy_template_settings(template_settings_dirs=template_settings_dirs)
+    copy_template_settings(template_settings_dirs=template_settings_dirs, settings_dir=settings_dir)
 
-def copy_template_settings(template_settings_dirs=()):
+def copy_template_settings(template_settings_dirs=(), settings_dir='~/.ccfetools/settings/'):
     if isinstance(template_settings_dirs, str):
         template_settings_dirs = (template_settings_dirs,)
     for template_settings_dir in template_settings_dirs:
