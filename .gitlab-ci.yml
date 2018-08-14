@@ -11,6 +11,7 @@ stages:
     - pip3 install --upgrade pip setuptools
     - pip3 install pytest-cov
     - export PYTHONPATH=$PWD
+    - export IN_DOCKER=True
     script:
     - pip3 install .
     - python3 setup.py test

@@ -6,8 +6,9 @@ import pandas as pd
 batch_mode = os.getenv('LOADL_ACTIVE', None)
 job_name = os.getenv('LOADL_JOB_NAME', None)
 execution_mode = os.getenv('LOADL_STEP_TYPE', None)
+in_docker = os.getenv('IN_DOCKER', None)
 import matplotlib
-if batch_mode == 'yes':
+if (batch_mode == 'yes') or (in_docker == 'True'):
     matplotlib.use('Agg')
     print('In batch mode')
 else:
