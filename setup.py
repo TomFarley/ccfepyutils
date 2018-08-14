@@ -1,6 +1,6 @@
 from setuptools import setup
 import os
-import ccfepyutils
+from .. import ccfepyutils
 
 setup(name='ccfepyutils',
       version=ccfepyutils.__version__,

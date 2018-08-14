@@ -12,7 +12,8 @@ import pickle
 import inspect
 import numpy as np
 from collections import defaultdict
-from ccfepyutils.classes.data_stack import Stack, Slice
+
+from ..classes.data_stack import Stack, Slice
 
 import logging
 from logging.config import fileConfig, dictConfig
