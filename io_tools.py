@@ -40,15 +40,32 @@ def get_from_ini(config, setting, value):
     """Return value for setting from config ini file if value is None"""
     raise NotImplementedError
 
-def rm_files(path, pattern, verbose=True):
+def delete_file(fn, path=None, ignore_exceptions=()):
+    """Delete file with error handelling"""
+    if path is not None:
+        fn_path = os.path.join(path, fn)
+    else:
+        fn_path = fn
+    try:
+        os.remove(fn_path)
+    except ignore_exceptions as e:
+        logger.debug(e)
+    except Exception as e:
+        raise e
+
+def rm_files(path, pattern, verbose=True, match=True, ignore_exceptions=()):
     path = str(path)
     if verbose:
-        print('Deleting files with pattern "{}" in path: {}'.format(pattern, path))
+        logger.info('Deleting files with pattern "{}" in path: {}'.format(pattern, path))
     for fn in os.listdir(path):
-        if re.search(pattern, fn):
-            os.remove(os.path.join(path, fn))
+        if match:
+            m = re.search(pattern, fn)
+        else:
+            m = re.search(pattern, fn)
+        if m:
+            delete_file(fn, path, ignore_exceptions=ignore_exceptions)
             if verbose:
-                print('Deleted file: {}'.format(fn))
+                logger.info('Deleted file: {}'.format(fn))
 
 
 def getUserFile(type=""):
