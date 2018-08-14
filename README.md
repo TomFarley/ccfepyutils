@@ -24,6 +24,7 @@ These packages are all available through pip/conda.
 - xarray
 - matplotlib
 - cv2
+- future
 - natsort  (optional, but recommended - may be buggy without)
 - PyQt5  (optional, needed for GUI)
 - plotly  (optional, needed for some plots)

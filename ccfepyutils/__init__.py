@@ -7,6 +7,7 @@ batch_mode = os.getenv('LOADL_ACTIVE', None)
 job_name = os.getenv('LOADL_JOB_NAME', None)
 execution_mode = os.getenv('LOADL_STEP_TYPE', None)
 in_docker = os.getenv('IN_DOCKER', None)
+print('In docker: {}'.format(in_docker))
 import matplotlib
 if (batch_mode == 'yes') or (in_docker == 'True'):
     matplotlib.use('Agg')
