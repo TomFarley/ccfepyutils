@@ -420,7 +420,7 @@ class Settings(object):
                 self.reorder_item(item_i, order, save=False)
                 for com_setting in self._composite_settings:
                     # Update composite settings objects referencing these settings
-                    com_setting._df.loc[item_i] = seld.df.loc[item_i]
+                    com_setting._df.loc[item_i] = self._df.loc[item_i]
                     com_setting._subsetting_mod_times[self] = t_now_str('natural')
                     com_setting._hash_id = None
             while '{}:{}'.format(item, i+1) in self.items:

@@ -875,7 +875,7 @@ class Movie(Stack):
         frames_not_set_enhanced = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
         frames_not_set_raw = frames[~self._meta.loc[frames, 'set'].values]
         if len(frames_not_set_enhanced) > 0:
-            if frames_not_set_raw > 0:
+            if len(frames_not_set_raw) > 0:
                 # Make sure raw data has been loaded for all the relevant fames
                 self.load_movie_data(n=frames_not_set_raw)
             # Make sure enhanced movie starts out with all relevent frames set to raw data
@@ -887,6 +887,7 @@ class Movie(Stack):
         for n in frames:
             if self._meta.loc[n, 'enhanced'] == True:
                 # Already enhanced
+                logger.debug('Frame n={} already enhanced'.format(n))
                 continue
             args.append(self._enhancer.prepare_arguments(enhancement, self, n))
             # Get current state of enhanced frame, so enhancements are applied sequentially
@@ -895,14 +896,16 @@ class Movie(Stack):
             # frame_arrays.append(self._enhanced_movie._data.sel(n=n).values)
 
         # TODO: Make parallel - processes
-        for j, n in enumerate(frames):
-            # Skip frame if already enhanced
+        j = 0
+        for n in frames:
             if self._meta.loc[n, 'enhanced'] == True:
+                # Skip frame if already enhanced
+                logger.debug('Frame n={} already enhanced'.format(n))
                 continue
             # NOTE: movie and n args only needed for fg and bg extraction
-            # self._enhanced_movie(n=n, raw=True, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
             self(n=n, raw=None, load=False)[:] = self._enhancer(enhancement, frame_arrays[j], **args[j])
             # self._meta.loc[n, 'enhanced'] = True
+            j += 1
             pass
 
     def enhance(self, enhancements, frames='all', keep_raw=True, **kwargs):
