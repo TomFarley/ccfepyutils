@@ -19,7 +19,7 @@ pd.set_option('display.max_columns', 50)
 pulse_range = None
 
 ## Files contianing list of pulses to analyse (overloads pulse_range). Intersection of pulse lists will be analysed.
-pulse_lists = ['../../misc/SA1_HDD_midplane_pulse_list-all.txt']
+pulse_lists = ['../../../misc/SA1_HDD_midplane_pulse_list-all.txt']
 # pulse_lists = ['../../misc/SA1_midplane_AKirk2016.txt']
 # pulse_lists = None
 # pulse_lists = np.array([29023, 29003, 28996, 28998, 29026, 29007])
@@ -37,14 +37,16 @@ pulse_lists = ['../../misc/SA1_HDD_midplane_pulse_list-all.txt']
 
 constraints = {
 # "Ip": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
-"Ip": {'range': None, 'mean': [300, 1000], 'percent_fluct': None, 'smoothness': None},
+# "Ip": {'range': None, 'mean': [300, 1000], 'percent_fluct': None, 'smoothness': None},
+"Ip": {'range': None, 'mean': [550, 600], 'percent_fluct': None, 'smoothness': None},
 "ne": {'range': None, 'mean': None, 'percent_fluct': 15000, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
 # "ne": {'range': None, 'mean': [1e16,1e26], 'percent_fluct': None, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
 # "ne": {'range': None, 'mean': [0.8e19, 1.6e19], 'percent_fluct': None, 'smoothness': None}, #'mean': [0.4e19, 2.0e19]
 # "Bphi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
 # "Pnbi": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None, 'missing': True},
-# "Pnbi": {'range': None, 'mean': [1.8, 2.2], 'percent_fluct': None, 'smoothness': None},
-"Pnbi": {'range': None, 'mean': None, 'max': [1.8, 2.5], 'percent_fluct': None, 'smoothness': None},
+# "Pnbi": {'range': None, 'mean': [0.1 , 2.2], 'percent_fluct': None, 'smoothness': None},
+# "Pnbi": {'range': None, 'mean': None, 'max': [1.55, 1.9], 'percent_fluct': None, 'smoothness': None},
+"Pnbi": {'range': None, 'mean': None, 'max': [1.8, 3], 'percent_fluct': None, 'smoothness': None},
 # "zmag": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
 # "q0": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
 # "q95": {'range': None, 'mean': None, 'percent_fluct': None, 'smoothness': None},
@@ -94,11 +96,11 @@ pf.write_summary()
 
 close_all_mpl_plots()
 
-if 'Pnbi' in constraints.keys() and 'ne' in constraints.keys():
+if False and ('Pnbi' in constraints.keys() and 'ne' in constraints.keys()):
         no_nbi_mask = np.isnan(df['Pnbi'].values)
-        plot = Plot(df['ne'][~no_nbi_mask], df['Ip'][~no_nbi_mask], mode='scatter', show=False, xlabel='$n_e$', ylabel='$I_p$', xlim=[1e19, 4e19], label='NBI')
-        plot.plot(df['ne'][no_nbi_mask], df['Ip'][no_nbi_mask], mode='scatter', label='No NBI', show=True, save='pulse_filter_param_space.png')
+        plot = Plot(df['ne'][~no_nbi_mask], df['Ip'][~no_nbi_mask], mode='scatter', show=False, xlabel='$n_e$', ylabel='$I_p$', xlim=[1e19, 4e19], label='NBI', title='Has NBI')
+        plot.plot(df['ne'][no_nbi_mask], df['Ip'][no_nbi_mask], mode='scatter', label='No NBI', show=False, save='pulse_filter_param_space.png', title='No NBI')
 
-PulseOverivew().plot(pulses=list(df.index), signals=['ne', 'Ip'], show=True)
+PulseOverivew().plot(pulses=list(df['pulse']), signals=['ne', 'Ip', 'Pnbi', 'q0'], show=True)
 
 pass

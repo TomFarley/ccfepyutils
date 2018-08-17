@@ -35,7 +35,7 @@ from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 from ccfepyutils.data_processing import pdf
-from ccfepyutils.mpl_tools import set_cycler, colormap_names
+from ccfepyutils.mpl_tools import set_cycler, colormap_names, repeat_color
 try:
     string_types = (basestring, unicode)  # python2
 except Exception as e:
@@ -55,7 +55,7 @@ class Plot(object):
     # Plotting modes compatible with different input data dimensions. The first mode for each dimension is the default
     dim_modes = dict((((0, 0, None), ('scatter',)),  # single point
                       ((1, None, None), ('line', 'scatter', 'pdf')),
-                      ((1, 1 , None), ('line', 'scatter')),
+                      ((1, 1, None), ('line', 'scatter', 'errorbar')),
                       # ((1, 1 , 1), ('scatter3D', 'line3D', 'segline')),
                       ((2, 2 , 2), ('contourf', 'surface3D',)),
                       ((1, 1, 2), ('contourf', 'contour', 'image', 'surface_3d')),
@@ -75,8 +75,10 @@ class Plot(object):
     other_args = ['show', 'xlabel', 'ylabel', 'legend', 'ax']
     args = plot_args + scatter_args + other_args # List of all possible args for use with external kwargs
 
+    defaults = {'label_fontsize': 18, 'lengend_fontsize': 16}
+
     def __init__(self, x=None, y=None, z=None, num=None, axes=(1, 1), default_ax=(0, 0), ax=None, mode=None,
-                 legend='each axis', save=False, show=False, fig_args={}, **kwargs):
+                 legend='each axis', fig_args={}, **kwargs):
         """
 
         :param x:
@@ -228,12 +230,19 @@ class Plot(object):
         ax_names = self._axes_names
         if isinstance(ax, numbers.Integral):
             shape = self._ax_shape
+            if ax < 0:
+                ax = np.prod(shape) + ax
             assert ax <= np.prod(shape), 'axes {} is outside of axes shape {}'.format(ax, shape)
             index = (ax // shape[1], ax % shape[1])
         elif isinstance(ax, string_types):
             assert ax in ax_names, 'Axis name "{}" not recognised. Options: {}'.format(ax, ax_names)
             index = ax_names[ax]
         elif isinstance(ax, (tuple, list)):
+            # Handle negative axis indices
+            if ax[0] < 0:
+                ax[0] = self._ax_shape[0] + ax[0]
+            if ax[1] < 0:
+                ax[1] = self._ax_shape[1] + ax[1]
             assert ax[0] < self._ax_shape[0], 'Axis index "{}" outside of axis_shape "{}"'.format(ax, self._ax_shape)
             assert ax[1] < self._ax_shape[1]
             index = ax
@@ -332,10 +341,14 @@ class Plot(object):
             self.call_if_args(ax, kwargs)
             return  # No data to plot
 
-        if 'color' in kwargs and isinstance(kwargs['color'], (tuple, list)) and kwargs['color'][0] in colormap_names:
-            # Set color cycler
-            self.set_axis_cycler([{'color': kwargs['color']}], ax=ax)
-            kwargs.pop('color')
+        if 'color' in kwargs:
+            color = kwargs['color']
+            if isinstance(color, (tuple, list)) and color[0] in colormap_names:
+                # Set color cycler
+                self.set_axis_cycler([{'color': kwargs['color']}], ax=ax)
+                kwargs.pop('color')
+            elif isinstance(color, string_types) and ('repeat' in color):
+                kwargs['color'] = repeat_color(color, ax=ax)
         artists = {}
         if smooth is not None:
             raise NotImplementedError
@@ -353,6 +366,9 @@ class Plot(object):
         elif mode == 'scatter':
             kws = args_for((scatter_1d, plt.scatter), kwargs, include=self.scatter_args, remove=True)
             scatter_1d(x, y, ax, **kws)
+        elif mode == 'errorbar':
+            kws = args_for((error_bar_1d, plt.errorbar), kwargs, include=self.scatter_args, remove=True)
+            error_bar_1d(x, y, ax, **kws)
         elif mode == 'contourf':
             kws = args_for((contourf, plt.contourf), kwargs, remove=True)
             artists = contourf(x, y, z, ax, **kws)
@@ -375,6 +391,10 @@ class Plot(object):
             kws.update(none_filter({}, fit_kwargs))
             f = Fitter(x, y).plot(ax=ax, data=False, show=False, **kws)
 
+        if 'point_annotations' in kwargs:
+            kws = args_for((annotate_points, plt.annotate), kwargs)
+            annotate_points(ax, x, y, **kws)
+
         self.call_if_args(ax, kwargs)
         if ax not in self.ax_artists:
             self.ax_artists[ax] = {}
@@ -382,9 +402,10 @@ class Plot(object):
         return self
 
     def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, label_fontsize=None, tick_fontsize=None,
-                        ax=None, tight_layout=False):
+                        title=None, title_fontsize=None, ax=None, tight_layout=False):
         assert isinstance(xlabel, (string_types, type(None))), '{}'.format(xlabel)
         assert isinstance(ylabel, (string_types, type(None))), '{}'.format(xlabel)
+        label_fontsize_dflt = self.defaults['lengend_fontsize']
         if ax == 'all':
             for ax in self.axes:
                 self.set_axis_labels(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, label_fontsize=label_fontsize,
@@ -392,16 +413,21 @@ class Plot(object):
             return
         ax = self.ax(ax)
         if (xlabel is not None) or (label_fontsize is not None):
+            label_fontsize = none_filter(label_fontsize_dflt, label_fontsize)
             ax.set_xlabel(xlabel if xlabel is not None else ax.get_xlabel(), fontsize=label_fontsize)
         if (ylabel is not None) or (label_fontsize is not None):
+            label_fontsize = none_filter(label_fontsize_dflt, label_fontsize)
             ax.set_ylabel(ylabel if ylabel is not None else ax.get_ylabel(), fontsize=label_fontsize)
         if (zlabel is not None) or (label_fontsize is not None) and isinstance(ax, mpl_toolkits.mplot3d.axes3d.Axes3D):
+            label_fontsize = none_filter(label_fontsize_dflt, label_fontsize)
             ax.set_zlabel(zlabel if zlabel is not None else ax.get_zlabel(), fontsize=label_fontsize)
         if tick_fontsize is not None:
             if not isinstance(tick_fontsize, (tuple, list)):
                 tick_fontsize = (tick_fontsize, tick_fontsize)
             ax.tick_params(axis='both', which='major', labelsize=tick_fontsize[0])
             ax.tick_params(axis='both', which='minor', labelsize=tick_fontsize[1])
+        if title is not None:
+            ax.figure.suptitle(title, fontsize=title_fontsize)
         if tight_layout:
             self.fig.tight_layout()
 
@@ -452,7 +478,7 @@ class Plot(object):
     def legend(self, ax=None, legend=True, legend_fontsize=14):
         """Finalise legends of each axes"""
         ax = none_filter(self._legend, ax)
-        if ax == 'each axis':
+        if ax in ('each axis', 'all'):
             axes = self.axes.flatten()
         else:
             axes = [self.ax(ax)]
@@ -587,6 +613,53 @@ def plot_pdf(x, ax, label=None, nbins=None, bin_edges=None, min_data_per_bin=10,
 
 def scatter_1d(x, y, ax, **kwargs):
     ax.scatter(x, y, **kwargs)
+
+def error_bar_1d(x, y, ax, xerr=None, yerr=None, errorbar_kwargs=None, **kwargs):
+    kws = {'fmt': 'o'}
+    kws.update(kwargs)
+    if errorbar_kwargs is not None:
+        kws.update(errorbar_kwargs)
+    if xerr is not None:
+        if is_scalar(x) and len(xerr) == 2:
+            xerr = np.expand_dims(xerr, 0)
+    kws.update({'xerr': xerr})
+    if yerr is not None:
+        if is_scalar(y) and len(yerr) == 2:
+            yerr = np.expand_dims(yerr, 0)
+        kws.update({'yerr': yerr})
+    ax.errorbar(x, y, **kws)
+
+def annotate_points(ax, x, y, point_annotations=None, annotate_points_kwargs=None,
+                    point_annotation_offset=(0.01, 0.01), point_annotation_offset_mode='ax', **kwargs):
+    # TODO: Add z parameter for 3d plots
+    if point_annotations is None:
+        return
+    x, y, point_annotations = to_array(x), to_array(y), make_iterable(point_annotations)
+    if isinstance(point_annotations, str) and (len(y) > 1):
+        point_annotations = [point_annotations.format(x=xi, y=yi) for (xi, yi) in zip(x, y)]
+
+    if x is None:
+        raise NotImplementedError
+
+    if annotate_points_kwargs is not None:
+        kwargs.update(annotate_points_kwargs)
+
+    point_annotation_offset = np.array(point_annotation_offset)
+
+    if point_annotation_offset_mode == 'data':
+        pass
+    elif point_annotation_offset_mode == 'data_range':
+        point_annotation_offset[0] = point_annotation_offset[0] * (np.max(x)-np.min(x))
+        point_annotation_offset[1] = point_annotation_offset[1] * (np.max(y)-np.min(y))
+    elif point_annotation_offset_mode == 'ax':
+        point_annotation_offset[0] = point_annotation_offset[0] * (np.max(ax.get_xlim()) - np.min(ax.get_xlim()))
+        point_annotation_offset[1] = point_annotation_offset[1] * (np.max(ax.get_ylim()) - np.min(ax.get_ylim()))
+    else:
+        raise ValueError('point_annotation_offset_mode "{}" not recognised'.format(point_annotation_offset_mode))
+    x = x + point_annotation_offset[0]
+    y = y + point_annotation_offset[1]
+    for xi, yi, label in zip(x, y, point_annotations):
+        ax.annotate(label, (xi, yi), **kwargs)
 
 def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viridis', transpose=False, **kwargs):
     """ """

@@ -5,14 +5,14 @@ except ImportError:
 import logging, os
 import pandas as pd
 from ccfepyutils.io_tools import pickle_dump, pickle_load, mkdir
-from ccfepyutils.utils import make_iterable
+from ccfepyutils.utils import make_iterable, sub_range
 logger = logging.getLogger(__name__)
 
 signal_abbreviations = {
     'Ip': "amc_plasma current",
-    'ne': 'ayc_ne_core',  # Core Thomson scattering data - (peak?) Electron Density
-    'ne2': "ESM_NE_BAR",  # (electron line averaged density) - Gives better plots - same as session logs
-    'ne3': "ane_density",  # Gives lower density - what is this? - CO2 Interferometry
+    'ne': "ESM_NE_BAR",  # (electron line averaged density) - Gives better plots - same as session logs
+    'ne2': 'ayc_ne_core',  # Core Thomson scattering data - (peak?) Electron Density
+    'ne3': "ane_density",  # Gives lower density - CO2 Interferometry, similar to session logs
     'Pnbi': "anb_tot_sum_power",  # Total NBI power
     'Pohm': "esm_pphi",  # Ohmic heating power (noisy due to derivatives!)
     'Ploss': "esm_p_loss",  # Total power crossing the separatrix
@@ -250,7 +250,7 @@ signal_sets = {
         "arp_rp radius"]   # (radial position of the reciprocating probe)
     }
 
-def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, load_saved=True, *args, **kwargs):
+def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, load_saved=True, twin=None, *args, **kwargs):
     """Get data with IDL_bridge getdata if available, else load from pickle store."""
     pulse = int(pulse)
     if signal in signal_abbreviations:
@@ -288,6 +288,11 @@ def get_data(signal, pulse, save_path='~/data/MAST_signals/', save=True, load_sa
         except ImportError as e:
             logger.error(e)
     if success:
+        if twin is not None:
+            # Return subwidnow in time
+            mask = sub_range(d['time'], twin, indices=True)
+            d['time'] = d['time'][mask]
+            d['data'] = d['data'][mask]
         return d
     else:
         return d

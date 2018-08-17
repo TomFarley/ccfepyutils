@@ -149,7 +149,7 @@ class PulseFilter(object):  # collections.MutableMapping
         # print(data.keys())
 
         out = [(key, list) for key, list in self.summary.items()]
-        out = [('Pulse', self.results['pass'])] + out
+        out = [('pulse', self.results['pass'])] + out
         df = pd.DataFrame.from_dict(dict(out))
         if stdout:
             print(df)
@@ -175,7 +175,7 @@ class PulseFilter(object):  # collections.MutableMapping
 
 
         out = [(key, list) for key, list in self.summary.items()]
-        out = [('Pulse', self.results['pass'])] + out
+        out = [('pulse', self.results['pass'])] + out
         df = pd.DataFrame.from_items(out)
         if self.name is not None:
             df.to_csv(path + 'pulse-filter_data-summary_{}.csv'.format(self.name))

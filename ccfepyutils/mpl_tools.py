@@ -455,14 +455,20 @@ def color_shade(color, percentage):
     c = np.clip(np.array(c)+percentage/100., 0, 1)
     return c
 
-def repeat_color(string, ax=None):
+def get_previous_line_color(ax=None):
+    """Return color of previous line plotted to axis"""
     if ax is None:
         ax = plt.gca()
     if len(ax.lines) == 0:
-        logger.warning('Cant repeat line color - no previous lines on axis')
+        logger.warning("Can't repeat line color - no previous lines on axis")
         return 'k'
-
     color = ax.lines[-1].get_color()
+    return color
+
+def repeat_color(string, ax=None):
+    if ax is None:
+        ax = plt.gca()
+    color = get_previous_line_color(ax)
     if '+' in string or '-' in string:
         percentage = float(string.split('+')[-1].split('-')[-1])
         c = color_shade(color, percentage)
