@@ -7,6 +7,7 @@ import logging, os, shutil
 logger = logging.getLogger(__name__)
 
 def check_ccfepyutils_dir_struct(template_settings_dirs=(), settings_dir='~/.ccfetools/settings/'):
+    settings_dir = os.path.expanduser(settings_dir)
     if not os.path.isdir(settings_dir):
         os.mkdir(settings_dir)
         os.mkdir(settings_dir+'values')
