@@ -231,7 +231,7 @@ class Plot(object):
         if isinstance(ax, numbers.Integral):
             shape = self._ax_shape
             if ax < 0:
-                ax = np.prod(shape) + 1 + ax
+                ax = np.prod(shape) + ax
             assert ax <= np.prod(shape), 'axes {} is outside of axes shape {}'.format(ax, shape)
             index = (ax // shape[1], ax % shape[1])
         elif isinstance(ax, string_types):
@@ -240,9 +240,9 @@ class Plot(object):
         elif isinstance(ax, (tuple, list)):
             # Handle negative axis indices
             if ax[0] < 0:
-                ax = self._ax_shape[0] + 1 + ax[0]
+                ax[0] = self._ax_shape[0] + ax[0]
             if ax[1] < 0:
-                ax = self._ax_shape[1] + 1 + ax[1]
+                ax[1] = self._ax_shape[1] + ax[1]
             assert ax[0] < self._ax_shape[0], 'Axis index "{}" outside of axis_shape "{}"'.format(ax, self._ax_shape)
             assert ax[1] < self._ax_shape[1]
             index = ax
@@ -402,7 +402,7 @@ class Plot(object):
         return self
 
     def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, label_fontsize=None, tick_fontsize=None,
-                        ax=None, tight_layout=False):
+                        title=None, title_fontsize=None, ax=None, tight_layout=False):
         assert isinstance(xlabel, (string_types, type(None))), '{}'.format(xlabel)
         assert isinstance(ylabel, (string_types, type(None))), '{}'.format(xlabel)
         label_fontsize_dflt = self.defaults['lengend_fontsize']
@@ -426,6 +426,8 @@ class Plot(object):
                 tick_fontsize = (tick_fontsize, tick_fontsize)
             ax.tick_params(axis='both', which='major', labelsize=tick_fontsize[0])
             ax.tick_params(axis='both', which='minor', labelsize=tick_fontsize[1])
+        if title is not None:
+            ax.figure.suptitle(title, fontsize=title_fontsize)
         if tight_layout:
             self.fig.tight_layout()
 
@@ -476,7 +478,7 @@ class Plot(object):
     def legend(self, ax=None, legend=True, legend_fontsize=14):
         """Finalise legends of each axes"""
         ax = none_filter(self._legend, ax)
-        if ax == 'each axis':
+        if ax in ('each axis', 'all'):
             axes = self.axes.flatten()
         else:
             axes = [self.ax(ax)]
