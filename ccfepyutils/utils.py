@@ -48,12 +48,13 @@ def nsigfig(values, sig_figs=1):
     out = vfunc(arr, dps)
     return out if safe_len(values) > 1 else np.float64(out)
 
-def sub_range(array, limits, indices=False):
+def sub_range(array, limits, indices=False, include_limits=True):
     """Return subset of array that falls within limits
 
     Arguments:
     array - data to be filtered
     limits - array [min, max] to filter array with
+    include_limits - whether to include min, max limits in returned range
     """
     if limits is None:
         if not indices:
@@ -61,7 +62,10 @@ def sub_range(array, limits, indices=False):
         else:
             return np.where(array == array)
     assert len(limits) == 2
-    ind = np.where(np.logical_and(array >= limits[0], array <= limits[1]))[0]
+    if include_limits:
+        ind = np.where(np.logical_and(array >= limits[0], array <= limits[1]))[0]
+    else:
+        ind = np.where(np.logical_and(array > limits[0], array < limits[1]))[0]
     if not indices:
         return array[ind]
     else:
