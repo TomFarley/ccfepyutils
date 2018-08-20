@@ -243,7 +243,8 @@ class Settings(object):
         # TODO: Fix deepcopy of Settings objects
         self._reset_settings_attributes()
         self.call_table = {'modifying': {'enter': [self._block_protected]},
-                           'modified': {'accessing': [self.save]}}
+                           # 'modified': {'accessing': [self.save]}
+                           }
         self.state = State(self, self.state_table, 'init', call_table=self.call_table)
         self.application = application  # property sets logfile
         self.name = name
