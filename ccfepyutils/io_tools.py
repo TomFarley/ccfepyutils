@@ -40,7 +40,10 @@ def get_from_ini(config, setting, value):
     raise NotImplementedError
 
 def delete_file(fn, path=None, ignore_exceptions=()):
-    """Delete file with error handelling"""
+    """Delete file with error handelling
+    :param fn: filename
+    :param path: optional path to prepend to filename
+    :ignore_exceptions: Tuple of exceptions to pass over (but log) if raised eg (FileNotFoundError,) """
     if path is not None:
         fn_path = os.path.join(path, fn)
     else:

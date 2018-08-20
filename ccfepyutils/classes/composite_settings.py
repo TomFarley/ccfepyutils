@@ -43,6 +43,7 @@ class CompositeSettings(object):
             # Make sure core settings are in whitelist else CompositeSettings will be empty
             self._whitelist = [application] + self._whitelist
         self.core = Settings.get(application, name)
+        assert len(self.core._df) > 0, 'Empty core parent settings for {}, {}'.format(application, name)
         self.build_composite_df(include_children=include_children, exclude_if_col_true=exclude_if_col_true)
 
     def _reset_settings_attributes(self):
