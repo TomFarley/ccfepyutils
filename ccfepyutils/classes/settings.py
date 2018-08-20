@@ -15,7 +15,7 @@ import ccfepyutils
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.utils import make_iterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str, \
     to_list
-from ccfepyutils.io_tools import mkdir, filter_files_in_dir
+from ccfepyutils.io_tools import mkdir, filter_files_in_dir, delete_file
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
 
 try:
@@ -632,14 +632,15 @@ class Settings(object):
     def load(self):
         assert self.file_exists
         # Make two attempts - sometimes inexplicably fails on first attempt
-        for attempt in [1,2,3]:
+        n_attempts = 3
+        for attempt in range(n_attempts):
             try:
                 with Dataset(self.fn_path) as root:
                     # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
                     self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
                 self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
             except OSError as e:
-                if attempt == 3:
+                if attempt == n_attempts-1:
                     logger.warning('Failed on 3rd attempt')
                     raise e 
                     # TODO: restore backup if corrupted?
@@ -680,23 +681,41 @@ class Settings(object):
             self.state.reverse()
             return 
         meta = {'t_created': self.t_created, 't_modified': self.t_modified, 't_accessed': self.t_accessed}
-        try:
-            #TODO: delete/overwrite previous values? Use with?
-            os.remove(self.fn_path)
-            with Dataset(self.fn_path, "w", format="NETCDF4") as root:
-                dict_to_netcdf(root, 'meta', meta)
-                dict_to_netcdf(root, 'column_sets_names', self.column_sets_names)
-            self._df.to_xarray().to_netcdf(self.fn_path, mode='a', group='df')
+        n_attempts = 3
+        for attempt in range(n_attempts):
+            try:
+                #TODO: delete/overwrite previous values? Use with?
+                delete_file(self.fn_path, ignore_exceptions=())
+                with Dataset(self.fn_path, "w", format="NETCDF4") as root:
+                    dict_to_netcdf(root, 'meta', meta)
+                    dict_to_netcdf(root, 'column_sets_names', self.column_sets_names)
+                self._df.to_xarray().to_netcdf(self.fn_path, mode='a', group='df')
 
-        except PermissionError as e:
-            logger.exception('Unable to write to settings log file')
-        except:
-            logger.exception('Failed to update Settings File for application "{app}": {path}'.format(
-                    app=self.application, path=self.fn_path))
-        else:
-            logger.info('Updated/saved SettingsFile values for application "{app}({name})": {path}'.format(
-                    app=self.application, name=self.name, path=self.fn_path))
-            self.log_file.updated(self.name)
+            except PermissionError as e:
+                logger.exception('Unable to write to settings log file "{app}({name})": {path}, {e}'.format(
+                    app=self.application, name=self.name, path=self.fn_path, e=e))
+                if attempt == n_attempts-1:
+                    raise e
+            except RuntimeError as e:
+                logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
+                    app=self.application, name=self.name, path=self.fn_path, e=e))
+                if attempt == n_attempts-1:
+                    raise e
+            except OSError as e:
+                logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
+                    app=self.application, name=self.name, path=self.fn_path, e=e))
+                if attempt == n_attempts - 1:
+                    raise e
+            except Exception as e:
+                logger.exception('Unanticipated error updating SettingsFile "{app}({name})": {path}, {e}'.format(
+                    app=self.application, name=self.name, path=self.fn_path, e=e))
+                raise e
+            else:
+                logger.info('Updated/saved SettingsFile values for application "{app}({name})": {path}'.format(
+                        app=self.application, name=self.name, path=self.fn_path))
+                self.log_file.updated(self.name)
+                break
+            time.sleep(3)
 
 
     def backup(self):
@@ -1267,6 +1286,7 @@ class SettingsLogFile(object):
 
     def __call__(self, name, cols=None):
         """Get log information for setting set, specifying columns"""
+        assert name in self._df.index, 'Name {} not in index for {}'.format(name, self.application)
         if cols is None:
             return self[name]
         else:
@@ -1310,11 +1330,12 @@ class SettingsLogFile(object):
         if not self.file_exists:
             self.init()
             return False
-        for attempt in [0,1]:
+        n_attempts = 3
+        for attempt in range(n_attempts):
             try:
                 self._df = xr.open_dataset(self.fn_path).to_dataframe()
             except Exception as e:
-                if attempt == 1:
+                if attempt == (n_attempts-1):
                     logger.error('Failed to open settingslogfile: {}'.format(self.fn_path))
                     # TODO: copy backedup file?
                     raise e
