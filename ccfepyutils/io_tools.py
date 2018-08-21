@@ -248,6 +248,11 @@ def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
                 logger.info('Directory "' + d + '" already exists')
     return 0
 
+def sub_dirs(path):
+    """Return subdirectories contained within top level directory/path"""
+    out = [p[0] for p in os.walk(path)]
+    out.pop(out.index(path))
+    return out
 
 def test_pickle(obj):
     """Test if an object can successfully be pickled and loaded again
