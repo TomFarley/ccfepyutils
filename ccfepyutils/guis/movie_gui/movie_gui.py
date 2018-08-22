@@ -40,6 +40,8 @@ from ccfepyutils.image import image_enhancement_functions
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+icon_dir = os.path.abspath('../icons/')
+
 class MovieGUI(QtWidgets.QMainWindow):
 
     def __init__(self):
@@ -180,19 +182,19 @@ class MovieGUI(QtWidgets.QMainWindow):
         sldr_frame.setSingleStep(1)
 
         # Frame toolbar buttons
-        toggle_annotate_action = QtWidgets.QAction(QtGui.QIcon('../../../../../repos/elzar/icons/appbar.edit.png'),
+        toggle_annotate_action = QtWidgets.QAction(QtGui.QIcon(os.path.join(icon_dir, 'appbar.edit.png')),
                                              'Toggle frame annotation', self)
         toggle_annotate_action.setShortcut('Ctrl+a')
         toggle_annotate_action.triggered.connect(self.toggle_annotate_frame)
         self.movie_widget.mpl_toolbar.addAction(toggle_annotate_action)
 
-        save_image_action = QtWidgets.QAction(QtGui.QIcon('../../../../../repos/elzar/icons/appbar.save.png'),
+        save_image_action = QtWidgets.QAction(QtGui.QIcon(os.path.join(icon_dir, 'appbar.save.png')),
                                             'Save current frame image (preserves resolution, no annotations)', self)
         save_image_action.setShortcut('Ctrl+s')
         save_image_action.triggered.connect(self.save_frame_image)
         self.movie_widget.mpl_toolbar.addAction(save_image_action)
 
-        save_figure_action = QtWidgets.QAction(QtGui.QIcon('../../../../../repos/elzar/icons/appbar.camera.png'),
+        save_figure_action = QtWidgets.QAction(QtGui.QIcon(os.path.join(icon_dir+'appbar.camera.png')),
                                 'Save current frame figure (includes annotations, does not preserve resolution)', self)
         save_figure_action.setShortcut('Ctrl+f')
         save_figure_action.triggered.connect(self.save_figure)
@@ -326,13 +328,20 @@ class MovieGUI(QtWidgets.QMainWindow):
         return _update_enhencement
 
     def play_pause(self):
+        icon = QtGui.QIcon()
         if not self.playing:
             # start playing
             self.play_timer.start()
+            icon.addPixmap(QtGui.QPixmap(os.path.join(icon_dir, 'appbar.control.pause.png')),
+                           QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.movie_widget.btn_play.setIcon(icon)
             #TODO: toggle icon, disable buttons
         else:
             # pause
             self.play_timer.stop()
+            icon.addPixmap(QtGui.QPixmap(os.path.join(icon_dir, 'appbar.control.play.png')),
+                           QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.movie_widget.btn_play.setIcon(icon)
         self.playing = not self.playing
 
     def set_play_speed(self):
