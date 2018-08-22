@@ -59,8 +59,12 @@ class GFileSelector(object):
         time = float(time)
         allow_scheduler_efit = none_filter(s['allow_scheduler_efit'].value, allow_scheduler_efit)
         dt_switch_gfile = none_filter(s['dt_switch_gfile'].value, dt_switch_gfile)
+        if pulse not in self.store['n']:
+            # If available files for pulse haven't been loaded, load them
+            self.store_gfile_info(pulse, machine=machine, scheduler=allow_scheduler_efit)
         if allow_scheduler_efit and ((pulse not in self.store['n']) or
                                      (np.min(np.abs(store.loc[pulse, 't']-time)) > dt_switch_gfile)):
+            # If gfile hasn't previously been saved and scheduler is allowed save the closest gfile for requested time
             self.save_scheduler_gfile(pulse, time, machine)
             self.store_gfile_info(pulse, machine=machine, scheduler=allow_scheduler_efit)
 
