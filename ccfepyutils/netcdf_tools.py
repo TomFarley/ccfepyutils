@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import logging
 import numbers
+import time
 
 import numpy as np
 import netCDF4
@@ -31,8 +32,20 @@ def add_netcdf_standalone_variable(group, name, value):
     if name not in group.variables:
         format_nc = get_netcdf_format(value)
         var = group.createVariable(name, format_nc, name)
-    var = group.variables[name]
-    var[:] = value
+    n_attempts = 3
+    for attempt in np.arange(n_attempts)+1:
+        try:
+            var = group.variables[name]
+            var[:] = value
+        except RuntimeError as e:
+            if attempt == n_attempts:
+                raise e
+        except Exception as e:
+            if attempt == n_attempts:
+                raise e
+        else:
+            break
+        time.sleep(3)
 
 def get_netcdf_atrribute(group, name):
     """Set NetCDF group attirbute safely replacing None values with np.nan"""
@@ -47,9 +60,9 @@ def get_netcdf_variable(group, name):
 def dict_to_netcdf(root, name, dictionary):
     """Save values in dict to attributes in group"""
     assert isinstance(dictionary, dict)
-    grp = root.createGroup(name)
+    group = root.createGroup(name)
     for key, value in dictionary.items():
-        add_netcdf_standalone_variable(grp, key, value)
+        add_netcdf_standalone_variable(group, key, value)
         # set_netcdf_atrribute(grp, key, value)
 
 def netcdf_to_dict(group, name):

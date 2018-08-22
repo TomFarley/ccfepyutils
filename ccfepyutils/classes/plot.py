@@ -566,7 +566,10 @@ class Plot(object):
         if legend:
             self.legend()
         if tight_layout:
-            plt.tight_layout()
+            try:
+                plt.tight_layout()
+            except ValueError as e:
+                logger.exception('tight_layout failed with strange mpl error!')
         plt.show()
 
     def to_plotly(self):
