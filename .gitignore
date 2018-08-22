@@ -1,11 +1,14 @@
 .idea/
 tmp/
-.directory
 .coverage
 .eggs/
 .pytest_cache/
 ccfepyutils.egg-info/
 .profile
+*.png
+!ccfepyutils/guis/icons/*
+*.directory
+*_tmp
 *__pycache__
 *.pyc
 *.log
@@ -18,7 +21,6 @@ ccfepyutils.egg-info/
 *.data
 *.prof
 *.lprof
-*.png
 *.tmp
 *.p
 *.csv

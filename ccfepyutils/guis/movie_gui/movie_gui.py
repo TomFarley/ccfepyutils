@@ -194,7 +194,7 @@ class MovieGUI(QtWidgets.QMainWindow):
         save_image_action.triggered.connect(self.save_frame_image)
         self.movie_widget.mpl_toolbar.addAction(save_image_action)
 
-        save_figure_action = QtWidgets.QAction(QtGui.QIcon(os.path.join(icon_dir+'appbar.camera.png')),
+        save_figure_action = QtWidgets.QAction(QtGui.QIcon(os.path.join(icon_dir, 'appbar.camera.png')),
                                 'Save current frame figure (includes annotations, does not preserve resolution)', self)
         save_figure_action.setShortcut('Ctrl+f')
         save_figure_action.triggered.connect(self.save_figure)
