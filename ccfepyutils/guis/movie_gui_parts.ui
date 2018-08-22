@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>766</width>
+    <height>519</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <widget class="QGroupBox" name="gb_enhancements">
+   <property name="geometry">
+    <rect>
+     <x>80</x>
+     <y>270</y>
+     <width>589</width>
+     <height>171</height>
+    </rect>
+   </property>
+   <property name="minimumSize">
+    <size>
+     <width>0</width>
+     <height>100</height>
+    </size>
+   </property>
+   <property name="title">
+    <string>Image enhancements:</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_8">
+    <item row="0" column="0" rowspan="2">
+     <widget class="QFrame" name="frm_enhancements">
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <widget class="QWidget" name="gridLayoutWidget">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>0</y>
+         <width>561</width>
+         <height>151</height>
+        </rect>
+       </property>
+       <layout class="QGridLayout" name="gridLayout">
+        <item row="2" column="0" colspan="2">
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QCheckBox" name="checkBox">
+            <property name="text">
+             <string>Apply enhancements</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_2">
+            <property name="text">
+             <string>Apply to all frames</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="5" column="0">
+         <layout class="QHBoxLayout" name="bg_sub_hl_9">
+          <item>
+           <widget class="QCheckBox" name="bgsub_cb_7">
+            <property name="text">
+             <string>Reduce noise</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="bgsub_tb_7">
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="5" column="1">
+         <layout class="QHBoxLayout" name="bg_sub_hl_8">
+          <item>
+           <widget class="QCheckBox" name="bgsub_cb_6">
+            <property name="text">
+             <string>Gamma enhance</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="bgsub_tb_6">
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="6" column="0">
+         <layout class="QHBoxLayout" name="fg_extract_hl_6">
+          <item>
+           <widget class="QCheckBox" name="fg_extract_cb_6">
+            <property name="text">
+             <string>Sharpen</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="fg_extract_tb_6">
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="4" column="0">
+         <layout class="QHBoxLayout" name="fg_extract_hl_5">
+          <item>
+           <widget class="QCheckBox" name="fg_extract_cb_5">
+            <property name="text">
+             <string>Extract foreground</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="fg_extract_tb_5">
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="4" column="1">
+         <layout class="QHBoxLayout" name="bg_sub_hl_10">
+          <item>
+           <widget class="QCheckBox" name="bg_extract_cb_3">
+            <property name="text">
+             <string>Extract background</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="bg_extract_tb_3">
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="3" column="0" colspan="2">
+         <widget class="Line" name="line">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <zorder>gridLayoutWidget</zorder>
+      <zorder></zorder>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <zorder>gb_enhancements</zorder>
+  <zorder></zorder>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

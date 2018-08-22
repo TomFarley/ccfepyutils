@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>movie_widget</class>
+ <widget class="QWidget" name="movie_widget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>662</width>
+    <height>831</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout_4">
+   <item row="0" column="0">
+    <layout class="QVBoxLayout" name="movie_widget_vl">
+     <item>
+      <widget class="QGroupBox" name="movie_select_gb">
+       <property name="title">
+        <string>Movie file</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <layout class="QGridLayout" name="gridLayout_3">
+        <item row="1" column="0">
+         <layout class="QGridLayout" name="gridLayout_5">
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="le_camera"/>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLineEdit" name="le_pulse"/>
+          </item>
+          <item row="1" column="3">
+           <widget class="QSpinBox" name="sb_start_frame"/>
+          </item>
+          <item row="0" column="4">
+           <widget class="QLabel" name="label_11">
+            <property name="text">
+             <string>End frame</string>
+            </property>
+            <property name="buddy">
+             <cstring>sb_end_frame</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="6">
+           <widget class="QPushButton" name="btn_load_meta">
+            <property name="text">
+             <string>Load meta</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLineEdit" name="le_machine"/>
+          </item>
+          <item row="1" column="4">
+           <widget class="QSpinBox" name="sb_end_frame"/>
+          </item>
+          <item row="1" column="6">
+           <widget class="QPushButton" name="btn_load_frames">
+            <property name="text">
+             <string>Load frames</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>Machine</string>
+            </property>
+            <property name="buddy">
+             <cstring>le_machine</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Camera</string>
+            </property>
+            <property name="buddy">
+             <cstring>le_camera</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>Pulse    </string>
+            </property>
+            <property name="buddy">
+             <cstring>le_pulse</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Start frame</string>
+            </property>
+            <property name="buddy">
+             <cstring>sb_start_frame</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="5">
+           <widget class="QSpinBox" name="sb_frame_stride">
+            <property name="maximum">
+             <number>10000</number>
+            </property>
+            <property name="value">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="5">
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>Stride</string>
+            </property>
+            <property name="buddy">
+             <cstring>sb_frame_stride</cstring>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="hl_movie_canvas">
+       <item>
+        <widget class="MplWidget" name="frame_canvas" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>200</width>
+           <height>450</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QGridLayout" name="gridLayout">
+       <item row="1" column="5">
+        <widget class="QDoubleSpinBox" name="sb_speed">
+         <property name="decimals">
+          <number>1</number>
+         </property>
+         <property name="minimum">
+          <double>-20.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>20.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>1.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>1.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="7">
+        <widget class="QSpinBox" name="sb_frame_no"/>
+       </item>
+       <item row="1" column="9">
+        <widget class="QDoubleSpinBox" name="sb_time">
+         <property name="suffix">
+          <string> s</string>
+         </property>
+         <property name="decimals">
+          <number>6</number>
+         </property>
+         <property name="singleStep">
+          <double>0.001000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QPushButton" name="btn_prev_frame">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>../../../../../repos/elzar/icons/appbar.navigate.previous.png</normaloff>../../../../../repos/elzar/icons/appbar.navigate.previous.png</iconset>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QPushButton" name="btn_play">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>../../../../../repos/elzar/icons/appbar.control.play.png</normaloff>../../../../../repos/elzar/icons/appbar.control.play.png</iconset>
+         </property>
+         <property name="checkable">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="3">
+        <widget class="QPushButton" name="btn_next_frame">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>../../../../../repos/elzar/icons/appbar.navigate.next.png</normaloff>../../../../../repos/elzar/icons/appbar.navigate.next.png</iconset>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="4">
+        <widget class="QLabelClickable" name="label_speed">
+         <property name="text">
+          <string>Speed</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         </property>
+         <property name="buddy">
+          <cstring>sb_speed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="6">
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Frame</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         </property>
+         <property name="buddy">
+          <cstring>sb_frame_no</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="8">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Time</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         </property>
+         <property name="buddy">
+          <cstring>sb_time</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1" colspan="9">
+        <widget class="QSlider" name="sldr_frame">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="gb_enhancements">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="title">
+        <string>Image enhancements:</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <property name="margin">
+         <number>0</number>
+        </property>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_2">
+          <item>
+           <widget class="QFrame" name="frm_enhancements">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>150</height>
+             </size>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::NoFrame</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Plain</enum>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_2">
+             <item row="0" column="0">
+              <layout class="QGridLayout" name="gl_enhancements">
+               <item row="8" column="0">
+                <layout class="QHBoxLayout" name="fg_extract_hl_8">
+                 <item>
+                  <widget class="QCheckBox" name="cb_invert_image">
+                   <property name="text">
+                    <string>Invert</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="fg_extract_tb_8">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="5" column="0">
+                <layout class="QHBoxLayout" name="bg_sub_hl_14">
+                 <item>
+                  <widget class="QCheckBox" name="cb_reduce_noise">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="text">
+                    <string>Reduce noise</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="bgsub_tb_10">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="5" column="2">
+                <layout class="QHBoxLayout" name="bg_sub_hl_15">
+                 <item>
+                  <widget class="QCheckBox" name="cb_gamma_enhance">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="text">
+                    <string>Gamma enhance</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="bgsub_tb_11">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="4" column="0">
+                <layout class="QHBoxLayout" name="fg_extract_hl_10">
+                 <item>
+                  <widget class="QCheckBox" name="cb_extract_fg">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="text">
+                    <string>Extract foreground</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="tb_extract_fg">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="4" column="2">
+                <layout class="QHBoxLayout" name="bg_sub_hl_16">
+                 <item>
+                  <widget class="QCheckBox" name="cb_extract_bg">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="text">
+                    <string>Extract background</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="bg_extract_tb_5">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="3" column="0" colspan="3">
+                <widget class="Line" name="line_3">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                </widget>
+               </item>
+               <item row="6" column="2">
+                <layout class="QHBoxLayout" name="fg_extract_hl_7">
+                 <item>
+                  <widget class="QCheckBox" name="cb_add_abs_gauss_noise">
+                   <property name="text">
+                    <string>Add positive Gaussian noise</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="fg_extract_tb_7">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="2" column="0" colspan="3">
+                <layout class="QHBoxLayout" name="horizontalLayout_4">
+                 <item>
+                  <widget class="QCheckBox" name="cb_apply_enhancements">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="text">
+                    <string>Apply enhancements</string>
+                   </property>
+                   <property name="checked">
+                    <bool>false</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="btn_enhance_all_frames">
+                   <property name="text">
+                    <string>Apply to all frames</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="8" column="2">
+                <layout class="QHBoxLayout" name="hist_eq_hl">
+                 <item>
+                  <widget class="QCheckBox" name="cb_hist_equalisation">
+                   <property name="text">
+                    <string>Histogram equalisation</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="tb_hist_eq">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="6" column="0">
+                <layout class="QHBoxLayout" name="fg_extract_hl_9">
+                 <item>
+                  <widget class="QCheckBox" name="cb_sharpen">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="text">
+                    <string>Sharpen</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="fg_extract_tb_9">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="7" column="0">
+                <layout class="QHBoxLayout" name="bg_sub_hl_12">
+                 <item>
+                  <widget class="QCheckBox" name="cb_threshold">
+                   <property name="text">
+                    <string>Treshold</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="bgsub_tb_9">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="7" column="2">
+                <layout class="QHBoxLayout" name="bg_sub_hl_11">
+                 <item>
+                  <widget class="QCheckBox" name="cb_canny_edge_detection">
+                   <property name="text">
+                    <string>Canny edge detection</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="bgsub_tb_8">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="4" column="1" rowspan="5">
+                <widget class="Line" name="line_2">
+                 <property name="orientation">
+                  <enum>Qt::Vertical</enum>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>MplWidget</class>
+   <extends>QWidget</extends>
+   <header>mplwidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>QLabelClickable</class>
+   <extends>QLabel</extends>
+   <header location="global">qlabel_clickable</header>
+  </customwidget>
+ </customwidgets>
+ <tabstops>
+  <tabstop>movie_select_gb</tabstop>
+  <tabstop>le_machine</tabstop>
+  <tabstop>le_camera</tabstop>
+  <tabstop>le_pulse</tabstop>
+  <tabstop>sb_start_frame</tabstop>
+  <tabstop>sb_end_frame</tabstop>
+  <tabstop>sb_frame_stride</tabstop>
+  <tabstop>btn_load_meta</tabstop>
+  <tabstop>btn_load_frames</tabstop>
+  <tabstop>btn_play</tabstop>
+  <tabstop>btn_prev_frame</tabstop>
+  <tabstop>btn_next_frame</tabstop>
+  <tabstop>sb_speed</tabstop>
+  <tabstop>sb_frame_no</tabstop>
+  <tabstop>sb_time</tabstop>
+  <tabstop>gb_enhancements</tabstop>
+  <tabstop>cb_apply_enhancements</tabstop>
+  <tabstop>btn_enhance_all_frames</tabstop>
+  <tabstop>cb_extract_fg</tabstop>
+  <tabstop>cb_extract_bg</tabstop>
+  <tabstop>cb_reduce_noise</tabstop>
+  <tabstop>cb_gamma_enhance</tabstop>
+  <tabstop>fg_extract_tb_8</tabstop>
+  <tabstop>fg_extract_tb_7</tabstop>
+  <tabstop>cb_sharpen</tabstop>
+  <tabstop>cb_add_abs_gauss_noise</tabstop>
+  <tabstop>cb_threshold</tabstop>
+  <tabstop>cb_canny_edge_detection</tabstop>
+  <tabstop>cb_invert_image</tabstop>
+  <tabstop>cb_hist_equalisation</tabstop>
+  <tabstop>bg_extract_tb_5</tabstop>
+  <tabstop>bgsub_tb_11</tabstop>
+  <tabstop>tb_hist_eq</tabstop>
+  <tabstop>tb_extract_fg</tabstop>
+  <tabstop>fg_extract_tb_9</tabstop>
+  <tabstop>sldr_frame</tabstop>
+  <tabstop>bgsub_tb_9</tabstop>
+  <tabstop>bgsub_tb_10</tabstop>
+  <tabstop>bgsub_tb_8</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>
