@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import natsort
-import matplotlib.pyplot as plt
 
 from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
@@ -35,15 +34,18 @@ def get_camera_data_path(machine, camera, pulse):
 
     camera_settings = Settings.get('Movie_data_locations', '{}_{}'.format(machine, camera))
     if len(camera_settings) == 0:
-        raise ValueError('No Movie_data_locations settings exist for camera="{}", machine="{}"'.format(camera, machine))
+        raise ValueError('No Movie_data_locations settings exist for camera="{}", machine="{}". Options: {}'.format(
+            camera, machine, Settings.existing_settings('Movie_data_locations')))
     
     path_options = camera_settings['path_options']
     fn_options = camera_settings['fn_options']
     
     path_kws = {'machine': machine, 'pulse': pulse}
-    fn_kws = {'n': 0}
+    fn_kws = {'n': 0, 'pulse': pulse}
     path, fn_format = locate_file(path_options, fn_options, path_kws=path_kws, fn_kws=fn_kws,
                           return_raw_path=False, return_raw_fn=True, _raise=True, verbose=True)
+    # Sub in pulse number, but leave mraw file number "{n:02d}" in place
+    fn_format = fn_format.replace('{pulse}', '{}'.format(pulse))
     if ('frame_transforms' in camera_settings) and (isinstance(camera_settings['frame_transforms'], list)):
         transforms = camera_settings['frame_transforms']
     else:
@@ -284,7 +286,7 @@ class Movie(Stack):
         # Check file path exists
         if not fn_path.parent.is_dir():
             raise IOError('Path "{}" does not exist'.format(fn_path.parent))
-        if not Path(str(fn_path).format(n=0)).is_file():
+        if not Path(str(fn_path).format(n=0, pulse=pulse)).is_file():
             raise IOError('Cannot locate file "{}" in path {}'.format(fn_path.name, fn_path.parent))
 
         self.fn_path = str(fn_path)
@@ -296,6 +298,9 @@ class Movie(Stack):
         self._movie_meta = {'format': self.movie_format}
         if self.movie_format == '.mraw':
             self._movie_meta.update(self.get_mraw_file_info(self.fn_path))
+        elif self.movie_format == '.ipx':
+            self._movie_meta.update(self.get_ipx_file_info(self.fn_path.format(pulse=pulse),
+                                                           transforms=self._transforms))
         elif self.movie_format == '.p':
             self._movie_meta.update(self.get_pickle_movie_info(self.fn_path, transforms=self._transforms))
         elif self.movie_format == '.npz':
@@ -509,6 +514,50 @@ class Movie(Stack):
         return movie_meta
 
     @classmethod
+    def get_ipx_file_info(cls, fn_path, transforms=[]):
+        """
+        Ipx files can be tested on Freia using eg:
+            ipxview /net/fuslsa/data/MAST_IMAGES/023/23400/rba023400.ipx
+        :param fn_path:
+        :param transforms:
+        :return:
+        """
+        movie_meta = {'movie_format': '.ipx'}
+        n = 0
+        step = 100
+
+        vid = ipxReader(filename=fn_path)
+        file_header = vid.file_header
+        ret, frame0, frame_header0 = vid.read(transforms=transforms)
+        while ret:
+            n += step
+            vid.set_frame_number(n)
+            ret, frame, frame_header = vid.read(transforms=transforms)
+
+        n_end = vid._current_frame
+        vid = ipxReader(filename=fn_path)
+        n -= step
+        vid.set_frame_number(n)
+        ret = True
+        while ret:
+            n += 1
+            ret, frame, frame_header = vid.read(transforms=transforms)  # auto advances vid frame number
+        # TODO: Fix problem with seeking to final frame   -2 => -1
+        n -= 2  # Go to last frame that returned True
+        vid = ipxReader(filename=fn_path)
+        vid.set_frame_number(n)
+        ret, frame, frame_header = vid.read(transforms=transforms)
+        vid.release()
+
+        movie_meta['ipx_header'] = file_header
+        movie_meta['frame_range'] = [0, n]
+        movie_meta['t_range'] = [frame_header0['time_stamp'], frame_header['time_stamp']]
+        movie_meta['frame_shape'] = frame0.shape
+        movie_meta['fps'] = (n+1) / (frame_header['time_stamp'] - frame_header0['time_stamp'])
+        logger.info('Readimg ipx movie file {} with frame range {}'.format(fn_path, movie_meta['frame_range']))
+        return movie_meta
+
+    @classmethod
     def get_pickle_movie_info(cls, fn_path, transforms=[]):
         """Get meta data from pickled frame data"""
         path, fn = os.path.split(fn_path)
@@ -613,7 +662,7 @@ class Movie(Stack):
         elif self.movie_format == '.npz':
             data = self.read_npz_movie(n=n)
         elif self.movie_format == '.ipx':
-            raise NotImplementedError
+            data = self.read_ipx_movie(n=n)
         else:
             raise ValueError('Movie class does not currently support "{}" format movies'.format(self.movie_format))
         
@@ -662,6 +711,46 @@ class Movie(Stack):
                 data[i_data, :, :] = frame
                 self._meta.loc[n, 'set'] = True
                 i_data += 1
+            else:
+                # TODO: Increment vid frame number without reading data
+                vid._skip_frame()
+                # ret, frame, header = vid.read(transforms=self._transforms)
+            n += 1
+        vid.release()
+        return data
+
+    def read_ipx_movie(self, n=None):
+        # Initialise array for data to be read into
+
+        if n is None:
+            # Loop over frames from start frame, including those in the frame set
+            # TODO: change to only loading files that haven't already been loaded?
+            frames = self._frame_range_info_all['frames']
+            n = self._frame_range_info_all['frame_range'][0]
+            end = self._frame_range_info_all['frame_range'][1]
+            i_meta = 0
+            i_data = 0
+        else:
+            assert is_numeric(n), 'frames to load are not numeric: {}'.format(n)
+            frames = make_iterable(n)
+            n = frames[0]
+            end = frames[-1]
+            i_data = 0
+        data = np.zeros((len(frames), *self._movie_meta['frame_shape']))
+        logger.debug('Reading {} frames from mraw movie file'.format(len(frames)))
+
+        vid = ipxReader(filename=self.fn_path)
+        vid.set_frame_number(n)
+        while n <= end:
+            if n in frames:
+                # frames are read with 16 bit dynamic range, but values are 10 bit!
+                ret, frame, header = vid.read(transforms=self._transforms)
+                data[i_data, :, :] = frame
+                self._meta.loc[n, 'set'] = True
+                i_data += 1
+            elif n > self._movie_meta['frame_range'][1]:
+                logger.warning('n={} outside ipx movie frame range'.format(n))
+                break
             else:
                 # TODO: Increment vid frame number without reading data
                 vid._skip_frame()
@@ -1193,3 +1282,8 @@ def transform_image(image, transforms):
         else:
             raise ValueError('Transform "{}" not recognised'.format(trans))
     return image
+
+if __name__ == '__main__':
+    # movie = Movie(29852, 'MAST', 'SA1.1', start_frame=0, end_frame=10)
+    # movie = Movie(23085, 'MAST', 'StereoA', start_frame=0, end_frame=10)
+    movie = Movie(23400, 'MAST', 'StereoA', start_frame=0, end_frame=10)
