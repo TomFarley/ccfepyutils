@@ -70,6 +70,8 @@ def distinguishable_colors(ncolors, backgrounds=[[0,0,0],[1,1,1]],
 
     """
     import numpy as np
+    import matplotlib
+    matplotlib.use('Qt5Agg')
     import matplotlib.pyplot as plt
     from colormath.color_objects import LabColor, AdobeRGBColor
     from colormath.color_conversions import convert_color

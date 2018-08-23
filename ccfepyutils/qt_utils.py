@@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg, NavigationToolbar2QT  # NavigationToolbar2QTAgg
 import numpy as np

@@ -17,6 +17,8 @@ Info:
 """
 
 import numpy as np                  # Maths library
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt     # Plotting library
 
 # from scipy.optimize import curve_fit                # Curve fitting

@@ -14,6 +14,8 @@ from logging.config import fileConfig
 import numpy as np
 import pandas as pd
 import xarray as xr
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 # from nested_dict import nested_dict
 

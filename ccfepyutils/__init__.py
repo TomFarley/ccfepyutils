@@ -12,7 +12,8 @@ if (batch_mode == 'yes') or (in_docker == 'True'):
     matplotlib.use('Agg')
     print('In batch mode')
 else:
-    # matplotlib.use('qt5agg')
+    matplotlib.use('Qt5Agg')
+    # matplotlib.use('Qt4Agg')
     pass
 
 def script_directory(level=0):

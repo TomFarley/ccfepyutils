@@ -2,6 +2,8 @@
 
 import logging, warnings, os, itertools
 
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection

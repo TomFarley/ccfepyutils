@@ -3,6 +3,8 @@
 import itertools
 import numpy as np
 from numpy import sin, cos, arctan, tan, sqrt
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import matplotlib
 from collections import OrderedDict

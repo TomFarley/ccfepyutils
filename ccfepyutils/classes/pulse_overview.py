@@ -1,4 +1,6 @@
 
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
 from ccfepyutils.utils import make_iterable
