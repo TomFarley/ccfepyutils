@@ -20,6 +20,8 @@ Info:
 from itertools import repeat
 import datetime
 import numpy as np
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import math
 import re

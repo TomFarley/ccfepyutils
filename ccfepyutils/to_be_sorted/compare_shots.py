@@ -51,6 +51,8 @@ for shot in shot_range:
 print "Comparable shots to shot number "+str(target_shot)+" are "+str(comparable_shots)
 
 if plotting:
+	import matplotlib
+	matplotlib.use('Qt5Agg')
 	import matplotlib.pyplot as plt
 	for i in np.arange(len(traces)):
 		plt.plot(target_trace_data[i].time,target_trace_data[i].data,label=str(target_shot))

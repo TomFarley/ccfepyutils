@@ -122,7 +122,7 @@ class GFileSelector(object):
                     store.loc[key, ['fn', 'i_path', 'scheduler', 'n', 't']] = [value, i_path, False, key[0], key[1]]
 
         store = store.sort_index()
-        self.store = store.astype({'n': int})
+        self.store['n'] = store.astype({'n': int})['n']
 
     def save_scheduler_gfile(self, pulse, time, machine='MAST', fn_format=None, path=None):
         from pyEquilibrium import equilibrium as eq

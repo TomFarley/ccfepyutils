@@ -8,6 +8,8 @@ import os
 import re
 import numpy as np
 import matplotlib
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import json
 import pandas as pd

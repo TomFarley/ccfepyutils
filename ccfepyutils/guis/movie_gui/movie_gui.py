@@ -31,14 +31,17 @@ FEATURES (minor):
 """
 import sys, os, random, logging, traceback
 import numpy as np
-from PyQt5 import uic, QtWidgets, QtGui, QtCore
-import matplotlib.pyplot as plt
 from ccfepyutils.classes.movie import Movie
 from ccfepyutils.utils import str_to_number, make_iterable, replace_in
 from ccfepyutils.image import image_enhancement_functions
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+try:
+    from PyQt5 import uic, QtWidgets, QtGui, QtCore
+except ImportError as e:
+    logger.exception('Failed to import PyQt5.')
 
 icon_dir = os.path.abspath('../icons/')
 
