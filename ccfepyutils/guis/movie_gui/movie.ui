@@ -201,7 +201,7 @@
          </property>
          <property name="icon">
           <iconset>
-           <normaloff>../../../../../repos/elzar/icons/appbar.navigate.previous.png</normaloff>../../../../../repos/elzar/icons/appbar.navigate.previous.png</iconset>
+           <normaloff>../icons/appbar.navigate.previous.png</normaloff>../icons/appbar.navigate.previous.png</iconset>
          </property>
         </widget>
        </item>
@@ -212,7 +212,7 @@
          </property>
          <property name="icon">
           <iconset>
-           <normaloff>../../../../../repos/elzar/icons/appbar.control.play.png</normaloff>../../../../../repos/elzar/icons/appbar.control.play.png</iconset>
+           <normaloff>../icons/appbar.control.play.png</normaloff>../icons/appbar.control.play.png</iconset>
          </property>
          <property name="checkable">
           <bool>false</bool>
@@ -226,7 +226,7 @@
          </property>
          <property name="icon">
           <iconset>
-           <normaloff>../../../../../repos/elzar/icons/appbar.navigate.next.png</normaloff>../../../../../repos/elzar/icons/appbar.navigate.next.png</iconset>
+           <normaloff>../../../../elzar/icons/appbar.navigate.next.png</normaloff>../../../../elzar/icons/appbar.navigate.next.png</iconset>
          </property>
         </widget>
        </item>
