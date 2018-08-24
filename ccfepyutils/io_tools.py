@@ -76,8 +76,28 @@ def getUserFile(type=""):
     filename = askopenfilename(message="Please select "+type+" file:")
     return filename
 
-
 def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True,
+                        raise_on_no_matches=True, depth=0, **kwargs):
+    path = Path(path)
+    path = path.expanduser()
+    if not path.is_dir():
+        if raise_on_missing_dir:
+            raise IOError('Search directory "{}" does not exist'.format(path))
+        else:
+            return {}
+    # filenames_all = sorted(os.listdir(str(path)))
+    out = {}
+    for level, (root, dirs, files) in enumerate(os.walk(path, topdown=False)):
+        out[root] = filter_files(files, fn_pattern, group_keys=group_keys, raise_on_incomplete_match=raise_on_incomplete_match,
+                     raise_on_missing_dir=raise_on_missing_dir, raise_on_no_matches=raise_on_no_matches, **kwargs)
+        if level == depth:
+            break
+    if len(out) == 1:
+        out = list(out.values())[0]
+    return out
+
+
+def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True,
                         raise_on_no_matches=True, **kwargs):
     """Return dict of filenames in given directory that match supplied regex pattern
 
@@ -99,13 +119,6 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     from ccfepyutils.utils import PartialFormatter
     fmt = PartialFormatter()
 
-    path = Path(path)
-    path = path.expanduser()
-    if not path.is_dir():
-        if raise_on_missing_dir:
-            raise IOError('Search directory "{}" does not exist'.format(path))
-        else:
-            return {}
     # If kwargs are supplied convert them to re patterns
     re_patterns = {}
     for key, value in kwargs.items():
@@ -121,10 +134,10 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
         fn_pattern = fmt.format(fn_pattern, **re_patterns)
     except IndexError as e:
         pass
-    filenames_all = sorted(os.listdir(str(path)))
     out = {}
     i = 0
-    for fn in filenames_all:
+    for fn in filenames:
+        # Check if each filename matches the pattern
         m = re.search(fn_pattern, fn)
         if m is None:
             continue
@@ -142,7 +155,7 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
         i += 1
 
     if len(out) == 0:
-        message = 'Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, path)
+        message = 'Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, filenames)
         if raise_on_no_matches:
             raise IOError(message)
         else:
@@ -560,9 +573,10 @@ def read_netcdf_group(fn_path, group):
     return match_data
 
 if __name__ == '__main__':
-    path = '/home/tfarley/elzar2/checkpoints/MAST/SynthCam/single_filament_scan/Corrected_inversion_data/6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3/'
+    # path = '/home/tfarley/elzar2/checkpoints/MAST/SynthCam/single_filament_scan/Corrected_inversion_data/6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3/'
+    path = '/home/tfarley/elzar2/checkpoints/MAST/SA1.1/29991/Corrected_inversion_data/'
     fn_pattern = 'corr_inv-test1-n({n})-6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3.nc'
-    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(2,8))
+    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(4600,4650), depth=1)
 
     fn = os.path.expanduser('~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
     # from nested_dict import nested_dict
