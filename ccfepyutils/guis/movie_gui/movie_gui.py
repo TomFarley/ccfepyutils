@@ -208,13 +208,13 @@ class MovieGUI(QtWidgets.QMainWindow):
         movie = self.movie
         widget = self.movie_widget
 
+        # Get values from input boxes
         machine = widget.le_machine.text()
         camera = widget.le_camera.text()
         pulse = str_to_number(widget.le_pulse.text())
 
         start_frame = widget.sb_start_frame.value()
         end_frame = widget.sb_end_frame.value()
-        assert start_frame <= end_frame, 'Start frame must be before end frame'
         frame_stride = widget.sb_frame_stride.value()
         widget.sb_frame_stride.setMaximum(end_frame-start_frame-1)
 
@@ -224,6 +224,16 @@ class MovieGUI(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.about(self, "Failed to locate movie file", "{}".format(e))
             # TODO: color lineedit inputs to show they are bad
             return
+        movie_frame_range = movie._movie_meta['frame_range']
+        if start_frame < 0:
+            start_frame = movie_frame_range[1] + 1 + start_frame
+        if end_frame < 0:
+            end_frame = movie_frame_range[1] + 1 + end_frame
+        assert (start_frame >= 0) and (end_frame >= 0), 'Frame range numbers must be > 0'
+        assert (end_frame <= movie_frame_range[1]), 'End frame outside of move frame range: {} > {}'.format(
+                end_frame, movie_frame_range[1])
+        assert start_frame <= end_frame, 'Start frame must be before end frame'
+
         movie.set_frames(start_frame=start_frame, end_frame=end_frame, frame_stride=frame_stride)
 
         if movie.current_frame not in self.movie.frame_numbers:
@@ -232,11 +242,11 @@ class MovieGUI(QtWidgets.QMainWindow):
             self.set_frame(force_update=True)
 
         # Frame range spin boxes
-        widget.sb_start_frame.setMinimum(movie._movie_meta['frame_range'][0])
-        widget.sb_end_frame.setMaximum(movie._movie_meta['frame_range'][1])
+        widget.sb_start_frame.setMinimum(-movie_frame_range[1]+1)
+        widget.sb_end_frame.setMaximum(movie_frame_range[1])
 
         # Current frame spinbox
-        widget.sb_frame_no.setMinimum(movie.frame_range[0])
+        widget.sb_frame_no.setMinimum(-movie.frame_range[1]+1)
         widget.sb_frame_no.setMaximum(movie.frame_range[1])
         widget.sb_frame_no.setSingleStep(frame_stride)
         # Time range spin boxes
