@@ -388,7 +388,8 @@ class MovieGUI(QtWidgets.QMainWindow):
 
     def save_figure(self, bbox_inches='tight'):
         """Save (annotated) figure. Not at original image resolution."""
-        fn = 'frame_figure_n{}.png'.format(self.movie.current_frame)
+        movie = self.movie
+        fn = 'frame_figure_{}_p{}_n{}.png'.format(movie.machine, movie.pulse, movie.current_frame)
         fn = self.get_fn('Save figure', fn)
         if not fn:
             return
@@ -397,7 +398,8 @@ class MovieGUI(QtWidgets.QMainWindow):
     def save_frame_image(self):
         """Save frame image at original resolution."""
         import imageio
-        fn = 'frame_image_n{}.png'.format(self.movie.current_frame)
+        movie = self.movie
+        fn = 'frame_image_{}_p{}_n{}.png'.format(movie.machine, movie.pulse, movie.current_frame)
         fn = self.get_fn('Save frame image', fn)
         if not fn:
             return
