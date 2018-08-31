@@ -229,10 +229,16 @@ class MovieGUI(QtWidgets.QMainWindow):
             start_frame = movie_frame_range[1] + 1 + start_frame
         if end_frame < 0:
             end_frame = movie_frame_range[1] + 1 + end_frame
-        assert (start_frame >= 0) and (end_frame >= 0), 'Frame range numbers must be > 0'
-        assert (end_frame <= movie_frame_range[1]), 'End frame outside of move frame range: {} > {}'.format(
-                end_frame, movie_frame_range[1])
-        assert start_frame <= end_frame, 'Start frame must be before end frame'
+
+        if (start_frame < 0) or (end_frame < 0):
+            QtWidgets.QMessageBox.about(self, 'Invalid frame range input', 'Frame range numbers must be > 0')
+            return
+        if (end_frame > movie_frame_range[1]):
+            QtWidgets.QMessageBox.about(self, 'Invalid frame range input', 'End frame outside of move frame range: {} > {}'.format(
+                end_frame, movie_frame_range[1]))
+            return
+        if start_frame > end_frame:
+            QtWidgets.QMessageBox.about(self, 'Invalid frame range input', 'Start frame must be before end frame')
 
         movie.set_frames(start_frame=start_frame, end_frame=end_frame, frame_stride=frame_stride)
 
