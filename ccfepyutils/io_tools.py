@@ -39,7 +39,7 @@ def get_from_ini(config, setting, value):
     """Return value for setting from config ini file if value is None"""
     raise NotImplementedError
 
-def delete_file(fn, path=None, ignore_exceptions=()):
+def delete_file(fn, path=None, ignore_exceptions=(), verbose=False):
     """Delete file with error handelling
     :param fn: filename
     :param path: optional path to prepend to filename
@@ -50,6 +50,8 @@ def delete_file(fn, path=None, ignore_exceptions=()):
         fn_path = fn
     try:
         os.remove(fn_path)
+        if verbose:
+            logger.info('Deleted file: {}'.format(fn_path))
     except ignore_exceptions as e:
         logger.debug(e)
     except Exception as e:
@@ -77,7 +79,7 @@ def getUserFile(type=""):
     return filename
 
 def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True,
-                        raise_on_no_matches=True, depth=0, **kwargs):
+                        raise_on_no_matches=True, depth=0, include_empty_dirs=False, **kwargs):
     path = Path(path)
     path = path.expanduser()
     if not path.is_dir():
@@ -87,18 +89,31 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
             return {}
     # filenames_all = sorted(os.listdir(str(path)))
     out = {}
-    for level, (root, dirs, files) in enumerate(os.walk(path, topdown=False)):
-        out[root] = filter_files(files, fn_pattern, group_keys=group_keys, raise_on_incomplete_match=raise_on_incomplete_match,
-                     raise_on_missing_dir=raise_on_missing_dir, raise_on_no_matches=raise_on_no_matches, **kwargs)
-        if level == depth:
+    n_matches = 0
+    for i, (root, dirs, files) in enumerate(os.walk(str(path), topdown=False)):
+        level = root.replace(str(path), '').count('/')
+        if level > depth:
             break
-    if len(out) == 1:
+        out_i = filter_files(files, fn_pattern, group_keys=group_keys, raise_on_incomplete_match=raise_on_incomplete_match,
+                     raise_on_no_matches=False, verbose=False, **kwargs)
+        if (len(out_i) == 0) and not include_empty_dirs:
+            continue
+        else:
+            n_matches += len(out_i)
+            out[root] = out_i
+    if (n_matches == 0):
+        message = 'Failed to locate any files with pattern "{}" in {}, depth={}'.format(fn_pattern, path, depth)
+        if raise_on_no_matches:
+            raise IOError(message)
+        else:
+            logger.warning(message)
+    if (depth ==0) and (len(out) == 1):
         out = list(out.values())[0]
     return out
 
 
-def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True,
-                        raise_on_no_matches=True, **kwargs):
+def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match=False,
+                        raise_on_no_matches=True, verbose=True, **kwargs):
     """Return dict of filenames in given directory that match supplied regex pattern
 
     The keys of the returned dict are the matched groups for each file from the fn_pattern.
@@ -159,7 +174,8 @@ def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match
         if raise_on_no_matches:
             raise IOError(message)
         else:
-            logger.warning(message)
+            if verbose:
+                logger.warning(message)
             return {}
     for i, group_key in enumerate(group_keys):
         if (group_key not in kwargs) or (isinstance(kwargs[group_key], (str, type(None)))):
@@ -175,7 +191,8 @@ def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match
             if raise_on_incomplete_match:
                 raise RuntimeError(message)
             else:
-                logger.warning(message)
+                if verbose:
+                    logger.warning(message)
     return out
 
 # def filter_files_in_dir(path, extension='.p', contain=None, not_contain=None):
@@ -574,8 +591,10 @@ def read_netcdf_group(fn_path, group):
 
 if __name__ == '__main__':
     # path = '/home/tfarley/elzar2/checkpoints/MAST/SynthCam/single_filament_scan/Corrected_inversion_data/6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3/'
+    # fn_pattern = 'corr_inv-test1-n({n})-6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3.nc'
+    # fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(4600,4650), depth=1)
     path = '/home/tfarley/elzar2/checkpoints/MAST/SA1.1/29991/Corrected_inversion_data/'
-    fn_pattern = 'corr_inv-test1-n({n})-6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3.nc'
+    fn_pattern = 'corr_inv-test1-n({n})-\w+.nc'
     fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(4600,4650), depth=1)
 
     fn = os.path.expanduser('~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
