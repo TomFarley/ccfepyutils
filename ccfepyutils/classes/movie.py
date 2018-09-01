@@ -428,7 +428,7 @@ class Movie(Stack):
         if self.settings['enhancements'] != enhancements:
             self.settings['enhancements'] = enhancements
         if self._enhancements != enhancements:
-            self._meta.loc[:, 'enhanced'] == False
+            self._meta.loc[:, 'enhanced'] = False
             self._enhanced_movie = None
             self._enhancements = None  # Enhancements already applied to _ENHANCED_movie
         else:
@@ -489,8 +489,16 @@ class Movie(Stack):
             for key in ['TotalFrame', 'StartFrame']:  # 'OriginalTotalFrame', 'CorrectTriggerFrame', 'ZeroFrame']:
                 mraw_files.loc[n, key] = int(header[key].strip())
             # Get time ranges for each file
-            mraw_files.loc[n, 'StartTime'] = vid.set_frame_number(0).read()[2]['time_stamp']
-            mraw_files.loc[n, 'EndTime'] = vid.set_frame_number(int(header['TotalFrame'].strip())).read()[2]['time_stamp']
+            mraw_files.loc[n, 'StartTime'] = np.round(vid.set_frame_number(0).read()[2]['time_stamp'], decimals=6)
+            mraw_files.loc[n, 'EndTime'] = np.round(
+                    vid.set_frame_number(int(header['TotalFrame'].strip())).read()[2]['time_stamp'], decimals=6)
+            if (len(mraw_files) > 1):
+                if (mraw_files.loc[n, 'StartTime'] < mraw_files.loc[n-1, 'EndTime']):
+                    # If same start time as previous file, add on to previous end time
+                    mraw_files.loc[n, 'StartTime'] += mraw_files.loc[n-1, 'EndTime']
+                if (mraw_files.loc[n, 'EndTime'] <= mraw_files.loc[n-1, 'EndTime']):
+                    # If same start time as previous file, add on to previous end time
+                    mraw_files.loc[n, 'EndTime'] += mraw_files.loc[n-1, 'EndTime']
             vid.release()
             n += 1
         assert n > 0, 'No mraw files read'
@@ -1285,5 +1293,7 @@ def transform_image(image, transforms):
 
 if __name__ == '__main__':
     # movie = Movie(29852, 'MAST', 'SA1.1', start_frame=0, end_frame=10)
+    movie = Movie(29991, 'MAST', 'SA1.1', start_frame=2889, end_frame=4689)
     # movie = Movie(23085, 'MAST', 'StereoA', start_frame=0, end_frame=10)
-    movie = Movie(23400, 'MAST', 'StereoA', start_frame=0, end_frame=10)
+    # movie = Movie(23400, 'MAST', 'StereoA', start_frame=0, end_frame=10)
+    pass
