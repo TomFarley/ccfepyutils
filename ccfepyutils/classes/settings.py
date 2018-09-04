@@ -219,7 +219,7 @@ class Settings(object):
                        'saving': ['saved', 'modifying'],
                        'accessing': ['loading', 'saving', 'modifying', 'modified', 'saved']}
                    }
-    default_column_sets = {'value': [('value', str), ('value_str', str), ('value_num', float)],
+    default_column_sets = {'values': [('value', str), ('value_str', str), ('value_num', float)],
                            'info': [('name', str), ('description', str), ('symbol', str), ('unit', str)],
                            'type': [('float', bool), ('int', bool), ('bool', bool), ('str', bool)],
                            'io': [('fn_str', str), ('priority', float)],

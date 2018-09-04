@@ -157,7 +157,7 @@ class CompositeSettings(object):
             df = self._df.sort_index(ascending=ascending)
         elif order == 'custom':
             df = self._df.sort_values('order', ascending=ascending)
-        df = df.loc[items, col_set]
+        df = df.loc[items]
         out = df
         if _expand_settings:
             # For items that correspond to a settings file, include the contents of that settings file in output
@@ -168,6 +168,7 @@ class CompositeSettings(object):
                 if df.loc[item, 'setting']:
                     df2 = df2.append(self._df.loc[self._df['parent'] == '{}:{}'.format(item, self[item].value), col_set])
             out = df2
+        out = out.loc[:, col_set]
         return out
 
     def search_items(self, pattern, contains=True, ignorecase=True):
