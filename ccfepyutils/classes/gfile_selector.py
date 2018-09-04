@@ -16,11 +16,11 @@ import pandas as pd
 
 from ccfepyutils.classes.settings import Settings
 from ccfepyutils.io_tools import filter_files_in_dir, locate_file, mkdir
-from ccfepyutils.utils import none_filter, str_to_number
+from ccfepyutils.utils import none_filter, str_to_number, safe_arange
 
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class GFileSelector(object):
@@ -146,33 +146,82 @@ class GFileSelector(object):
         """Save scheduler gfile to file for access without idam"""
         if not self.idam:
             logging.warning('IDAM is not availble for saving gfiles')
-            return
+            return (None, None, None)
         from pyEquilibrium import equilibrium as eq
         if fn_format is None:
             fn_format = self.settings['scheduler_gfile_fn_formats'][0]
         if path is None:
-            path = os.path.expanduser(self.settings['scheduler_gfile_paths'][0])
+            path = self.settings['scheduler_gfile_paths'][0]
         e = eq.equilibrium(device=machine, shot=pulse, time=time)
         if not e._loaded:
             logger.error('Failed to load equilibrium gfile for pulse {}, time {}'.format(pulse, time))
-            return
+            return (None, None, None)
         gfile_time = e._time
         if gfile_time != time:
             logger.info('Closest scheduler equilibrium time to {:0.6f} s is {:0.5f} s (diff {:0.3} ms)'.format(
                 time, gfile_time, (gfile_time-time)*1e3))
         fn = fn_format.format(pulse=pulse, gfile_time=gfile_time, machine=machine)
-        path = path.format(pulse=pulse, gfile_time=gfile_time, machine=machine)
+        path = os.path.expanduser(path.format(pulse=pulse, gfile_time=gfile_time, machine=machine))
         fn_path = os.path.join(path, fn)
         if os.path.isfile(fn_path):
             logger.debug('Closest scheduler equilibrium file to time {:0.6f} s already exists for {:0.5f} s'.format(
                 time, gfile_time))
-            return
+            return fn, path, gfile_time
         mkdir(path, depth=3)
         e.dump_geqdsk(fn_path)
         if os.path.isfile(fn_path):
             logger.info('Saved gfile "{}" to {}'.format(fn, path))
         else:
             raise IOError('Failed to produce scheduler gfile: {}'.format(fn))
+        return fn, path, gfile_time
+
+    def save_scheduler_gfiles_in_twin(self, pulse, t_win, machine='MAST', dt_switch_gfile=None, fn_format=None,
+                                      path=None, max_workers=16):
+        import concurrent.futures
+        s = self.settings
+        dt_switch_gfile = none_filter(s['dt_switch_gfile'], dt_switch_gfile)
+        fn_format = none_filter(s['scheduler_gfile_fn_formats'][0], fn_format)
+        path = none_filter(s['scheduler_gfile_paths'][0], path)
+        fn, path, t0 = self.save_scheduler_gfile(pulse, t_win[0], machine=machine, fn_format=fn_format, path=path)
+        times = list(safe_arange(t0, t_win[1], dt_switch_gfile))
+
+        # Remove times that already have files
+        existing_times = []
+        for t0 in deepcopy(times):
+            fn0 = fn_format.format(pulse=pulse, gfile_time=t0, machine=machine)
+            path0 = os.path.expanduser(path.format(pulse=pulse, gfile_time=t0, machine=machine))
+            fn_path = os.path.join(path0, fn0)
+            if os.path.isfile(fn_path):
+                existing_times.append(times.pop(times.index(t0)))
+        nt = len(times)
+        if nt == 0:
+            logger.debug('Gfiles already exist for requested time window for pulse {}: {}'.format(
+                pulse, existing_times))
+            return
+        inputs = list(zip([pulse]*nt, times, [machine]*nt, ))
+        logging.info('Getting pulse {} gfiles for {} times ({} already exist): {}'.format(
+            pulse, nt, len(existing_times), times))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Dict linking future objects to times
+            # executor.map(self.save_scheduler_gfile, inputs)
+            future_to_t = {executor.submit(self.save_scheduler_gfile, *inputs[i]): t0 for (i, t0) in enumerate(times)}
+            # As each process completes set and save the data for the appropriate frame
+            for future in concurrent.futures.as_completed(future_to_t):
+                exception = future.exception()
+                if exception:
+                    logger.info('Exception from future: ({}){} == None: {}, {}'.format(type(exception),
+                                                                                       exception, exception is None,
+                                                                                       exception == None))
+                    logger.exception('Analysis of frame {n} failed\n{error}'.format(n=future_to_t[future],
+                                                                                    error=future.exception()))
+                    # continue
+                t0 = future_to_t[future]
+                try:
+                    logger.info('Saved gfiles for time {}: {}'.format(t0, future.result()))
+                except Exception as e:
+                    raise e
+        logging.info('Saved pulse {} gfiles for times: {}'.format(pulse, times))
+
 
     def path_index_to_path(self, i, scheduler=False):
 
@@ -195,4 +244,9 @@ class GFileSelector(object):
         raise ValueError('Path {} is not in settings options: {}'.format(path, index_paths))
 
 if __name__ == '__main__':
-    pass
+    gs = GFileSelector('scheduler')
+    # gs.save_scheduler_gfiles_in_twin(29840, [0.10601, 0.25001], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
+    # gs.save_scheduler_gfiles_in_twin(29991, [0.12890, 0.14690], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
+    # gs.save_scheduler_gfiles_in_twin(29991, [0.182, 0.195], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
+    gs.save_scheduler_gfiles_in_twin(29991, [0.255, 0.272], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
+    gs.save_scheduler_gfiles_in_twin(2985, [0.255, 0.272], machine='MAST', dt_switch_gfile=0.005, max_workers=1)

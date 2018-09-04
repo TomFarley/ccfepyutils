@@ -547,7 +547,9 @@ class Plot(object):
              bbox_inches='tight', transparent=True, dpi=90):
         if save is False:  # Don't save!
             return
-        elif pos_path(save, allow_relative=allow_relative):  # string path
+        elif isinstance(save, string_types):
+            if not pos_path(save, allow_relative=allow_relative):  # string path
+                raise IOError('Not valid save path: {}'.format(save))
             path_fn = save
         else:
             assert settings is not None
