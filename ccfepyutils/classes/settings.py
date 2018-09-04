@@ -14,8 +14,8 @@ from netCDF4 import Dataset
 import ccfepyutils
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.utils import make_iterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str, \
-    to_list
-from ccfepyutils.io_tools import mkdir, filter_files_in_dir, delete_file
+    to_list, ask_input_yes_no
+from ccfepyutils.io_tools import mkdir, filter_files_in_dir, delete_file, attempt_n_times
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
 
 try:
@@ -632,22 +632,19 @@ class Settings(object):
     @in_state('loading', 'loaded')
     def load(self):
         assert self.file_exists
-        # Make two attempts - sometimes inexplicably fails on first attempt
-        n_attempts = 3
-        for attempt in range(n_attempts):
-            try:
-                with Dataset(self.fn_path) as root:
-                    # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
-                    self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
-                self._df = xr.open_dataset(self.fn_path, group='df').to_dataframe()
-            except OSError as e:
-                if attempt == n_attempts-1:
-                    logger.warning('Failed on 3rd attempt')
-                    raise e 
-                    # TODO: restore backup if corrupted?
-                time.sleep(1)
-            else:
-                break
+
+        def read_settings_file(fn_path):
+            with Dataset(fn_path) as root:
+                # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
+                self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
+            self._df = xr.open_dataset(fn_path, group='df').to_dataframe()
+
+        # Make multiple attempts reading file - sometimes inexplicably fails on first attempt
+        n_attempts = 4
+        error_message = 'Failed to read settings file after {{n_attempts}} attempts: {fn}'.format(fn=self.fn_path)
+        attempt_n_times(read_settings_file, args=[self.fn_path], n_attempts=n_attempts, exceptions=(OSError,),
+                        sleep_invterval=3, error_message=error_message)
+
         self.log_file.loaded(self.name)
         self.check_consistency()
  
@@ -693,19 +690,19 @@ class Settings(object):
                 self._df.to_xarray().to_netcdf(self.fn_path, mode='a', group='df')
 
             except PermissionError as e:
-                logger.exception('Unable to write to settings log file "{app}({name})": {path}, {e}'.format(
-                    app=self.application, name=self.name, path=self.fn_path, e=e))
                 if attempt == n_attempts-1:
+                    logger.exception('Unable to write to settings log file "{app}({name})": {path}, {e}'.format(
+                        app=self.application, name=self.name, path=self.fn_path, e=e))
                     raise e
             except RuntimeError as e:
-                logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
-                    app=self.application, name=self.name, path=self.fn_path, e=e))
                 if attempt == n_attempts-1:
+                    logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
+                        app=self.application, name=self.name, path=self.fn_path, e=e))
                     raise e
             except OSError as e:
-                logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
-                    app=self.application, name=self.name, path=self.fn_path, e=e))
                 if attempt == n_attempts - 1:
+                    logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
+                        app=self.application, name=self.name, path=self.fn_path, e=e))
                     raise e
             except Exception as e:
                 logger.exception('Unanticipated error updating SettingsFile "{app}({name})": {path}, {e}'.format(
@@ -718,18 +715,42 @@ class Settings(object):
                 break
             time.sleep(3)
 
+    def delete_file(self, force=False):
+        """Delete settings file for this settings instance"""
+        if not force:
+            answer = ask_input_yes_no('Are you sure you want to delete settings file "{}"')
+            if not answer:
+                return
+        delete_file(self.fn_path)
+
+    def refresh_file_from_memory(self):
+        """Delete existing settings file and save new file with values in memory
+
+        Useful for fixing corrupted netcdf files"""
+        self.delete_file(force=True)
+        self.save()
 
     def backup(self):
         """Backup current settings to backup folder"""
+        # TODO: Clear recent backups
+        # self.trim_backups()
         if self.state == 'modified':
             self.save()
         backup_path = os.path.join(self.path, 'backups')
         mkdir(backup_path)
+        # TODO: check new backup isn't identical to previous backup
         backup_fn = '{fn}-{time}.nc'.format(fn=str(Path(self.fn).stem), time=t_now_str())
         fn_path = os.path.join(backup_path, backup_fn)
         shutil.copyfile(self.fn_path, fn_path)
         logger.info('Created backup of SettingsLogFile for "{app}, {name}": {path}'.format(
                 app=self.application, name=self.name, path=fn_path))
+
+    def trim_backups(self):
+        """Reduce number of backups to save space"""
+        raise NotImplementedError
+
+    def restore_backup(self, recent=0):
+        raise NotImplementedError
 
     def create_file(self):
         if self.file_exists:
