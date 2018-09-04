@@ -286,7 +286,7 @@ class Settings(object):
             return Settings(application, name)
         
     @classmethod
-    def collect(cls, application=None, name=None, values={}, blacklist=[], whitelist=[], exclude_if_col_true=(),
+    def collect(cls, application=None, name=None, core_values={}, blacklist=[], whitelist=[], exclude_if_col_true=(),
                 **kwargs):
         """Collect together settings from multiple settings files into one large settings collection.
 
@@ -296,11 +296,11 @@ class Settings(object):
         from .composite_settings import CompositeSettings
         exclude_if_col_true = make_iterable(exclude_if_col_true)
         settings = Settings.get(application, name)
-        for item, value in values.items():
+        for item, value in core_values.items():
             settings.set(item, value, ignore=[None])
         composite_settings = CompositeSettings(application, name, blacklist=blacklist, whitelist=whitelist,
-                                               exclude_if_col_true=exclude_if_col_true)
-        composite_settings.set_value(**kwargs)
+                                               exclude_if_col_true=exclude_if_col_true, update_values=kwargs)
+        # composite_settings.set_value(**kwargs)
         composite_settings.save()
         return composite_settings
 
