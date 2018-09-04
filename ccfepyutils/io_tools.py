@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 from past.types import basestring
 
-from ccfepyutils.utils import string_types, make_iterable, compare_dict, \
-    is_number, is_subset, str_to_number
+from ccfepyutils.utils import (string_types, make_iterable, compare_dict,
+    is_number, is_subset, str_to_number, args_for)
 from ccfepyutils.debug import get_traceback_location
 
 logger = logging.getLogger(__name__)
@@ -515,12 +515,13 @@ def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, r
         return None, None
 
 def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOError,), sleep_invterval=0.5,
-                    error_message='Call to {func} failed after {n_attempts} attempts', verbose=True):
+                    error_message='Call to {func} failed after {n_attempts} attempts', call_on_fail=(), verbose=True):
     """Attempt I/O call multiple times with pauses in between to avoid read/write clashes etc."""
     if args is None:
         args = ()
     if kwargs is None:
         kwargs = {}
+    call_on_fail = make_iterable(call_on_fail)
     attempt = 1
     success = False
     while (success is False):
@@ -535,6 +536,10 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
             else:
                 if error_message is not None:
                     logger.error(error_message.format(func=func.__name__, n_attempts=n_attempts))
+                for func in call_on_fail:
+                    raise NotImplementedError  # Need args_for to pass positional args
+                    args, kwargs = args_for(func, kwargs)
+                    func(*args0, **kws)
                 raise e
     return out
 
