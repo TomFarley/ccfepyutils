@@ -387,7 +387,9 @@ def auto_correlation(signal, detrend=False, norm=True):
 
 def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
         max_resolution=None, density=False, max_1=False, filter_nans=True):
-    """Return distribution in x of peaks in y nsigma above mean"""
+    """Return bin edges and counts in PDF for given x data
+
+    bin_edges, bin_centres, counts = pdf(x, nbins=15)"""
     # Todo: add outlier detection to auto pdf
     assert not ((nbins is not None) and (bin_edges is not None)), 'Only supply one bins argument'
     if filter_nans:
