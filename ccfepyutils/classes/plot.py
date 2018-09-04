@@ -381,7 +381,7 @@ class Plot(object):
             plot_scatter_3d(ax, x, y, z, **kws)
         elif mode == 'surface_3d':
             ax = self.convert_ax_to_3d(ax)
-            kws = args_for(plot_surface(), kwargs, remove=True)
+            kws = args_for(plot_surface, kwargs, remove=True)
             plot_surface(ax, x, y, z, **kws)
         else:
             raise NotImplementedError('Mode={}'.format(mode))
@@ -837,10 +837,10 @@ def plot_2d(self, z, x, y, ax, raw=False, show=True, save=False, annotate=True,
 def plot_scatter_3d(ax, x, y, z, **kwargs):
     points = ax.scatter(x, y, z, **kwargs)
 
-def plot_surface(ax, x, y, z, cmap='viridis', colorbar=True, **kwargs):
+def plot_surface(ax, x, y, z, cmap='viridis', colorbar=True, alpha=1, **kwargs):
     if x.ndim == 1 and y.ndim == 1:
         x, y = np.meshgrid(x, y)
-    surf = ax.plot_surface(x, y, z, cmap=cmap, **kwargs)
+    surf = ax.plot_surface(x, y, z, cmap=cmap, alpha=alpha, **kwargs)
     if colorbar:  # TODO: Move to Plot object?
         ax.figure.colorbar(surf, shrink=0.5, aspect=5, pad=0.015)
 
