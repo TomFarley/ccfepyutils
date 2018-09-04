@@ -25,6 +25,12 @@ logger.setLevel(logging.INFO)
 
 class GFileSelector(object):
     """ """
+    try:
+        import idam
+        idam.setHost("idam1")
+    except:
+        logger.warning("Idam module found not available for saving new scheduler gfiles")
+        idam = False
 
     def __init__(self, settings, fix_gfile=None, start_gfile=None, **kwargs):
         # TODO generalise to other origins other than scheduler and default
@@ -44,7 +50,7 @@ class GFileSelector(object):
         return '<{}: {}>'.format(class_name, None)
 
     def get_gfile_fn(self, pulse=None, time=None, allow_scheduler_efit=None, machine='MAST', current_file=None,
-                     dt_switch_gfile=None, default_to_last=True):
+                     dt_switch_gfile=None, default_to_last=True, raise_on_inexact_match=True):
         if self.fixed_gfile is not None:
             return self.fixed_gfile
         elif (pulse is None) or (time is None):
@@ -62,9 +68,10 @@ class GFileSelector(object):
         if pulse not in self.store['n']:
             # If available files for pulse haven't been loaded, load them
             self.store_gfile_info(pulse, machine=machine, scheduler=allow_scheduler_efit)
-        if allow_scheduler_efit and ((pulse not in self.store['n']) or
-                                     (np.min(np.abs(store.loc[pulse, 't']-time)) > dt_switch_gfile)):
-            # If gfile hasn't previously been saved and scheduler is allowed save the closest gfile for requested time
+        if ((allow_scheduler_efit) and (self.idam) and
+                ((pulse not in self.store['n']) or (np.min(np.abs(store.loc[pulse, 't']-time)) > dt_switch_gfile))):
+            # If scheduler gfile hasn't previously been saved in desired time inverval save the closest gfile for
+            # requested time
             self.save_scheduler_gfile(pulse, time, machine)
             self.store_gfile_info(pulse, machine=machine, scheduler=allow_scheduler_efit)
 
@@ -80,7 +87,7 @@ class GFileSelector(object):
             assert len(t_current) == 1
             t_current = t_current.values[0]
             if np.abs(t_current - time) < dt_switch_gfile:
-                # No change
+                # No change - previous (current) file is still within time window
                 self.last_gfile = current_file
                 return (current_file)
         store = store.loc[pulse]
@@ -89,8 +96,18 @@ class GFileSelector(object):
         assert len(closest) == 1
         fn_closest = closest['fn'].values[0]
         path_closest = self.path_index_to_path(closest['i_path'], scheduler=closest['scheduler'].all()).format(
-                pulse=pulse, machine=machine)
+            pulse=pulse, machine=machine)
         new_file = (path_closest, fn_closest)
+        t_diff = closest['t'].values - time
+
+        if np.abs(t_diff) >= dt_switch_gfile:
+            message = 'Closest available gfile is outside of desired time window {} +/- {}: {}'.format(
+                time, dt_switch_gfile, new_file)
+            if raise_on_inexact_match:
+                raise ValueError(message)
+            else:
+                logger.warning(message)
+
         logger.debug('Closest gfile at t={} changed from \n"{}" to \n"{}"'.format(time, current_file, new_file))
         self.last_gfile = new_file
         self.settings['gfile'] = new_file[1]
@@ -98,6 +115,7 @@ class GFileSelector(object):
 
 
     def store_gfile_info(self, pulse, machine='MAST', scheduler=False):
+        """Add information about available gfiles to self.store for requested (pulse, machine)"""
         #TODO: Consolidate code
         s = self.settings
         store = self.store
@@ -125,6 +143,10 @@ class GFileSelector(object):
         self.store['n'] = store.astype({'n': int})['n']
 
     def save_scheduler_gfile(self, pulse, time, machine='MAST', fn_format=None, path=None):
+        """Save scheduler gfile to file for access without idam"""
+        if not self.idam:
+            logging.warning('IDAM is not availble for saving gfiles')
+            return
         from pyEquilibrium import equilibrium as eq
         if fn_format is None:
             fn_format = self.settings['scheduler_gfile_fn_formats'][0]
