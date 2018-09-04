@@ -39,7 +39,7 @@ def get_from_ini(config, setting, value):
     """Return value for setting from config ini file if value is None"""
     raise NotImplementedError
 
-def delete_file(fn, path=None, ignore_exceptions=(), verbose=False):
+def delete_file(fn, path=None, ignore_exceptions=(), verbose=True):
     """Delete file with error handelling
     :param fn: filename
     :param path: optional path to prepend to filename
@@ -78,24 +78,26 @@ def getUserFile(type=""):
     filename = askopenfilename(message="Please select "+type+" file:")
     return filename
 
-def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_match=False, raise_on_missing_dir=True,
-                        raise_on_no_matches=True, depth=0, include_empty_dirs=False, **kwargs):
-    path = Path(path)
-    path = path.expanduser()
+def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, None), raise_on_incomplete_match=False,
+                        raise_on_missing_dir=True, raise_on_no_matches=True, depth=0, include_empty_dirs=False,
+                        **kwargs):
+    path = Path(path).expanduser()
     if not path.is_dir():
         if raise_on_missing_dir:
             raise IOError('Search directory "{}" does not exist'.format(path))
         else:
             return {}
+    path = path.resolve()
     # filenames_all = sorted(os.listdir(str(path)))
     out = {}
     n_matches = 0
-    for i, (root, dirs, files) in enumerate(os.walk(str(path), topdown=False)):
+    for i, (root, dirs, files) in enumerate(os.walk(str(path), topdown=True)):
         level = root.replace(str(path), '').count('/')
         if level > depth:
             break
-        out_i = filter_files(files, fn_pattern, group_keys=group_keys, raise_on_incomplete_match=raise_on_incomplete_match,
-                     raise_on_no_matches=False, verbose=False, **kwargs)
+        out_i = filter_files(files, fn_pattern, path=root, group_keys=group_keys,
+                             raise_on_incomplete_match=raise_on_incomplete_match,
+                             raise_on_no_matches=False, verbose=False, **kwargs)
         if (len(out_i) == 0) and not include_empty_dirs:
             continue
         else:
@@ -112,13 +114,14 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), raise_on_incomplete_mat
     return out
 
 
-def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match=False,
+def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range=(None, None), raise_on_incomplete_match=False,
                         raise_on_no_matches=True, verbose=True, **kwargs):
     """Return dict of filenames in given directory that match supplied regex pattern
 
     The keys of the returned dict are the matched groups for each file from the fn_pattern.
-    :param path: path in which to search for/filter filenames
+    :param filenames: filenames to be filtered
     :param fn_pattern: regex pattern to match against files. kwargs will be substituted into the pattern (see example)
+    :param path: path where files are located (only needed to querying files modification dates etc)
     :param group_keys: list that links the ordering of the regex groups to the kwargs keys. Warnings are raised
                          if not all of the kwarg values are mmatched to files.
     :param raise_on_incomplete_match: raise an exception if not all kwarg values are located
@@ -133,6 +136,11 @@ def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match
     # TODO: Use glob for path selection
     from ccfepyutils.utils import PartialFormatter
     fmt = PartialFormatter()
+
+    if (modified_range != (None, None)):
+        assert path is not None, 'A path must be supplied to filter files by modified date'
+        assert len(modified_range) == 2, 'Modifed range must have start and end'
+        assert os.path.isdir(path)
 
     # If kwargs are supplied convert them to re patterns
     re_patterns = {}
@@ -156,6 +164,16 @@ def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match
         m = re.search(fn_pattern, fn)
         if m is None:
             continue
+        if path is not None:
+            fn_path = os.path.join(path, fn)
+            t_now = time.time()
+            t_day = 24*60*60
+            t_age = t_now-os.path.getmtime(fn_path)
+            if (modified_range[0] is not None) and (t_age < modified_range[0]*t_day):
+                continue
+            if (modified_range[1] is not None) and (t_age < modified_range[1]*t_day):
+                continue
+
         ngroups = len(m.groups())
         if ngroups == 0:
             # Use index of element as output key
@@ -181,6 +199,8 @@ def filter_files(filenames, fn_pattern, group_keys=(), raise_on_incomplete_match
         if (group_key not in kwargs) or (isinstance(kwargs[group_key], (str, type(None)))):
             continue
         # List of located values for group cast to same type
+        if ngroups == 0:
+            raise ValueError('fn_pattern doesn not contain any regex groups "()"')
         if ngroups == 1:
             located_values = list(out.keys())
         else:
