@@ -15,7 +15,7 @@ except ImportError:
     pass
 
 def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', duration=0.5, file_range=None, repeat={}, path_out=None,
-            user_confirm=True):
+            user_confirm=True, palettesize=512):
     """Generate a gif from a collection of images in a given directory.
     path_in:        path of input images
     pattern         regular expression matching file to include in gif
@@ -51,12 +51,13 @@ def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', durati
         print('{} frames will be combined into gif in: {}'.format(nframes, os.path.join(path_in, fn_out)))
         if nframes < 60:
             pprint(filenames)
-        choice = raw_input('Proceed? [y/n]: ')
+        choice = input('Proceed? [y/n]: ')
         if not choice == 'y':
             print('gif was not produced')
             return  ## return from function without renaming
 
-    with imageio.get_writer(os.path.join(path_out, fn_out), mode='I', duration=duration) as writer:  # duration = 0.4
+    with imageio.get_writer(os.path.join(path_out, fn_out), mode='I', duration=duration, palettesize=palettesize,
+                            subrectangles=False) as writer:  # duration = 0.4
 
         for i, filename in enumerate(filenames):
             image = imageio.imread(os.path.join(path_in, filename))
@@ -69,7 +70,8 @@ def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', durati
 
 if __name__ == '__main__':
     # Path of images to be compiled into a gif (also the output dir)
-    path_in = '/home/tfarley/elzar/images/frames/elm_bgsub/'
+    # path_in = '/home/tfarley/elzar/images/frames/elm_bgsub/'
+    path_in = '/home/tfarley/elzar2/results/MAST/SA1.1/29852/overview_plot/7e25f017a6eaf2f655e8de7abde0faefc249b272/'
 
     # Name of output gif file (produced in same directory as input images)
     fn_out = 'movie.gif'  # Output file name
