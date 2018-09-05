@@ -152,7 +152,7 @@ class Frame(Slice):
 
     def plot(self, ax=None, annotate=True, update_existing=True, **kwargs):
         # TODO: Add automatic axis labeling once parameter class is complete
-        kws = {'mode': 'image', 'cmap': 'gray', 'show': False}
+        kws = {'mode': 'image', 'cmap': 'gray', 'show': False, 'vmin': 0, 'vmax': None}
         kws.update(kwargs)
         show = args_for(Plot.show, kws, exclude='tight_layout')
         show.update(args_for(Plot.show, kws, remove=False))  # pass tight layout to show and plot
