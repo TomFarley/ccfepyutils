@@ -30,7 +30,7 @@ import mpl_toolkits
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
 
-from ccfepyutils.utils import make_iterable, make_iterables, args_for, to_array, is_scalar, none_filter
+from ccfepyutils.utils import make_iterable, make_iterables, args_for, to_array, is_scalar, none_filter, nsigfig
 from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
@@ -402,7 +402,8 @@ class Plot(object):
         return self
 
     def set_axis_labels(self, xlabel=None, ylabel=None, zlabel=None, label_fontsize=None, tick_fontsize=None,
-                        title=None, title_fontsize=None, ax=None, tight_layout=False):
+                        fig_title=None, fig_title_fontsize=None, ax_title=None, ax_title_fontsize=None,
+                        ax=None, tight_layout=False):
         assert isinstance(xlabel, (string_types, type(None))), '{}'.format(xlabel)
         assert isinstance(ylabel, (string_types, type(None))), '{}'.format(xlabel)
         label_fontsize_dflt = self.defaults['lengend_fontsize']
@@ -426,8 +427,10 @@ class Plot(object):
                 tick_fontsize = (tick_fontsize, tick_fontsize)
             ax.tick_params(axis='both', which='major', labelsize=tick_fontsize[0])
             ax.tick_params(axis='both', which='minor', labelsize=tick_fontsize[1])
-        if title is not None:
-            ax.figure.suptitle(title, fontsize=title_fontsize)
+        if fig_title is not None:
+            ax.figure.suptitle(fig_title, fontsize=fig_title_fontsize)
+        if ax_title is not None:
+            ax.set_title(ax_title, fontsize=ax_title_fontsize)
         if tight_layout:
             self.fig.tight_layout()
 
@@ -666,7 +669,8 @@ def annotate_points(ax, x, y, point_annotations=None, annotate_points_kwargs=Non
     for xi, yi, label in zip(x, y, point_annotations):
         ax.annotate(label, (xi, yi), **kwargs)
 
-def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viridis', transpose=False, **kwargs):
+def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=True, cbar_range=None, cbar_label=None,
+             **kwargs):
     """ """
     assert not np.all([i is None for i in (x, y, z)])
 
@@ -680,17 +684,18 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
         v = z.flatten()[0]
         levels = [v, 0.1]
 
-    # if (x is not None) and (y is not None):
-    #     if (np.array(x).ndim == 1) and (np.array(y).ndim == 1):
-    #         x, y = np.meshgrid(y, x)
+    # Set range of data colored in plot
+    vmin, vmax = cbar_range if cbar_range is not None else (None, None)
 
     try:
-        if not any(v is None  for v in (x, y, z)):
-            img = ax.contour(x, y, z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
-            img = ax.contourf(x, y, z, levels, cmap=cmap, **kwargs)
+        if not any(v is None for v in (x, y, z)):
+            # Has x and y values
+            img = ax.contour(x, y, z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)  # prevent white lines between contour fils
+            img = ax.contourf(x, y, z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)
         else:
-            img = ax.contour(z, levels, cmap=cmap, **kwargs)  # prevent white lines between contour fils
-            img = ax.contourf(z, levels, cmap=cmap, **kwargs)
+            # No x or y values
+            img = ax.contour(z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)  # prevent white lines between contour fils
+            img = ax.contourf(z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)
     except ValueError as e:
         logger.exception('Failed to plot contour. min(z)={}, max(z)={}'.format(np.min(z), np.max(z)))
         img = None
@@ -700,22 +705,40 @@ def contourf(x, y, z, ax, colorbar=True, cbar_label=None, levels=200, cmap='viri
         from mpl_toolkits.axes_grid1 import make_axes_locatable
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
-        fmt = '%.2g' if colorbar != '%' else '%.2%'
+        z_max = np.max(np.abs(z)) if cbar_range is None else np.max(np.abs(cbar_range))
+        if 0.08 > z_max > 0.008:
+            fmt = '%.3f' if colorbar != '%' else '%.3%'
+        elif 0.8 > z_max >= 0.08:
+            fmt = '%.2f' if colorbar != '%' else '%.2%'
+        else:
+            fmt = '%.2g' if colorbar != '%' else '%.2%'
         if cbar_label is None:
             cbar_label = ''
-        cbar = plt.colorbar(img, cax=cax, format=fmt)
-        cbar.set_label(cbar_label)
+        # ticks = nsigfig(np.linspace(vmin, vmax, 6), 1) if cbar_range else None
 
+        if cbar_range is not None:
+            # Create ScalarMappable to define colorbar range instead of contour image
+            norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+            img = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            img.set_array([])
+
+        cbar = plt.colorbar(img, cax=cax, format=fmt, extend='neither')#  , ticks=ticks)
+        cbar.set_label(cbar_label)
     return {'img': img, 'cbar': cbar}
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
-           show_axes=False, fil_canvas=False, transpose=False, **kwargs):
+           show_axes=False, fill_canvas=False, transpose=False, adjust_contrast=None, adjust_brightness=None,
+           gamma_enhance=None, **kwargs):
     """Plot data as 2d image
 
     Note:
     - aspect = 'auto' useful for extreeme aspect ratio data
     - transpose = True useful since imshow and contourf expect arrays ordered (y, x)
 """
+    from ccfepyutils.image import gamma_enhance as _gamma_enhance
+    from ccfepyutils.image import adjust_brightness as _adjust_brightness
+    from ccfepyutils.image import adjust_contrast as _adjust_contrast
+    from ccfepyutils.image import hist_equalisation as _hist_equalisation
     if (x is not None) and (y is None) and (z is None):  # if 2d data passed to x treat x as z data
         x, y, z = y, z, x
     if x is None and y is None:
@@ -726,7 +749,11 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
         kwargs.update({'extent': (np.min(x), np.max(x), np.min(y), np.max(y))})
     if transpose:
         z = np.array(z).T
-    if fil_canvas:
+    z = _gamma_enhance(z, gamma_enhance)
+    z = _adjust_contrast(z, adjust_contrast)
+    z = _adjust_brightness(z, adjust_brightness)
+    z = _hist_equalisation(z, apply=hist_equalisation, adaptive=True)
+    if fill_canvas:
         ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
     if set_axis_limits:
         if x is None and y is None:
