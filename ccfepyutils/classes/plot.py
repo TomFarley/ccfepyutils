@@ -730,7 +730,7 @@ def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
            show_axes=False, fill_canvas=False, transpose=False, adjust_contrast=None, adjust_brightness=None,
-           gamma_enhance=None, **kwargs):
+           gamma_enhance=None,hist_equalisation=False, **kwargs):
     """Plot data as 2d image
 
     Note:
@@ -751,6 +751,7 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
         kwargs.update({'extent': (np.min(x), np.max(x), np.min(y), np.max(y))})
     if transpose:
         z = np.array(z).T
+    # TODO: Use enhancer class here?
     z = _gamma_enhance(z, gamma_enhance)
     z = _adjust_contrast(z, adjust_contrast)
     z = _adjust_brightness(z, adjust_brightness)

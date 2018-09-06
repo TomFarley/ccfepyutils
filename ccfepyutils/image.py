@@ -16,16 +16,20 @@ def to_grayscale(image):
     image_out = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return image_out
 
-def to_8bit(image):
+def to_nbit(image, nbit=8):
+    nbit = int(nbit)
     image = np.array(image)
     original_max = float(np.max(image))
     original_type = image.dtype
-    if not image.dtype == np.uint8:
-        image = (image * 255.0 / original_max).astype(np.uint8)
+    new_max = 2**nbit - 1
+    new_type = getattr(np, 'uint{:d}'.format(nbit))
+    if not image.dtype == new_type:
+        image = (image * new_max / original_max).astype(new_type)
     return image, original_max, original_type
 
-def to_original_type(image, original_max, original_type):
-    image_out =  (image * original_max / 255.0).astype(type)
+def to_original_type(image, original_max, original_type, from_type=8):
+    from_max = 2**from_type - 1
+    image_out = (image * original_max / from_max).astype(original_type)
     return image_out
 
 def threshold(image, thresh_abs=None, thresh_frac=0.25, fill_value=0):
@@ -49,7 +53,7 @@ def reduce_noise(image, diameter=5, sigma_color=75, sigma_space=75):
     :param: sigmaSpace: Filter sigma in the coordinate space. A larger value of the parameter means that farther pixels
             will influence each other as long as their colors are close enough (see sigmaColor ). When d>0 , it
             specifies the neighborhood size regardless of sigmaSpace . Otherwise, d is proportional to sigmaSpace ."""
-    image, original_max, original_type = to_8bit(image)
+    image, original_max, original_type = to_nbit(image)
     # try:
     #     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # except:
@@ -79,9 +83,11 @@ def sharpen(image, ksize_x=15, ksize_y=15, sigma=16, alpha=1.5, beta=-0.5, gamma
     sharpened = cv2.addWeighted(image, alpha, blured_image, beta, gamma)
     return sharpened
 
-def hist_equalisation(image, adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8)):
+def hist_equalisation(image, adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8), apply=True):
     """Apply histogram equalisation to image"""
-    image_out, original_max, original_type = to_8bit(image)
+    if not apply:
+        return image
+    image_out, original_max, original_type = to_nbit(image, nbit=8)
     if adaptive:
         clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
         image_out = clahe.apply(image_out)
@@ -92,11 +98,31 @@ def hist_equalisation(image, adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8
 
 def gamma_enhance(image, gamma=1.2):
     """Apply gamma enhancement to image"""
-    image_out = image ** gamma
+    image_out = image
+    if gamma not in (None, 1, 1.0):
+        image_out = image ** gamma
+    return image_out
+
+def adjust_contrast(image, adjust_contrast=1.2):
+    image_out = image
+    if adjust_contrast not in (None, 1, 1.0):
+        image_ceil = 2**np.ceil(np.log2(np.max(image))) - 1
+        image_out = (((image/image_ceil - 0.5) * adjust_contrast)+0.5)*image_ceil
+        image_out[image_out < 0] = 0
+        image_out[image_out > image_ceil] = image_ceil
+    return image_out
+
+def adjust_brightness(image, adjust_brightness=1.2):
+    image_out = image
+    if adjust_brightness not in (None, 1, 1.0):
+        image_ceil = 2**np.ceil(np.log2(np.max(image))) - 1
+        image_out = image + (adjust_brightness-1)*image_ceil
+        image_out[image_out < 0] = 0
+        image_out[image_out > image_ceil] = image_ceil
     return image_out
 
 def canny_edge_detection(image, canny_threshold1=50, canny_threshold2=250, canny_edges=True):
-    image_out, original_max, original_type = to_8bit(image)
+    image_out, original_max, original_type = to_nbit(image)
     image_out = cv2.Canny(image_out, canny_threshold1, canny_threshold2, canny_edges)  # 500, 550
     image_out = to_original_type(image_out, original_max, original_type)
     return image_out
@@ -104,7 +130,7 @@ def canny_edge_detection(image, canny_threshold1=50, canny_threshold2=250, canny
 def invert_image(image, bit_depth=255):
     convert_to_8bit = True if bit_depth == 255 and np.max(image) > bit_depth else False
     if convert_to_8bit:
-        image_out, original_max, original_type = to_8bit(image)
+        image_out, original_max, original_type = to_nbit(image)
     image_out = bit_depth - image_out
     if convert_to_8bit:
         image_out = to_original_type(image_out, original_max, original_type)
