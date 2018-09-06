@@ -547,7 +547,7 @@ class Plot(object):
         raise RuntimeError("2D axis wasn't replaced with 3D one")
 
     def save(self, save=False, settings=None, prefix='', description=None, allow_relative=True,
-             bbox_inches='tight', transparent=True, dpi=90):
+             bbox_inches='tight', transparent=True, dpi=90, verbose=True):
         if save is False:  # Don't save!
             return
         elif isinstance(save, string_types):
@@ -558,6 +558,8 @@ class Plot(object):
             assert settings is not None
             raise NotImplementedError
         self.fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
+        if verbose:
+            logger.info('Saved plot "{}" to: {}'.format(self.fig.number, path_fn))
 
     def save_image(self, z, fn, bit_depth=12):
         """Save image to file preserving resolution"""
