@@ -55,3 +55,11 @@ try:
     check_ccfepyutils_dir_struct(template_settings_dirs=template_settings_dirs, settings_dir=settings_dir)
 except FileNotFoundError as e:
     settings_dir = os.path.abspath(os.path.join(this_dir, '.ccfetools/settings'))
+
+# Make most commonly used classes available directly from ccfepyutils import
+from ccfepyutils.classes.settings import Settings
+from ccfepyutils.classes.composite_settings import CompositeSettings
+from ccfepyutils.classes.plot import Plot
+from ccfepyutils.classes.fitter import Fitter
+from ccfepyutils.classes.gfile_selector import GFileSelector
+from ccfepyutils.classes.movie import Movie
