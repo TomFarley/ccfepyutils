@@ -696,6 +696,7 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
     :param - named_dict      - if kwargs contains a dict under key '<func_name>_args' return its contents (+ filtered kwargs)
     :param - remove          - remove filtered kwargs from original kwargs
     """
+    #TODO: Include positional arguments!
     func = make_iterable(func)  # Nest lone function in list for itteration
     kws = {}
     keep = []  # list of argument names

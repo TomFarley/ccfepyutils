@@ -29,7 +29,7 @@ class GFileSelector(object):
         import idam
         idam.setHost("idam1")
     except:
-        logger.warning("Idam module found not available for saving new scheduler gfiles")
+        logger.warning("Idam module not available for saving new scheduler gfiles")
         idam = False
 
     def __init__(self, settings, fix_gfile=None, start_gfile=None, **kwargs):
@@ -249,4 +249,4 @@ if __name__ == '__main__':
     # gs.save_scheduler_gfiles_in_twin(29991, [0.12890, 0.14690], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
     # gs.save_scheduler_gfiles_in_twin(29991, [0.182, 0.195], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
     gs.save_scheduler_gfiles_in_twin(29991, [0.255, 0.272], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
-    gs.save_scheduler_gfiles_in_twin(2985, [0.255, 0.272], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
+    # gs.save_scheduler_gfiles_in_twin(29852, [0.255, 0.272], machine='MAST', dt_switch_gfile=0.005, max_workers=1)
