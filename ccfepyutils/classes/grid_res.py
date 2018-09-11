@@ -50,10 +50,10 @@ try:
     import pandas as pd
     from natsort import natsorted
 except ImportError:
-    sys.path.append(os.path.expanduser('/home/tfarley/.local/lib/python2.7/site-packages/'))
+    sys.path.append(os.path.expanduser('~/.local/lib/python2.7/site-packages/'))
     import pandas as pd
     from natsort import natsorted
-    print('Using tfarley .local version of pandas, natsort')
+    print('Using user .local version of pandas, natsort')
 pd.set_option('display.width', 190)  # wider print output in terminal (without wrapping)
 # idx = pd.IndexSlice
 
