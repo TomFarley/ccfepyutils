@@ -1506,7 +1506,7 @@ def compare_settings_hash(application, name, settings_obj, n_output=1, skip_iden
     """ Compare settings to saved settings hashes"""
     if isinstance(settings_obj, dict):
         settings_obj = Settings.from_dict(application, name, settings_obj, runtime=False)
-    hash_path = '/home/tfarley/.ccfetools/settings/hash_records/{app}/{name}/'.format(app=application, name=name)
+    hash_path = os.path.expanduser('~/.ccfetools/settings/hash_records/{app}/{name}/'.format(app=application, name=name))
     fn_pattern = 'settings_hash_record-(\w+).nc'
     files = filter_files_in_dir(hash_path, fn_pattern, ['hash_id'])
     differences = {}
