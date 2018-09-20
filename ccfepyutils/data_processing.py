@@ -12,8 +12,12 @@ import scipy as sp
 from scipy import stats
 import matplotlib
 from ccfepyutils import batch_mode
-from ccfepyutils.mpl_tools import set_matplotlib_backend
-set_matplotlib_backend(batch_mode, non_visual_backend='Agg', visual_backend='Qt5Agg')
+import matplotlib
+if batch_mode:
+    matplotlib.use('Agg')
+    print('Using non-visual backend')
+else:
+    matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 
