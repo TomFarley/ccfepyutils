@@ -9,7 +9,10 @@ import re
 import numpy as np
 import matplotlib
 import matplotlib
-matplotlib.use('Qt5Agg')
+from ccfepyutils import batch_mode
+from ccfepyutils.mpl_tools import set_matplotlib_backend
+set_matplotlib_backend(batch_mode, non_visual_backend='Agg', visual_backend='Qt5Agg')
+
 import matplotlib.pyplot as plt
 import json
 import pandas as pd

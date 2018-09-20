@@ -7,7 +7,7 @@ import os
 import numpy as np
 from pprint import pprint
 
-from io_tools import fn_filter, regexp_int_range
+from ccfepyutils.io_tools import fn_filter, regexp_int_range
 
 try:
     from natsort import natsorted as sorted
@@ -15,7 +15,7 @@ except ImportError:
     pass
 
 def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', duration=0.5, file_range=None, repeat={}, path_out=None,
-            user_confirm=True, palettesize=512):
+            user_confirm=True, palettesize=256):
     """Generate a gif from a collection of images in a given directory.
     path_in:        path of input images
     pattern         regular expression matching file to include in gif
@@ -37,11 +37,15 @@ def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', durati
         assert '{number}' in pattern, 'Include "{number}" in pattern when using file range'
         pattern = pattern.format(number=regexp_int_range(*file_range))
 
+
     filenames = fn_filter(path_in, pattern)
     filenames = sorted(filenames)
 
     nframes = len(filenames)
     assert nframes > 0, 'No frames to create gif from'
+
+    # Fill in information in filename
+    fn_out = fn_out.format(n_images=nframes)
 
     if -1 in repeat.keys():  # If repeating final frame, replace '-1' with index
         repeat[nframes-1] = repeat[-1]
@@ -51,8 +55,8 @@ def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', durati
         print('{} frames will be combined into gif in: {}'.format(nframes, os.path.join(path_in, fn_out)))
         if nframes < 60:
             pprint(filenames)
-        choice = input('Proceed? [y/n]: ')
-        if not choice == 'y':
+        choice = input('Proceed? [Y/n]: ')
+        if choice.lower() in ('n', 'no'):
             print('gif was not produced')
             return  ## return from function without renaming
 
@@ -71,10 +75,11 @@ def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', durati
 if __name__ == '__main__':
     # Path of images to be compiled into a gif (also the output dir)
     # path_in = '/home/tfarley/elzar/images/frames/elm_bgsub/'
-    path_in = '/home/tfarley/elzar2/results/MAST/SA1.1/29852/overview_plot/7e25f017a6eaf2f655e8de7abde0faefc249b272/'
+    # path_in = '/home/tfarley/elzar2/results/MAST/SA1.1/29852/overview_plot/7e25f017a6eaf2f655e8de7abde0faefc249b272/'
+    path_in = '/home/tfarley/elzar2/results/MAST/SA1.1/29852/overview_plot/7077f2fb8db4df870b8cf4a617b9e0150b46f8d8/'
 
     # Name of output gif file (produced in same directory as input images)
-    fn_out = 'movie.gif'  # Output file name
+    fn_out = 'movie_{n_images}.gif'  # Output file name
     # fn_out = '{range}.gif'  # Output file name
 
     # Regex pattern describing files to include in gif. Use {number} to filter files by numbering.
@@ -86,7 +91,7 @@ if __name__ == '__main__':
     # file_number_range = [350, 469]  # range of numbers permitted in filename filter
 
     # Number of additional times to repeat each frame number. Useful for creating pause and beginning and end of gif
-    repeat = {0: 3, -1: 0}
+    repeat = {0: 2, -1: 0}
 
     # Frame duration in seconds
     duration = 0.3

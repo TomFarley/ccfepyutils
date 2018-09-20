@@ -3,12 +3,12 @@ from logging.config import fileConfig
 import os, inspect, shutil
 import pandas as pd
 
-batch_mode = os.getenv('LOADL_ACTIVE', 'no')
+batch_mode = os.getenv('LOADL_ACTIVE', 'no') == 'yes'
 job_name = os.getenv('LOADL_JOB_NAME', None)
 execution_mode = os.getenv('LOADL_STEP_TYPE', None)
 in_docker = os.getenv('IN_DOCKER', 'False')
 import matplotlib
-if (batch_mode == 'yes') or (in_docker == 'True'):
+if (batch_mode is True) or (in_docker == 'True'):
     matplotlib.use('Agg')
     print('In batch mode')
 else:

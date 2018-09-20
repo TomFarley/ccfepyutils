@@ -2,9 +2,6 @@
 
 import logging, warnings, os, itertools
 
-import matplotlib
-matplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
 
@@ -14,6 +11,21 @@ from ccfepyutils.utils import make_iterable, safe_len
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+def set_matplotlib_backend(use_non_visual_backend, non_visual_backend='Agg', visual_backend='Qt5Agg'):
+    import matplotlib
+    # TODO: Supress backend warnings
+    if use_non_visual_backend:
+        matplotlib.use(non_visual_backend)
+        logger.info('Using non-visual backend')
+    else:
+        matplotlib.use(visual_backend)
+        # matplotlib.use('Qt4Agg')
+        pass
+
+from ccfepyutils import batch_mode
+set_matplotlib_backend(batch_mode, non_visual_backend='Agg', visual_backend='Qt5Agg')
+import matplotlib
+import matplotlib.pyplot as plt
 colormap_names = sorted(m for m in plt.cm.datad if not m.endswith("_r"))
 
 def get_fig_ax(ax=None, num=None, subplot=111, **fig_kwargs):

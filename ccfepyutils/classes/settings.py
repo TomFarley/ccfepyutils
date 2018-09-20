@@ -465,7 +465,8 @@ class Settings(object):
             cols = self.column_sets_names['type']
             df.loc[:, cols] = df.loc[:, cols].fillna(False)
             for com_setting in self._composite_settings:
-                # Update composite settings objects referencing these settings
+                # Update composite settings objects to referencing these settings
+                # TODO: Fix pandas warning: A value is trying to be set on a copy of a slice from a DataFrame
                 com_setting._df.loc[item] = self._df.loc[item]
                 com_setting._subsetting_mod_times[self] = t_now_str('natural')
                 com_setting._hash_id = None
@@ -1308,7 +1309,8 @@ class SettingsLogFile(object):
 
     def __call__(self, name, cols=None):
         """Get log information for setting set, specifying columns"""
-        assert name in self._df.index, 'Name {} not in index for {}'.format(name, self.application)
+        assert name in self._df.index, 'No "{}" settings for name "{}". Options: {}'.format(self.application, name,
+                                                                                         self._df.index)
         if cols is None:
             return self[name]
         else:

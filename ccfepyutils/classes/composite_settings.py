@@ -116,11 +116,15 @@ class CompositeSettings(object):
                     items[item].append(s)
             if df_nest.loc[item, 'setting']:
                 name = df_nest.loc[item, 'value']
-                # If include_children pass to subsequent calls, but set False for calls from core Settings set
-                df = self.append_settings_file(item, name, df, settings, items,
-                                           add_to_whitelist=(include_children and (application != self._application)),
-                                           include_children=include_children, exclude_if_col_true=exclude_if_col_true,
-                                               update_values=update_values)
+                try:
+                    # If include_children pass to subsequent calls, but set False for calls from core Settings set
+                    df = self.append_settings_file(item, name, df, settings, items,
+                                               add_to_whitelist=(include_children and (application != self._application)),
+                                               include_children=include_children, exclude_if_col_true=exclude_if_col_true,
+                                                   update_values=update_values)
+                except Exception as e:
+                    logger.warning('Failed to append settings file: {} {}'.format(item, name))
+                    raise e
         return df
 
     def save(self, force=False):
