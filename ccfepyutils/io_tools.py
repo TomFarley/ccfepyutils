@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from past.types import basestring
 
-from ccfepyutils.utils import (string_types, make_iterable, compare_dict,
+from ccfepyutils.utils import (make_iterable, compare_dict,
     is_number, is_subset, str_to_number, args_for)
 from ccfepyutils.debug import get_traceback_location
 
@@ -19,6 +19,10 @@ try:
 except ImportError as e:
     logger.debug('Please install natsort for improved sorting')
 
+try:
+    string_types = (basestring, unicode)  # python2
+except Exception as e:
+    string_types = (str,)  # python3
 
 def create_config_file(fn, dic):
     """Create ini config file structured around supplied dictionary"""
