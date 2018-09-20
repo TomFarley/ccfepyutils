@@ -8,8 +8,7 @@ from pathlib import Path
 import numpy as np
 from past.types import basestring
 
-from ccfepyutils.utils import (make_iterable, compare_dict,
-    is_number, is_subset, str_to_number, args_for)
+from ccfepyutils.utils import make_iterable, compare_dict, is_number, is_subset, str_to_number, args_for
 from ccfepyutils.debug import get_traceback_location
 
 logger = logging.getLogger(__name__)
