@@ -22,13 +22,9 @@ def set_matplotlib_backend(use_non_visual_backend, non_visual_backend='Agg', vis
         # matplotlib.use('Qt4Agg')
         pass
 
+from ccfepyutils import batch_mode
 import matplotlib
-if batch_mode:
-    matplotlib.use('Agg')
-    print('Using non-visual backend')
-else:
-    matplotlib.use('Qt5Agg')
-import matplotlib
+set_matplotlib_backend(batch_mode, non_visual_backend='Agg', visual_backend='Qt5Agg')
 import matplotlib.pyplot as plt
 colormap_names = sorted(m for m in plt.cm.datad if not m.endswith("_r"))
 
