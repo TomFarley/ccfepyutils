@@ -254,6 +254,7 @@ class Settings(object):
         if self.file_exists:
             self.load()
         else:
+            logger.info('Initialising new empty settings ({}, {})'.format(application, name))
             self.init()
 
         self.add_instance()
@@ -280,8 +281,9 @@ class Settings(object):
             raise ValueError('No settings set name supplied to Settings,get().\n'
                              'Existing settings for application "{}": {}'.format(
                             application, cls.existing_settings(application)))
-        if Settings.get_instance(application, name) is not None:
-            return Settings.get_instance(application, name)
+        s = Settings.get_instance(application, name)
+        if s is not None:
+            return s
         else:
             return Settings(application, name)
         
@@ -1309,8 +1311,9 @@ class SettingsLogFile(object):
 
     def __call__(self, name, cols=None):
         """Get log information for setting set, specifying columns"""
-        assert name in self._df.index, 'No "{}" settings for name "{}". Options: {}'.format(self.application, name,
-                                                                                         self._df.index)
+        if name not in self._df.index:
+            raise ValueError('SettingsLogFile: No "{}" settings for name "{}". Options: {}'.format(
+                                                self.application, name, self._df.index))
         if cols is None:
             return self[name]
         else:

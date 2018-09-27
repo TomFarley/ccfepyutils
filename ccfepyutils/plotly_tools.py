@@ -28,7 +28,7 @@ def hoverinfo_text(names, values, format='0.3g'):
     example usage:
     trace = go.Scatter3d(x=x, y=y, z=z, mode='markers', text=hoverinfo_text(axis_labels, values), hoverinfo='text')"""
     # from ccfepyutils.ccfe_array import make_iterable
-    names, values = make_iterable(names, cast=list), make_iterable(values, cast=list)  # iterable
+    names, values = make_iterable(names, cast_to=list), make_iterable(values, cast_to=list)  # iterable
     for i in np.arange(len(values)):  # make sure values are flattened arrays
         values[i] = values[i].flatten()
     fmt = ''

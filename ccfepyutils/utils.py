@@ -144,18 +144,20 @@ def is_scalar(var):
     else:
         return True
 
-def is_number(s):
+def is_number(s, cast_string=False):
     """
     TODO: Test on numbers and strings and arrays
     """
     # from numbers import
+    if (not cast_string) and isinstance(s, string_types):
+        return False
     try:
         n=str(float(s))
         if n == "nan" or n=="inf" or n=="-inf" :
             return False
     except ValueError:
         try:
-            complex(s) # for complex
+            complex(s)  # for complex
         except ValueError:
             return False
     except TypeError as e:  # eg trying to convert an array
