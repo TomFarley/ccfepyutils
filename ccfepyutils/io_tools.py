@@ -532,7 +532,8 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
             out = func(*args, **kwargs)
             success = True
         except exceptions as e:
-            logger.warning('Attempt {} to call function "{}" failed'.format(attempt, func.__name__))
+            logger.warning('Attempt {} to call function "{}({})" failed'.format(
+                            attempt, func.__name__, ', '.join([str(a) for a in args])))
             if attempt <= n_attempts:
                 time.sleep(sleep_invterval)
                 attempt += 1
