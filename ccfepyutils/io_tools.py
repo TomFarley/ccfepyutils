@@ -555,7 +555,7 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
                 else:
                     out = e
                     break
-    return out#, success
+    return out, success
 
 
 def gen_hash_id(obj, mode='ripemd160'):
