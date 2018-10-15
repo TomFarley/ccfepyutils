@@ -12,6 +12,8 @@ import pandas as pd
 import xarray as xr
 import natsort
 
+import matplotlib.pyplot as plt
+
 from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
 from ccfepyutils.classes.data_stack import Stack, Slice
@@ -41,7 +43,7 @@ def get_camera_data_path(machine, camera, pulse):
     fn_options = camera_settings['fn_options']
     
     path_kws = {'machine': machine, 'pulse': pulse}
-    fn_kws = {'n': 0, 'pulse': pulse}
+    fn_kws = {'n': 1, 'pulse': pulse}
     path, fn_format = locate_file(path_options, fn_options, path_kws=path_kws, fn_kws=fn_kws,
                           return_raw_path=False, return_raw_fn=True, _raise=True, verbose=True)
     # Sub in pulse number, but leave mraw file number "{n:02d}" in place
@@ -159,7 +161,13 @@ class Frame(Slice):
         if (update_existing and hasattr(ax, 'ccfe_plot') and (ax in ax.ccfe_plot.ax_artists) and
                 ('img' in ax.ccfe_plot.ax_artists[ax])):
             plot = ax.ccfe_plot
-            plot.ax_artists[ax]['img'].set_data(self.data.T)
+            img = plot.ax_artists[ax]['img']
+            img.set_data(self.data.T)
+            data_max = np.max(self.data.values)
+            clim1 = img.get_clim()[1]
+            if (clim1 is not None) and ((clim1 > data_max / 4) or (data_max > clim1)):
+                # Update imshow dynamic range to cover data range or reduce it if loading different frame data with diff range
+                img.set_clim(0, data_max)
             logger.debug('Updated existing image artist')
         else:
             plot = Slice.plot(self, ax=ax, show=False, **kws)
@@ -286,7 +294,7 @@ class Movie(Stack):
         # Check file path exists
         if not fn_path.parent.is_dir():
             raise IOError('Path "{}" does not exist'.format(fn_path.parent))
-        if not Path(str(fn_path).format(n=0, pulse=pulse)).is_file():
+        if not Path(str(fn_path).format(n=1, pulse=pulse)).is_file():
             raise IOError('Cannot locate file "{}" in path {}'.format(fn_path.name, fn_path.parent))
 
         self.fn_path = str(fn_path)
@@ -625,14 +633,17 @@ class Movie(Stack):
         movie_meta['frame_range'] = [np.min(list(frames_all.keys())), np.max(list(frames_all.keys()))]
         movie_meta['t_range'] = [np.nan, np.nan]
         movie_meta['fps'] = np.nan
-        example_frame = np.load(os.path.join(path, frame_files[0]))['frame']
+        example_frame = np.load(os.path.join(path, frame_files[0]))
+        if hasattr(example_frame, 'files'):
+            # If numpy file is a compressed file archive, extract the frame array from the archive
+            example_frame = example_frame['frame']
 
         # TODO: Remove tmp bodge!
         if transforms == []:
             transforms = ['transpose', 'reverse_y']
 
         movie_meta['frame_shape'] = transform_image(example_frame, transforms).shape
-        movie_meta['frame0'] = 0
+        movie_meta['frame0'] = np.min(list(frames_all.keys()))
         return movie_meta
 
     def get_mraw_file_number(self, **kwargs):
@@ -802,7 +813,9 @@ class Movie(Stack):
             if n not in frames_all:
                 raise IOError('Cannot locate npz file for frame n={}'.format(n))
             fn = frames_all[n]
-            data_i = np.load(os.path.join(path, fn))['frame']
+            data_i = np.load(os.path.join(path, fn))
+            if hasattr(data_i, 'files'):
+                data_i = data_i['frame']
 
             # TODO: remove tmp bodge for npz files which are saved in different format to pickle synth data!
             if transforms == []:
