@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
 """General purpose tools for processing data"""
-import itertools
-import numbers
-
-import os
+import itertools, numbers, logging, os
 from copy import deepcopy
 
 import numpy as np
@@ -20,6 +17,8 @@ else:
     matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
+
+logger = logging.getLogger(__name__)
 
 
 def local_maxima(arr, bg_thresh=0.0, neighborhood=(7, 7), elliptical=True):
@@ -392,8 +391,10 @@ def auto_correlation(signal, detrend=False, norm=True):
     return autocorr
 
 def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
-        max_resolution=None, density=False, max_1=False, filter_nans=True):
+        max_resolution=None, density=False, max_1=False, filter_nans=True, detect_delta_fuctions=False):
     """Return bin edges and counts in PDF for given x data
+
+    detect_delta_fuctions: used to plot sharp deltas rather than triangles when all x vales are the same
 
     bin_edges, bin_centres, counts = pdf(x, nbins=15)"""
     # Todo: add outlier detection to auto pdf
@@ -409,12 +410,23 @@ def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_
 
         x_range = np.ptp(x)
         # Check don't exceed max resolution for x data to avoid jagged beating of pdf
-        if (max_resolution is None) and (x_range > 0):  # may overestimate max_resolution for small sample sizes
-            diffs = np.abs(np.diff(x))
-            max_resolution = 2*np.min(diffs[diffs>0])  # twice minimum distance between values to avoid gaps
+        # If max_resolution not supplied, estimate it from data
+        if (max_resolution is None):
+            if (x_range > 0):  # may overestimate max_resolution for small sample sizes
+                diffs = np.abs(np.diff(x))
+                max_resolution = 2*np.min(diffs[diffs > 0])  # twice minimum distance between values to avoid gaps
+            else:
+                # If all x data is the same use 100th of data magnitude
+                max_resolution = x[0] / 100
 
         if x_range == 0:
-            nbins = 1
+            if detect_delta_fuctions:
+                nbins = 3
+                x0 = x[0]
+                bin_edges = [x0-1.5*max_resolution, x0-0.5*max_resolution, x0+0.5*max_resolution, x0+1.5*max_resolution]
+                logger.debug('Using bin edges for delta function pdf: {}'.format(bin_edges))
+            else:
+                nbins = 1
         elif (max_resolution is not False) and (x_range/nbins < max_resolution):  # Reduce number of bins
             nbins = int(np.floor(x_range/max_resolution))
         if nbins < nbins_min:

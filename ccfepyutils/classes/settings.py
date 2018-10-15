@@ -1302,7 +1302,8 @@ class SettingsLogFile(object):
     def __init__(self, application):
         """ """
         assert isinstance(application, str)
-        self.application = application
+        self._df = None
+        self.application = application  # setter calls load() method
 
     def __getitem__(self, name):
         """Get log information for setting set"""
@@ -1329,7 +1330,7 @@ class SettingsLogFile(object):
         self.save()
 
     def save(self):
-        gc.collect()# Fix problems with netcdf file handles persisting
+        gc.collect()  # Fix problems with netcdf file handles persisting
         exists = self.file_exists
         # Don't save the log file if it is empty
         if not exists and len(self.names) == 0:

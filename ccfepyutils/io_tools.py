@@ -12,6 +12,7 @@ from ccfepyutils.utils import make_iterable, compare_dict, is_number, is_subset,
 from ccfepyutils.debug import get_traceback_location
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 try:
     from natsort import natsorted
     sorted = natsorted
@@ -518,7 +519,8 @@ def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, r
         return None, None
 
 def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOError,), sleep_invterval=0.5,
-                    error_message='Call to {func} failed after {n_attempts} attempts', call_on_fail=(), verbose=True):
+                    error_message='Call to {func} failed after {n_attempts} attempts',
+                    call_on_fail=(), raise_on_fail=True, verbose=True):
     """Attempt I/O call multiple times with pauses in between to avoid read/write clashes etc."""
     if args is None:
         args = ()
@@ -529,8 +531,12 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
     success = False
     while (success is False):
         try:
+            logger.debug('Attempt {} to call function "{}({})"'.format(
+                            attempt, func.__name__, ', '.join([str(a) for a in args])))
             out = func(*args, **kwargs)
             success = True
+            logger.debug('Suceeded on attempt {} to call function "{}({})"'.format(
+                            attempt, func.__name__, ', '.join([str(a) for a in args])))
         except exceptions as e:
             logger.warning('Attempt {} to call function "{}({})" failed'.format(
                             attempt, func.__name__, ', '.join([str(a) for a in args])))
@@ -544,8 +550,12 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
                     raise NotImplementedError  # Need args_for to pass positional args
                     args, kwargs = args_for(func, kwargs)
                     func(*args0, **kws)
-                raise e
-    return out
+                if raise_on_fail:
+                    raise e
+                else:
+                    out = e
+                    break
+    return out, success
 
 
 def gen_hash_id(obj, mode='ripemd160'):
@@ -595,6 +605,12 @@ def regexp_int_range(low, high, compile=False):
     else:
         return '(%s)' % '|'.join('{:d}'.format(i) for i in range(low, high + 1))
 
+def regexp_int_set(values, compile=False):
+    fmt = '%%0%dd' % len(str(np.max(values)))
+    if compile:
+        return re.compile('(%s)' % '|'.join(fmt % i for i in values))
+    else:
+        return '(%s)' % '|'.join('{:d}'.format(i) for i in values)
 
 def pos_path(value, allow_relative=True):
     """Return True if value is a potential file path else False"""

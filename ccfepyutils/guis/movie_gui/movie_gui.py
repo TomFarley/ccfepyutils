@@ -257,10 +257,16 @@ class MovieGUI(QtWidgets.QMainWindow):
         widget.sb_frame_no.setSingleStep(frame_stride)
         # Time range spin boxes
         # TODO: Handle missing time values
-        widget.sb_time.setMinimum(movie._movie_meta['t_range'][0]*self.time_multiplier)
-        widget.sb_time.setMaximum(movie._movie_meta['t_range'][1]*self.time_multiplier)
-        widget.sb_time.setSingleStep(frame_stride*self.time_multiplier/movie._movie_meta['fps'])
-        widget.sb_time.setDecimals(np.ceil(np.log10(movie._movie_meta['fps'])))
+        if not np.all(np.isnan(movie._movie_meta['t_range'])):
+            widget.sb_time.setMinimum(movie._movie_meta['t_range'][0]*self.time_multiplier)
+            widget.sb_time.setMaximum(movie._movie_meta['t_range'][1]*self.time_multiplier)
+            widget.sb_time.setSingleStep(frame_stride*self.time_multiplier/movie._movie_meta['fps'])
+            widget.sb_time.setDecimals(np.ceil(np.log10(movie._movie_meta['fps'])))
+        else:
+            widget.sb_time.setMinimum(-1)
+            widget.sb_time.setMaximum(-1)
+            widget.sb_time.setSingleStep(0)
+            widget.sb_time.setDecimals(-1)
         # Frame slider range
         sldr_frame = self.movie_widget.sldr_frame
         sldr_frame.setMinimum(movie.frame_range[0])

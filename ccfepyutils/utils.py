@@ -136,7 +136,7 @@ def make_iterables(*args):
     return out
 
 def is_scalar(var):
-    """ True if variable is scalar """
+    """ True if variable is scalar or string"""
     if isinstance(var, str):
         return True
     elif hasattr(var, "__len__"):
@@ -187,13 +187,38 @@ def ndarray_0d_to_num(array):
             raise NotImplementedError(array.dtype)
     return out
 
-def safe_len(var, scalar=1):
+def input_timeout(prompt='Input: ', timeout=1, raise_on_timeout=False, yes_no=False, default_yes=True):
+    import sys, select, time
+    # print(prompt, end='')
+    print(prompt)
+    t0 = time.time()
+    i, o, e = select.select([sys.stdin], [], [], timeout*60)
+    t1 = time.time()
+    if (t1-t0) / 60 > timeout:
+        message = 'Input timed out after {} mins'.format(timeout)
+        print(message)
+        if raise_on_timeout:
+            raise IOError(message)
+    if yes_no:
+        if i.lower() in ('y', 'yes'):
+            i = True
+        elif i.lower() in ('n', 'no'):
+            i = False
+        elif i == '':
+            i = default_yes
+        else:
+            raise ValueError('Input "{}" not recognised yes/no option'.format(i))
+    return i
+
+def safe_len(var, scalar=1, all_nan=0, none=0):
     """ Length of variable returning 1 instead of type error for scalars """
+    if var is None:
+        return none
     if is_scalar(var): # checks if has atribute __len__
         return scalar
     elif len(np.array(var) == np.nan) == 1 and np.all(np.array(var) == np.nan):
         # If value is [Nan] return zero length # TODO: change to catch [Nan, ..., Nan] ?
-        return 0
+        return all_nan
     else:
         return len(var)
 
