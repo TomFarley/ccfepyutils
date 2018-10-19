@@ -703,6 +703,8 @@ def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=
         logger.exception('Failed to plot contour. min(z)={}, max(z)={}'.format(np.min(z), np.max(z)))
         img = None
 
+    out = {'img': img}
+
     # TODO: move to Plot class
     if colorbar and img:
         from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -727,7 +729,9 @@ def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=
 
         cbar = plt.colorbar(img, cax=cax, format=fmt, extend='neither')#  , ticks=ticks)
         cbar.set_label(cbar_label)
-    return {'img': img, 'cbar': cbar}
+        out['cbar'] = cbar
+
+    return out
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
            show_axes=False, fill_canvas=False, transpose=False, adjust_contrast=None, adjust_brightness=None,
