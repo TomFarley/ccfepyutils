@@ -218,11 +218,11 @@ class CompositeSettings(object):
     def __setitem__(self, item, value):
         self(item, value)
     
-    def __call__(self, item, value=None, create_columns=False, _save=False, **kwargs):
+    def __call__(self, item, value=None, _create_columns=False, _save=False, **kwargs):
         """Call __call__ from appropriate settings object"""
         item = Settings.name_to_item(self, item)
         settings = self.get_settings_for_item(item)
-        out = settings(item, value=value, create_columns=create_columns, _save=_save, **kwargs)
+        out = settings(item, value=value, _create_columns=_create_columns, _save=_save, **kwargs)
 
         # Update combined settings instance to reflect change
         # if Settings.is_list_item(settings, item):

@@ -419,7 +419,7 @@ class Settings(object):
                         order = len(self)
                 else:
                     order += 1
-                self(item_i, v, create_columns=_create_columns, **kwargs)
+                self(item_i, v, _create_columns=_create_columns, **kwargs)
                 self.reorder_item(item_i, order, save=False)
                 for com_setting in self._composite_settings:
                     # Update composite settings objects referencing these settings
