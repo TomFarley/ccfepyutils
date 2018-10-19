@@ -43,23 +43,30 @@ def get_from_ini(config, setting, value):
     """Return value for setting from config ini file if value is None"""
     raise NotImplementedError
 
-def delete_file(fn, path=None, ignore_exceptions=(), verbose=True):
+def delete_file(fn, path=None, ignore_exceptions=(), raise_on_fail=True, verbose=True):
     """Delete file with error handelling
     :param fn: filename
     :param path: optional path to prepend to filename
     :ignore_exceptions: Tuple of exceptions to pass over (but log) if raised eg (FileNotFoundError,) """
+    fn = str(fn)
     if path is not None:
         fn_path = os.path.join(path, fn)
     else:
         fn_path = fn
+    success = False
     try:
         os.remove(fn_path)
+        success = True
         if verbose:
             logger.info('Deleted file: {}'.format(fn_path))
     except ignore_exceptions as e:
         logger.debug(e)
     except Exception as e:
-        raise e
+        if raise_on_fail:
+            raise e
+        else:
+            logger.warning('Failed to delete file: {}'.format(fn_path))
+    return success
 
 def rm_files(path, pattern, verbose=True, match=True, ignore_exceptions=()):
     path = str(path)
@@ -82,9 +89,27 @@ def getUserFile(type=""):
     filename = askopenfilename(message="Please select "+type+" file:")
     return filename
 
-def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, None), raise_on_incomplete_match=False,
+def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, None), n_matches_expected=None,
+                        raise_on_incomplete_match=False,
                         raise_on_missing_dir=True, raise_on_no_matches=True, depth=0, include_empty_dirs=False,
                         **kwargs):
+    """Return dict of filenames in 'path' directory that match supplied regex pattern
+
+    The keys of the returned dict are the matched groups for each file from the fn_pattern.
+    :param filenames: filenames to be filtered
+    :param fn_pattern: regex pattern to match against files. kwargs will be substituted into the pattern (see example)
+    :param path: path where files are located (only needed to querying files modification dates etc)
+    :param group_keys: list that links the ordering of the regex groups to the kwargs keys. Warnings are raised
+                         if not all of the kwarg values are mmatched to files.
+    :param raise_on_incomplete_match: raise an exception if not all kwarg values are located
+    :param kwargs: values are substituted into the fn_pattern (provided the pattern contains a format key matching that
+                    of the kwarg) with lists/arrays of values converted to the appropriate regex pattern.
+    e.g. to get the files with values of n between 10 and 50 use. The returned dict will be keyed by the number n and
+    the last group in the filename (<n>, <.*>). You will be warned if any of the requested n's are not found.
+    fn_pattern = 'myfile-n({n})-(.*).nc'
+    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(20,51))
+
+    """
     path = Path(path).expanduser()
     if not path.is_dir():
         if raise_on_missing_dir:
@@ -107,6 +132,9 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, N
         else:
             n_matches += len(out_i)
             out[root] = out_i
+        if (n_matches_expected is not None) and (n_matches >= n_matches_expected):
+            # If all the required files have been found, ignore the remaining files
+            break
     if (n_matches == 0):
         message = 'Failed to locate any files with pattern "{}" in {}, depth={}'.format(fn_pattern, path, depth)
         if raise_on_no_matches:
@@ -120,7 +148,7 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, N
 
 def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range=(None, None), raise_on_incomplete_match=False,
                         raise_on_no_matches=True, verbose=True, **kwargs):
-    """Return dict of filenames in given directory that match supplied regex pattern
+    """Return dict of filenames from given set of filenames that match supplied regex pattern
 
     The keys of the returned dict are the matched groups for each file from the fn_pattern.
     :param filenames: filenames to be filtered
@@ -131,11 +159,15 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
     :param raise_on_incomplete_match: raise an exception if not all kwarg values are located
     :param kwargs: values are substituted into the fn_pattern (provided the pattern contains a format key matching that
                     of the kwarg) with lists/arrays of values converted to the appropriate regex pattern.
+
     e.g. to get the files with values of n between 10 and 50 use. The returned dict will be keyed by the number n and
     the last group in the filename (<n>, <.*>). You will be warned if any of the requested n's are not found.
-    fn_pattern = 'myfile-n({n})-(.*).nc'
+    fn_pattern = 'myfile-n({n})-(.*)\.nc'
     fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(20,51))
 
+    e.g. to get all files in a directory sorted by some number in their filename i.e. catch all values of n:
+    fn_pattern = 'myfile-n(\d+)-.*\.nc'
+    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'])
     """
     # TODO: Use glob for path selection
     from ccfepyutils.utils import PartialFormatter
@@ -152,13 +184,14 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
         if isinstance(value, (np.ndarray, list, tuple)):  # and is_number(value[0]):
             # List/array of numbers, so match any number in list
             re_patterns[key] = '{}'.format('|'.join([str(v) for v in value]))
-        if isinstance(value, str):
+        elif isinstance(value, str):
             # Replace python format codes eg {time:0.3f} with regex pattern eg ([.\d]{3,4})
             fmt_pattern = '{{{key:}[^_]*}}'.format(key=key).replace('{', '\{').replace('}', '\}')
             fn_pattern = re.sub(fmt_pattern, value, fn_pattern)
     # fn_pattern = fn_pattern.format(**re_patterns)
     try:
-        fn_pattern = fmt.format(fn_pattern, **re_patterns)
+        # fn_pattern = fmt.format(fn_pattern, **re_patterns)
+        fn_pattern = fn_pattern.format(**re_patterns)
     except IndexError as e:
         pass
     out = {}
@@ -531,12 +564,12 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
     success = False
     while (success is False):
         try:
-            logger.debug('Attempt {} to call function "{}({})"'.format(
-                            attempt, func.__name__, ', '.join([str(a) for a in args])))
+            # logger.debug('Attempt {} to call function "{}({})"'.format(
+            #                 attempt, func.__name__, ', '.join([str(a) for a in args])))
             out = func(*args, **kwargs)
             success = True
-            logger.debug('Suceeded on attempt {} to call function "{}({})"'.format(
-                            attempt, func.__name__, ', '.join([str(a) for a in args])))
+            # logger.debug('Suceeded on attempt {} to call function "{}({})"'.format(
+            #                 attempt, func.__name__, ', '.join([str(a) for a in args])))
         except exceptions as e:
             logger.warning('Attempt {} to call function "{}({})" failed'.format(
                             attempt, func.__name__, ', '.join([str(a) for a in args])))
