@@ -1,5 +1,6 @@
 .idea/
 tmp/
+*tmp*
 .coverage
 .eggs/
 .pytest_cache/
