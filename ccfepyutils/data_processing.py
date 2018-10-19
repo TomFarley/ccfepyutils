@@ -433,6 +433,7 @@ def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_
             nbins = nbins_min
 
     bins = bin_edges if (bin_edges is not None) else nbins
+    logger.debug('Bins: {}'.format(bins))
     counts, bin_edges = np.histogram(x, bins=bins, density=density)
 
     counts = counts / np.max(counts) if max_1 else counts

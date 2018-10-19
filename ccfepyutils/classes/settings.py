@@ -374,7 +374,7 @@ class Settings(object):
         return out
 
     @in_state('modifying', 'modified')
-    def __call__(self, item, value=None, create_columns=False, _save=False, _silent=False, **kwargs):
+    def __call__(self, item, value=None, _create_columns=False, _save=False, _silent=False, _verbose=True, **kwargs):
         """Set value of setting
         :item: name of setting to change
         :value: value to set the item to
@@ -419,7 +419,7 @@ class Settings(object):
                         order = len(self)
                 else:
                     order += 1
-                self(item_i, v, create_columns=create_columns, **kwargs)
+                self(item_i, v, create_columns=_create_columns, **kwargs)
                 self.reorder_item(item_i, order, save=False)
                 for com_setting in self._composite_settings:
                     # Update composite settings objects referencing these settings
@@ -446,7 +446,8 @@ class Settings(object):
                 col = self.get_value_column(self._df, item)
                 df.loc[item, col] = value
                 df.loc[item, 'value'] = str(value)
-                logger.info('Existing item of {} set: "{}" = {}'.format(repr(self), col, value))
+                if _verbose:
+                    logger.info('Existing item of {} set: "{}" = {}'.format(repr(self), col, value))
             for k, v in kwargs.items():
                 # TODO: Deal with setting columns for list item
                 if (k in self.columns) and (df.loc[item, k] == v):
@@ -456,7 +457,7 @@ class Settings(object):
                     # Modify existing value
                     df.loc[item, k] = v
                     modified = True
-                elif create_columns:
+                elif _create_columns:
                     # New column
                     df.loc[item, k] = v
                     logger.info('Added column {} to {}'.format(k, repr(self)))
