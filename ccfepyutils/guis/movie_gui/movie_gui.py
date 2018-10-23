@@ -30,6 +30,7 @@ FEATURES (minor):
 
 """
 import sys, os, random, logging, traceback
+from pathlib import Path
 import numpy as np
 from ccfepyutils.classes.movie import Movie
 from ccfepyutils.utils import str_to_number, make_iterable, replace_in
@@ -54,7 +55,8 @@ class MovieGUI(QtWidgets.QMainWindow):
         self.setCentralWidget(self.centralWidget)
         self.gl_main = QtWidgets.QGridLayout(self.centralWidget)
         # Load QtCore.movie widget and add to grid layout
-        self.movie_widget = uic.loadUi('movie.ui')
+        pwd = Path(__file__).parent
+        self.movie_widget = uic.loadUi(str(pwd/'movie.ui'))
         self.gl_main.addWidget(self.movie_widget, 0, 0, 0, 0)
 
         self._prev_dir = os.path.expanduser('~')  # Record of previous save dir
