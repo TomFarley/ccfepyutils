@@ -48,8 +48,10 @@ icon_dir = os.path.abspath('../icons/')
 
 class MovieGUI(QtWidgets.QMainWindow):
 
-    def __init__(self):
+    def __init__(self, movie):
         super(MovieGUI, self).__init__()
+        assert isinstance(movie, Movie)
+        self.movie = movie
         # Set up main window and gridlayout for this window
         self.centralWidget = QtWidgets.QWidget()
         self.setCentralWidget(self.centralWidget)
@@ -68,7 +70,6 @@ class MovieGUI(QtWidgets.QMainWindow):
         from mpltoolbar import MplToolbar
         self.setWindowTitle("CCFE Movie Viewer")
         self.movie_widget.gb_enhancements.clicked.connect(self.hide_enhancements_pannel)
-        self.movie = Movie(29852, camera='SA1.1', machine='MAST', start_frame=10, end_frame=100, name='Movie_gui')
         movie = self.movie
         widget = self.movie_widget
 
@@ -510,9 +511,11 @@ class Worker(QtCore.QRunnable):
 
 
 if __name__ == '__main__':
+    movie = Movie(29852, camera='SA1.1', machine='MAST', start_frame=10, end_frame=100, name='Movie_gui')
+
     app = QtWidgets.QApplication(sys.argv)
 
     app.aboutToQuit.connect(app.deleteLater)  # if using IPython Console
-    window = MovieGUI()
+    window = MovieGUI(movie)
 
     sys.exit(app.exec_())

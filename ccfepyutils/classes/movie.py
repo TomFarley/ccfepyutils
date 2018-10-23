@@ -2,7 +2,7 @@
 
 """Classes for working with fusion camera data"""
 
-import os, re, numbers, logging, inspect, glob, pickle, socket, string
+import os, re, numbers, logging, inspect, glob, sys, pickle, socket, string
 from collections import defaultdict, OrderedDict
 from pathlib import Path
 from copy import copy, deepcopy
@@ -1039,6 +1039,17 @@ class Movie(Stack):
 
     def from_hdf5(self, fn=None):
         raise NotImplementedError
+
+    def open_gui(self):
+        from ccfepyutils.guis.movie_gui.movie_gui import MovieGUI
+        from PyQt5 import QtWidgets
+        app = QtWidgets.QApplication(sys.argv)
+
+        app.aboutToQuit.connect(app.deleteLater)  # if using IPython Console
+        self.gui = MovieGUI(self)
+
+        sys.exit(app.exec_())
+        self.gui = None
 
     @property
     def data(self):
