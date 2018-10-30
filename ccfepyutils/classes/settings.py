@@ -299,6 +299,8 @@ class Settings(object):
         exclude_if_col_true = make_iterable(exclude_if_col_true)
         settings = Settings.get(application, name)
         for item, value in core_values.items():
+            if isinstance(value, Setting):
+                value = value.value
             settings.set(item, value, ignore=[None])
         composite_settings = CompositeSettings(application, name, blacklist=blacklist, whitelist=whitelist,
                                                exclude_if_col_true=exclude_if_col_true, update_values=kwargs)

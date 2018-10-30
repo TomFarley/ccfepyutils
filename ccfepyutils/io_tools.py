@@ -1,5 +1,5 @@
 import configparser
-import os, time
+import os, time, gc
 import logging
 import pickle
 import re
@@ -337,8 +337,11 @@ def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
 
 def sub_dirs(path):
     """Return subdirectories contained within top level directory/path"""
+    path = os.path.expanduser(path)
+    assert os.path.isdir(path)
     out = [p[0] for p in os.walk(path)]
-    out.pop(out.index(path))
+    if len(out) > 0:
+        out.pop(out.index(path))
     return out
 
 def test_pickle(obj):
@@ -573,6 +576,7 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
         except exceptions as e:
             logger.warning('Attempt {} to call function "{}({})" failed'.format(
                             attempt, func.__name__, ', '.join([str(a) for a in args])))
+            gc.collect()  # Attemp to avoid netcdf segfaults?
             if attempt <= n_attempts:
                 time.sleep(sleep_invterval)
                 attempt += 1

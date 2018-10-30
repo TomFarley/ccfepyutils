@@ -406,6 +406,10 @@ class CompositeSettings(object):
         return hash_id
 
     @property
+    def name(self):
+        return self.core.name
+
+    @property
     def column_sets_names(self):
         names = {key: [v[0] for v in value] for key, value in Settings.default_column_sets.items()}
         return names

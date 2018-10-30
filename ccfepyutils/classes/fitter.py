@@ -81,9 +81,9 @@ class Fitter(object):
             elif window == '<-max':
                 ind = np.arange(0, np.argmax(y)+1)
             elif window == 'rightpeak->':
-                window_sizes = [0.3, 0.5]  # Spatial scale range of peaks
+                window_sizes = [0.1, 0.5]  # Spatial scale range of peaks
                 # local maxima on similar spatial scale to peaks
-                ind_high = np.where(y > 0.5*np.max(y))
+                ind_high = np.where(y > np.min(y) + 0.5*np.ptp(y))
                 ind_max = argrelmax(y, order=int(len(x)*window_sizes[0]*0.5))[0]
                 if len(ind_max) == 0:
                     ind_max = argrelmax(y, order=2)[0]
@@ -275,9 +275,9 @@ class Fitter(object):
                 raise ValueError('Function {} not recognised/supported'.format(fit))
 
             kws = args_for(self.plot_fit, kwargs)
-            func, popt, pcov, chi2r = self.plot_fit(func, p0=p0, ax=ax, fit_window=fit_window, show=False, **kws)
+            ax, func, popt, pcov, chi2r = self.plot_fit(func, p0=p0, ax=ax, fit_window=fit_window, show=False, **kws)
         else:
-            func, popt, pcov, chi2r = None, None, None, None
+            ax, func, popt, pcov, chi2r = ax, None, None, None, None
 
         if legend:
             try:

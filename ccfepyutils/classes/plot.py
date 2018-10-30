@@ -35,7 +35,7 @@ from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 from ccfepyutils.data_processing import pdf
-from ccfepyutils.mpl_tools import set_cycler, colormap_names, repeat_color
+from ccfepyutils.mpl_tools import set_cycler, colormap_names, repeat_color, close_all_mpl_plots
 try:
     string_types = (basestring, unicode)  # python2
 except Exception as e:
@@ -357,7 +357,7 @@ class Plot(object):
             mode = self._get_modes(x, y, z)[0]  # take first compatible mode as default
         self._check_mode(x, y, z, mode)  # Check mode is compatible with supplied data
         if mode == 'pdf':
-            kws = args_for(plot_pdf, kwargs, include=self.plot_args, remove=True)
+            kws = args_for((plot_pdf, pdf), kwargs, include=self.plot_args, remove=True)
             bin_edges, bin_centres, counts = plot_pdf(x, ax, **kws)
             self.return_values = bin_edges, bin_centres, counts
         elif mode == 'line':
@@ -560,7 +560,7 @@ class Plot(object):
             raise NotImplementedError
         self.fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
         if verbose:
-            logger.info('Saved plot "{}" to: {}'.format(self.fig.number, path_fn))
+            logger.info('Saved plot "{}" to: {}'.format(self.fig.canvas.get_window_title(), path_fn))
 
     def save_image(self, z, fn, bit_depth=12):
         """Save image to file preserving resolution"""
@@ -568,17 +568,17 @@ class Plot(object):
         scipy.misc.toimage(z, cmin=0.0, cmax=2 ** bit_depth).save(fn)  # Ensure preserve resolution and bit depth
         logger  # TODO logger
 
-    def show(self, show=True, tight_layout=True, legend=True):
-        if (not show) or (self.fig is None):
-            return
-        if legend:
-            self.legend()
-        if tight_layout:
-            try:
-                plt.tight_layout()
-            except ValueError as e:
-                logger.exception('tight_layout failed with strange mpl error!')
-        plt.show()
+    def show(self, show=True, tight_layout=True, legend=True, close_previous_plot_windows=True):
+        if (show) and (self.fig is not None):
+            if legend:
+                self.legend()
+            if tight_layout:
+                try:
+                    plt.tight_layout()
+                except ValueError as e:
+                    logger.exception('tight_layout failed with strange mpl error!')
+            plt.show()
+        close_all_mpl_plots(close_all=close_previous_plot_windows, verbose=False)
 
     def to_plotly(self):
         """Convert figure to plotly figure"""
@@ -605,19 +605,20 @@ def plot_1d(x, y, ax, ls=None, lw=None, alpha=None, **kwargs):
 
 def plot_pdf(x, ax, label=None, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
         max_resolution=None, density=False, max_1=False, **kwargs):
+    kws = args_for(pdf, kwargs)
     bin_edges, bin_centres, counts = pdf(x, nbins=nbins, bin_edges=bin_edges, min_data_per_bin=min_data_per_bin,
                                          nbins_max=nbins_max, nbins_min=nbins_min, max_resolution=max_resolution,
-                                         density=density, max_1=max_1)
+                                         density=density, max_1=max_1, **kws)
     ax.plot(bin_centres, counts, label=label, **kwargs)
     if ax.get_xlabel() == '':
         ax.set_xlabel(label)
     if ax.get_ylabel() == '':
         if density:
-            y_label = 'Frequency density [N/A]'
+            y_label = 'Frequency density'
         elif max_1:
-            y_label = 'Normalised frequency [N/A]'
+            y_label = 'Normalised frequency'
         else:
-            y_label = 'Frequency [N/A]'
+            y_label = 'Frequency'
         ax.set_ylabel(y_label)
     ax.set_ylim(bottom=0)
     return bin_edges, bin_centres, counts
