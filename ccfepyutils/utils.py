@@ -2,16 +2,13 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
-from datetime import datetime
-
-from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
-
 """
 Utility functions used in the filament tracker program
 """
 from past.builtins import basestring  # pip install future
 from pprint import pprint
 import string
+from datetime import datetime
 # try:
 #     from Tkinter import Tk  # python2 freia
 #     from tkFileDialog import askopenfilename
@@ -135,12 +132,14 @@ def make_iterables(*args):
         out.append(obj)
     return out
 
-def is_scalar(var):
+def is_scalar(var, ndarray_0d=True):
     """ True if variable is scalar or string"""
     if isinstance(var, str):
         return True
     elif hasattr(var, "__len__"):
         return False
+    elif isinstance(var, np.ndarray) and var.ndim == 0:
+        return ndarray_0d
     else:
         return True
 
@@ -176,15 +175,21 @@ def is_numeric(value):
             numeric = False
     return numeric
 
-def ndarray_0d_to_num(array):
+def ndarray_0d_to_scalar(array):
     out = array
     if isinstance(array, np.ndarray) and array.ndim == 0:
-        if array.dtype == np.float64:
-            out = float(array)
-        elif array.dtype == np.int32:
-            out = int(array)
-        else:
-            raise NotImplementedError(array.dtype)
+        out = array.item()
+        # dtype = array.dtype
+        # if 'float' in str(dtype):
+        #     out = float(array)
+        # elif 'int' in str(dtype):
+        #     out = int(array)
+        # elif '<U' in str(dtype):
+        #     out = str(array)
+        # elif dtype == object:
+        #     raise NotImplementedError
+        # else:
+        #     raise NotImplementedError(array.dtype)
     return out
 
 def input_timeout(prompt='Input: ', timeout=1, raise_on_timeout=False, yes_no=False, default_yes=True):
@@ -210,14 +215,16 @@ def input_timeout(prompt='Input: ', timeout=1, raise_on_timeout=False, yes_no=Fa
             raise ValueError('Input "{}" not recognised yes/no option'.format(i))
     return i
 
-def safe_len(var, scalar=1, all_nan=0, none=0):
+def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0):
     """ Length of variable returning 1 instead of type error for scalars """
     if var is None:
         return none
-    if is_scalar(var): # checks if has atribute __len__
+    elif isinstance(var, np.ndarray) and var.ndim == 0:
+        return ndarray_0d
+    if is_scalar(var):  # checks if has atribute __len__ etc
         return scalar
-    elif len(np.array(var) == np.nan) == 1 and np.all(np.array(var) == np.nan):
-        # If value is [Nan] return zero length # TODO: change to catch [Nan, ..., Nan] ?
+    elif (len(np.array(var)) == np.sum(np.isnan(np.array(var)))):
+        # If value is [Nan, Nan, ...] return zero length
         return all_nan
     else:
         return len(var)
@@ -232,7 +239,7 @@ def safe_zip(*args):
 def safe_arange(start, stop, step):
     """Return array of elements between start and stop, each separated by step.
 
-    Replacement for np.arange that always includes stop.
+    Replacement for np.arange that DOES always include stop.
     Normally np.arange should not include stop, but due to floating point precision sometimes it does, so output is
     unpredictable"""
     n = np.abs((stop - start) / step)
@@ -483,7 +490,7 @@ class ROISelector(object):
 
 
 def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
-                  decimals=2, nth_loop=2, barLength=50):
+                  decimals=2, nth_loop=2, barLength=50, flush=True):
     """
     Based on http://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
 
@@ -529,7 +536,8 @@ def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
         time = ' {past} -> {remain}'.format(past=t_diff_past, remain=t_diff_rem)
 
     sys.stdout.write('\r %s |%s| %s%s%s%s %s' % (prefix, bar, frac, percents, '%', time, suffix)),
-    sys.stdout.flush()
+    if flush:
+        sys.stdout.flush()
     if iteration == total:
         sys.stdout.write('\n')
         sys.stdout.flush()
@@ -896,45 +904,6 @@ def lookup_from_dataframe(df, col, _raise_on_missing=True, **kwargs):
         new_value = new_value[0]
     return new_value
 
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-    safe_arange(1.32, 1.46, 0.003)
-
-
-    reference = [1, -345, 0, 23432.5]
-    arr = [23432.234, -345.36, 0.0004, 4356256, -0.254, -344.9] #[345.45654, 6.4576, 0.0007562, 4.34534, 0.34534]
-    print('match_in...')
-    print('match_in: {} -> {}: {}'.format(arr, reference, replace_in(arr, reference, tol=0.2)))
-    print('isclose_withini: {} -> {}: {}'.format(arr, reference, isclose_within(arr, reference, tol=0.2)))
-
-    print('nsignif: {} -> {}'.format(arr, nsigfig(arr, 3)))
-
-    plt.figure()
-    plt.subplot(2,1,1)
-    line1, = plt.plot(range(10), 'ro-')
-    plt.subplot(2,1,2)
-    line2, = plt.plot(range(10), 'bo-')
-
-    DataCursor([line1, line2])
-    # plt.show()
-
-    x = [1,4,7,9,12,16]
-    print('moving_average:', moving_average(x, 1))
-    print('moving_average:', moving_average(x, 2))
-    print('moving_average:', moving_average(x, 3))
-    print(find_nearest(x, 11))
-    print(find_nearest(x, 11, index=False))
-
-    a, b = [[1,2], [11,2], [2,4], [7,32], [7,1], [8,23], [6,6.5]], [[15,52], [17,23], [12,24], [17,38], [6,6], [10,23]]
-    indices = find_furthest(a, b, index=True)
-    print(indices)
-
-    print(a[indices[0]], b[indices[1]])
-    print('Arrays:')
-    pprint(to_arrays(x, a, b, arr))
-
-
 def datetime2str(time, format="%y%m%d%H%M%S"):
     string = time.strftime(format)
     return string
@@ -1011,3 +980,43 @@ class PartialFormatter(string.Formatter):
         except ValueError:
             if self.bad_fmt is not None: return self.bad_fmt
             else: raise
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
+
+    safe_arange(1.32, 1.46, 0.003)
+
+
+    reference = [1, -345, 0, 23432.5]
+    arr = [23432.234, -345.36, 0.0004, 4356256, -0.254, -344.9] #[345.45654, 6.4576, 0.0007562, 4.34534, 0.34534]
+    print('match_in...')
+    print('match_in: {} -> {}: {}'.format(arr, reference, replace_in(arr, reference, tol=0.2)))
+    print('isclose_withini: {} -> {}: {}'.format(arr, reference, isclose_within(arr, reference, tol=0.2)))
+
+    print('nsignif: {} -> {}'.format(arr, nsigfig(arr, 3)))
+
+    plt.figure()
+    plt.subplot(2,1,1)
+    line1, = plt.plot(range(10), 'ro-')
+    plt.subplot(2,1,2)
+    line2, = plt.plot(range(10), 'bo-')
+
+    DataCursor([line1, line2])
+    # plt.show()
+
+    x = [1,4,7,9,12,16]
+    print('moving_average:', moving_average(x, 1))
+    print('moving_average:', moving_average(x, 2))
+    print('moving_average:', moving_average(x, 3))
+    print(find_nearest(x, 11))
+    print(find_nearest(x, 11, index=False))
+
+    a, b = [[1,2], [11,2], [2,4], [7,32], [7,1], [8,23], [6,6.5]], [[15,52], [17,23], [12,24], [17,38], [6,6], [10,23]]
+    indices = find_furthest(a, b, index=True)
+    print(indices)
+
+    print(a[indices[0]], b[indices[1]])
+    print('Arrays:')
+    pprint(to_arrays(x, a, b, arr))
