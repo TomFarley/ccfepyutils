@@ -18,6 +18,8 @@ else:
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 
+from ccfepyutils.utils import safe_arange
+
 logger = logging.getLogger(__name__)
 
 
@@ -156,24 +158,29 @@ def low_pass(signal, order=3, critical_freq=0.05):
     return y
 
 
-def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_longest=False, verbose=True):
+def data_split(x, y=None, gap_length=3, data_length=10, gap_length_abs=None,
+               av_diff=False, return_longest=False, verbose=True):
     """ Split data at gaps where difference between x data points in much greater than the average/modal difference
     Return indices and values of data in each continuous section (and y values if supplied)"""
     i = np.arange(len(x))
-    ## Find the average distace between the x data
+    x = np.array(x)
     diff = np.diff(x)               # differences between adjacent data
-    av_gap = stats.mode(diff) if not av_diff else np.average(diff)       # average/modal separation
+    if gap_length_abs is None:
+        ## Find the average distace between the x data
+        av_gap = stats.mode(diff) if not av_diff else np.average(diff)       # average/modal separation
+        gap_length_abs = gap_length*av_gap
     ## Get indices of begining of gaps sufficiently greater than the average
-    igap = np.nonzero(diff > gap_length*av_gap)[0]  # nonzero nested in tuple
+    igap = np.nonzero(diff > gap_length_abs)[0]  # nonzero nested in tuple
 
-    if verbose: 
+    if verbose:
         print('data_split: {} gap(s) identified: {}'.format(len(igap), igap))
 
     xsplit = []
     if y is not None:
+        y = np.array(y)
         ysplit = []
     isplit_all = []
-    ## No gap => 1 linear section, 1 gap => 2 linear sections, 2 pags => 3 linear sections etc.
+    ## No gap => 1 linear section, 1 gap => 2 linear sections, 2 gaps => 3 linear sections, etc.
     ## If no gaps, don't split the data
     if len(igap) == 0:
         xsplit.append(x)
@@ -182,8 +189,8 @@ def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_lo
         isplit_all.append(i)
     else:
         ## First set of linear data before first gap
-        if igap[0]-0 >= data_length: # Only add data if set is long enough
-            isplit = np.arange(0, igap[0]) # begining of data to begining of gap
+        if igap[0]-0 >= data_length:  # Only add data if set is long enough
+            isplit = np.arange(0, igap[0])  # begining of data to begining of gap
             xsplit.append(x[isplit])
             if y is not None:
                 ysplit.append(y[isplit])
@@ -215,11 +222,11 @@ def data_split(x, y=None, gap_length=3, data_length=10, av_diff=False, return_lo
 
     # If return_longest is True, only return longest section of data without gaps, else return all data with gap removed
     ind = int(np.array([len(x) for x in xsplit]).argmax()) if return_longest else np.arange(len(xsplit)).astype(int)
-    isplit_all, xsplit, ysplit = np.array(isplit_all), np.array(xsplit), np.array(ysplit)
+    isplit_all, xsplit = np.array(isplit_all), np.array(xsplit)
     if y is not None:
-        return isplit_all[ind], xsplit[ind], ysplit[ind]
+        return isplit_all[ind], xsplit[ind], np.array(ysplit[ind])
     else:
-        return isplit_all[ind], xsplit[ind]
+        return isplit_all[ind], xsplit[ind], None
 
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
@@ -390,50 +397,84 @@ def auto_correlation(signal, detrend=False, norm=True):
         autocorr /= np.max(autocorr)
     return autocorr
 
-def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=40, nbins_min=3,
-        max_resolution=None, density=False, max_1=False, filter_nans=True, detect_delta_fuctions=False):
+def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=50, nbins_min=3,
+        data_per_bin_percentiles=(5, 95), max_resolution=None, density=False, max_1=False, filter_nans=True,
+        detect_delta_fuctions=False, av_data_per_delta=10, compensate_for_extrema=True, res_delta_zero=0.1):
     """Return bin edges and counts in PDF for given x data
 
-    detect_delta_fuctions: used to plot sharp deltas rather than triangles when all x vales are the same
+    detect_delta_fuctions: used to plot sharp deltas rather than triangles when only a few unique x values
 
     bin_edges, bin_centres, counts = pdf(x, nbins=15)"""
-    # Todo: add outlier detection to auto pdf
+    # TODO: Add nbins_ideal as in blobs.pdf - use to set min_data_per_bin
+    # Add forced bin_width option
     assert not ((nbins is not None) and (bin_edges is not None)), 'Only supply one bins argument'
+    x = np.array(x)
     if filter_nans:
         x = x[~np.isnan(x)]
     if len(x) < 2:
         return np.array([]), np.array([]), np.array([])
     if (nbins is None) and (bin_edges is None):
-        nbins = np.floor(len(x) / min_data_per_bin)
-        nbins = int(np.round(np.max([8, nbins])))
-        nbins = np.min((nbins, nbins_max))
 
         x_range = np.ptp(x)
+        av_data_per_unique_value = len(x) / len(set(x))
+        contains_deltas = (av_data_per_unique_value > av_data_per_delta) or (x_range == 0)
+
         # Check don't exceed max resolution for x data to avoid jagged beating of pdf
         # If max_resolution not supplied, estimate it from data
         if (max_resolution is None):
-            if (x_range > 0):  # may overestimate max_resolution for small sample sizes
+            if x_range == 0 and x[0] == 0:
+                # Delta at 0 so no information about data resolution - use kwarg info
+                max_resolution = res_delta_zero
+            elif detect_delta_fuctions and contains_deltas:
+                max_resolution = x[0] / 10000
+            elif (x_range > 0):
+                # General case of non-delta data. May overestimate max_resolution for small sample sizes
                 diffs = np.abs(np.diff(x))
-                max_resolution = 2*np.min(diffs[diffs > 0])  # twice minimum distance between values to avoid gaps
+                max_resolution = np.min(diffs[diffs > 0])  # minimum distance between values to avoid gaps
             else:
-                # If all x data is the same use 100th of data magnitude
-                max_resolution = x[0] / 100
+                # Single delta, not at zero - use 100th of data magnitude as guess
+                max_resolution = x[0] / 10000
 
-        if x_range == 0:
-            if detect_delta_fuctions:
-                nbins = 3
-                x0 = x[0]
-                bin_edges = [x0-1.5*max_resolution, x0-0.5*max_resolution, x0+0.5*max_resolution, x0+1.5*max_resolution]
-                logger.debug('Using bin edges for delta function pdf: {}'.format(bin_edges))
-            else:
-                nbins = 1
-        elif (max_resolution is not False) and (x_range/nbins < max_resolution):  # Reduce number of bins
-            nbins = int(np.floor(x_range/max_resolution))
-        if nbins < nbins_min:
-            nbins = nbins_min
+        if (not detect_delta_fuctions) or (not contains_deltas):
+            # Number of bins needed for requested minimum average data per bin
+            nbins = np.floor(len(x) / min_data_per_bin)
+            # Make sure nbins not below minimum requested
+            nbins = int(np.round(np.max([nbins_min, nbins])))
+
+            x_lims = [np.min(x), np.max(x)]
+            x_sub_lims = [np.percentile(x, data_per_bin_percentiles[0]), np.percentile(x, data_per_bin_percentiles[1])]
+            x_sub_range = x_sub_lims[1] - x_sub_lims[0]
+            if compensate_for_extrema:
+                # Increase number of bins if extrema are increasing the x range and so unevenly distributing min_data_per_bin
+                # Bascially add extra bins to cover areas of x range where effectively empty bins
+                try:
+                    nbins = int(np.ceil(nbins * (0.01 * (data_per_bin_percentiles[1] - data_per_bin_percentiles[0])) /
+                                        ((x_sub_range) / x_range)))
+                except ValueError as e:
+                    raise e
+            if nbins_max is not None:
+                # Keep nbins below max requested
+                nbins = np.min((nbins, nbins_max))
+
+            if (max_resolution is not False) and (x_range/(nbins-1) < max_resolution):
+                # Reduce number of bins if sampling above data resolution
+                nbins = int(np.floor(x_range/max_resolution)) + 1
+        else:
+            # Return sharp deltas rather than triangles when only a few unique x values
+            # if x_range == 0:
+            #     # Single delta function
+            #     nbins = 3
+            #     x0 = x[0]
+            #     bin_edges = [x0-1.5*max_resolution, x0-0.5*max_resolution, x0+0.5*max_resolution, x0+1.5*max_resolution]
+            #     logger.debug('Using bin edges for delta function pdf: {}'.format(bin_edges))
+            # else:
+            try:
+                bin_edges = safe_arange(np.min(x)-1.5*max_resolution, np.max(x)+1.5*max_resolution, max_resolution)
+            except Exception as e:
+                raise e
 
     bins = bin_edges if (bin_edges is not None) else nbins
-    logger.debug('Bins: {}'.format(bins))
+    # logger.info('Bins: {}'.format(bins))
     counts, bin_edges = np.histogram(x, bins=bins, density=density)
 
     counts = counts / np.max(counts) if max_1 else counts
