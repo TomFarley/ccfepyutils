@@ -425,6 +425,10 @@ class Movie(Stack):
         if self.current_frame not in self.frame_numbers:
             self.current_frame = frames_user[0]
         # TODO: recover useful data from previous_frames_data when extending frame range etc
+        self.settings['start_frame'] = frame_range_all[0]
+        self.settings['end_frame'] = frame_range_all[1]
+        stride = (np.ptp(frames_all)+1)/len(frames_all)
+        self.settings['stride'] = int(stride) if stride % 1 == 0 else np.nan
         self._data = None
         self._values = None
         self._enhanced_movie = None
