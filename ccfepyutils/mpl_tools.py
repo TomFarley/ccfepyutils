@@ -503,6 +503,12 @@ def show_if(show, close_all=False):
     if show:
         plt.show()
 
+def annotate_axis(ax, string, x=0.85, y=0.955, fontsize=16,
+                  bbox=dict(facecolor='w', ec=None, lw=0, alpha=0.5, boxstyle='round'),
+                horizontalalignment='center', verticalalignment='center'):
+    ax.text(x, y, string, fontsize=fontsize, bbox=bbox,
+            horizontalalignment=horizontalalignment, verticalalignment=verticalalignment, transform=ax.transAxes)
+
 if __name__ == '__main__':
     fig = plt.figure()
     axes = fig.add_subplot(111)
