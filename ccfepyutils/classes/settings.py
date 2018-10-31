@@ -281,6 +281,7 @@ class Settings(object):
             raise ValueError('No settings set name supplied to Settings,get().\n'
                              'Existing settings for application "{}": {}'.format(
                             application, cls.existing_settings(application)))
+        application, name = str(application), str(name)
         s = Settings.get_instance(application, name)
         if s is not None:
             return s
