@@ -379,19 +379,23 @@ class CompositeSettings(object):
         from ccfepyutils.io_tools import gen_hash_id
         if self._hash_id is not None:
             return self._hash_id
+        application, name = self._application, self._name
         mask = ~self._df['runtime']
-        df = self._df.loc[mask, 'value']
-        hash_id = gen_hash_id(df)
-        path = os.path.join(settings_dir, 'hash_records', self._application, self._name)
+        df_hash = self._df.loc[mask]
+        df_runtime = self._df.loc[~mask]
+        hash_id = gen_hash_id(df_hash)
+        path = os.path.join(settings_dir, 'hash_records', application, name)
         if not os.path.isdir(path):
             mkdir(path, depth=3)
-        fn = 'settings_hash_record-{}.nc'.format(hash_id)
+        fn = 'settings_hash_record-{}-{}-{}.nc'.format(application, name, hash_id)
         fn_path = os.path.join(path, fn)
         t0 = t_now_str(format='natural')
         if not os.path.isfile(fn_path):
+        # if True:
             meta = {'application': self._application, 'name': self._name, 'first_used': t0, 'last_used': t0,
                     'protected': False}
-            df.to_xarray().to_netcdf(fn_path, mode='w', group='df')
+            df_hash.to_xarray().to_netcdf(fn_path, mode='w', group='df')
+            df_runtime.to_xarray().to_netcdf(fn_path, mode='a', group='runtime')
             with Dataset(fn_path, "a", format="NETCDF4") as root:
                 dict_to_netcdf(root, 'meta', meta)
             logger.info('Created new settings hash file record: {}'.format(fn))
