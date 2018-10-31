@@ -735,8 +735,8 @@ def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=
     return out
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
-           show_axes=False, fill_canvas=False, transpose=False, adjust_contrast=None, adjust_brightness=None,
-           gamma_enhance=None,hist_equalisation=False, **kwargs):
+           extent=None, show_axes=False, fill_canvas=False, transpose=False,
+           adjust_contrast=None, adjust_brightness=None, gamma_enhance=None,hist_equalisation=False, **kwargs):
     """Plot data as 2d image
 
     Note:
@@ -753,8 +753,9 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
         ax.set_axis_off()  # Don't display axes and labels
         if len(ax.figure.axes) == 1:
             ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
-    else:
-        kwargs.update({'extent': (np.min(x), np.max(x), np.min(y), np.max(y))})
+    elif extent is None:
+        # Use x and y arrays to set axis labels
+        extent = (np.min(x), np.max(x), np.min(y), np.max(y))
     if transpose:
         z = np.array(z).T
     # TODO: Use enhancer class here?
@@ -777,7 +778,7 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
         ax.set_axis_off()
     # if aspect:
     #     ax.set_aspect(aspect)
-    img = ax.imshow(z, cmap=cmap, interpolation=interpolation, origin=origin, **kwargs)
+    img = ax.imshow(z, cmap=cmap, interpolation=interpolation, origin=origin, extent=extent, **kwargs)
     return {'img': img}
 
 def plot_2d(self, z, x, y, ax, raw=False, show=True, save=False, annotate=True,
