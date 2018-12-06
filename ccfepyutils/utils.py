@@ -28,6 +28,7 @@ except ImportError:
     import pickle
 import logging
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 try:
     string_types = (basestring, unicode)  # python2
@@ -169,8 +170,8 @@ def is_numeric(value):
         numeric = False
     else:
         try:
-            np.sum(value)
-            numeric = True
+            sum_values = np.sum(value)
+            numeric = is_number(sum_values, cast_string=False)
         except TypeError as e:
             numeric = False
     return numeric
@@ -217,16 +218,21 @@ def input_timeout(prompt='Input: ', timeout=1, raise_on_timeout=False, yes_no=Fa
 
 def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0):
     """ Length of variable returning 1 instead of type error for scalars """
+    # logger.debug(var)
     if var is None:
         return none
     elif isinstance(var, np.ndarray) and var.ndim == 0:
         return ndarray_0d
-    if is_scalar(var):  # checks if has atribute __len__ etc
+    elif is_scalar(var):  # checks if has atribute __len__ etc
         return scalar
-    elif (len(np.array(var)) == np.sum(np.isnan(np.array(var)))):
-        # If value is [Nan, Nan, ...] return zero length
-        return all_nan
     else:
+        assert hasattr(var, '__len__')
+        try:
+            if (len(np.array(var)) == np.sum(np.isnan(np.array(var)))):
+                # If value is [Nan, Nan, ...] return zero length
+                return all_nan
+        except TypeError as e:
+            pass
         return len(var)
 
 def safe_zip(*args):
@@ -253,6 +259,48 @@ def safe_arange(start, stop, step):
     out = np.linspace(start, stop, n)
     return out
 
+def cast_safe(obj, new_type):
+    """Cast obj to new_type, nesting if necessary, or change dtype for arrays"""
+    assert isinstance(new_type, type)
+    if (new_type in (tuple, list, np.ndarray)) and is_scalar(obj):
+        out = new_type([obj])
+    elif is_scalar(obj):
+        out = new_type(obj)
+    elif new_type in (tuple, list, np.ndarray):
+        out = new_type(obj)
+    elif isinstance(obj, np.ndarray):
+        out = obj.astype(new_type)
+    else:
+        raise NotImplementedError('Cast safe not implemented for new_type: {}, obj: {}'.format(new_type, obj))
+    return out
+
+
+def ceil_cast(value, cast_type=int):
+    """Return ceil cast to int
+
+    Avoids unnecessary rounding up due to floating point representation"""
+    scalar = is_scalar(value)
+
+    # Avoid unnecessary rounding up due to floating point representation
+    out = to_array(value)
+    mask = np.isclose(out, np.round(out))
+    out[mask] = np.round(out[mask])
+
+    out = np.ceil(out)
+
+    if scalar:
+        out = out[0]
+
+    if cast_type is not None:
+        out = cast_safe(out, cast_type)
+    return out
+
+def round_cast(value, cast_type=int):
+    """Round input and return cast to int"""
+    out = np.round(value)
+    out = cast_safe(out, cast_type)
+    return out
+
 def any_equal(object, list):
     """ Return true if object is equal to any of the elements of list
     """
@@ -266,6 +314,46 @@ def is_in(items, collection):
     items = make_iterable(items)
     collection = make_iterable(collection)
     out = pd.Series(items).isin(collection).values
+    return out
+
+def similarity_difflib(reference, option):
+    import difflib
+    similarity = difflib.SequenceMatcher(a=reference.lower(), b=option.lower()).ratio()
+    return similarity
+
+def similarilty_to(reference, options, return_type='order', n_return=None,
+                   similarity_threshold=None, similarity_measure='difflib'):
+    """Compare strings and rank in order of similarity"""
+    assert return_type in ('order', 'values', 'similarity')
+    assert similarity_measure in ('difflib',)
+    if similarity_measure == 'difflib':
+        similarity_func = similarity_difflib
+    else:
+        raise ValueError('similarity_measure "{}" not recognised'.format(similarity_measure))
+    reference = str(reference)
+    options = to_array(options)
+    similarities = np.zeros(len(options))
+    for i, option in enumerate(options):
+        option = str(option)
+        similarity = similarity_func(reference.lower(), option.lower())
+        similarities[i] = similarity
+    ordering = np.argsort(similarities)[::-1]
+
+    if return_type == 'order':
+        out = ordering
+    elif return_type == 'values':
+        out = options[ordering]
+    elif return_type == 'similarity':
+        out = similarities
+    else:
+        raise ValueError('Return type "{}" not recognised'.format(return_type))
+
+    if similarity_threshold is not None:
+        # Only return values above similarity threshold
+        mask = similarities > similarity_threshold
+        out = out[mask]
+    if n_return is not None:
+        out = out[:n_return]
     return out
 
 def to_list(obj):
@@ -361,19 +449,28 @@ def compare_dict(dict1, dict2, tol=1e-12, top=True):
                     return False
     return True
 
-def isclose_within(values, reference, tol=1e-8, all=False):
+def isclose_within(values, reference, tol=1e-8, all=False, return_values=False):
     """Return true if elements of a appear in comparison_list (b) within tollerance
     From: http://stackoverflow.com/questions/39602004/can-i-use-pandas-dataframe-isin-with-a-numeric-tolerance-parameter
     """
     # import pandas as pd
+    scalar_value = is_scalar(values)
     values = to_array(values)
     reference = to_array(reference)
     values = np.expand_dims(values, axis=1)  # add dimension to compare pairwise
     out = np.isclose(values, reference, atol=tol).any(axis=1)
-    if all is False:
-        return out
+    if all:
+        # Return single boolean
+        out = np.all(out)
+    elif return_values:
+        # Return values that are close
+        out = values.flatten()[out]
     else:
-        return np.all(out)
+        # Return indices of values that are close
+        pass
+    if scalar_value and not is_scalar(out):
+        out = out[0]
+    return out
 
 def equal_string(obj, string):
     """Return True if obj is equal to string"""
@@ -721,6 +818,11 @@ def exists_equal(value, obj, indices):
     obj = exists_lookup(obj, *indices)
     return obj == value
 
+def argsort(itterable):
+    #http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3382369#3382369
+    #by unutbu
+    return sorted(range(len(itterable)), key=itterable.__getitem__)
+
 def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_dict=True, remove=True):
     """Return filtered dict of args from kwargs that match input for func.
     :param - Effectively filters kwargs to return those arguments
@@ -732,7 +834,7 @@ def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_d
     :param - remove          - remove filtered kwargs from original kwargs
     """
     #TODO: Include positional arguments!
-    func = make_iterable(func)  # Nest lone function in list for itteration
+    func = make_iterable(func)  # Nest lone function in list for itteration, TODO: Handle itterable classes
     kws = {}
     keep = []  # list of argument names
     name_args = []
@@ -986,8 +1088,11 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
 
-    safe_arange(1.32, 1.46, 0.003)
+    similarilty_to()
 
+    safe_arange(1.32, 1.46, 0.003)
+    l = [[4,5], [1,1], [2,1], [1,2]]
+    argsort(l)
 
     reference = [1, -345, 0, 23432.5]
     arr = [23432.234, -345.36, 0.0004, 4356256, -0.254, -344.9] #[345.45654, 6.4576, 0.0007562, 4.34534, 0.34534]
