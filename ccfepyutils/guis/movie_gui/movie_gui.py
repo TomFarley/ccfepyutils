@@ -30,6 +30,7 @@ FEATURES (minor):
 
 """
 import sys, os, random, logging, traceback
+from pathlib import Path
 import numpy as np
 from ccfepyutils.classes.movie import Movie
 from ccfepyutils.utils import str_to_number, make_iterable, replace_in
@@ -47,14 +48,17 @@ icon_dir = os.path.abspath('../icons/')
 
 class MovieGUI(QtWidgets.QMainWindow):
 
-    def __init__(self):
+    def __init__(self, movie):
         super(MovieGUI, self).__init__()
+        assert isinstance(movie, Movie)
+        self.movie = movie
         # Set up main window and gridlayout for this window
         self.centralWidget = QtWidgets.QWidget()
         self.setCentralWidget(self.centralWidget)
         self.gl_main = QtWidgets.QGridLayout(self.centralWidget)
         # Load QtCore.movie widget and add to grid layout
-        self.movie_widget = uic.loadUi('movie.ui')
+        pwd = Path(__file__).parent
+        self.movie_widget = uic.loadUi(str(pwd/'movie.ui'))
         self.gl_main.addWidget(self.movie_widget, 0, 0, 0, 0)
 
         self._prev_dir = os.path.expanduser('~')  # Record of previous save dir
@@ -66,7 +70,6 @@ class MovieGUI(QtWidgets.QMainWindow):
         from mpltoolbar import MplToolbar
         self.setWindowTitle("CCFE Movie Viewer")
         self.movie_widget.gb_enhancements.clicked.connect(self.hide_enhancements_pannel)
-        self.movie = Movie(29852, camera='SA1.1', machine='MAST', start_frame=10, end_frame=100, name='Movie_gui')
         movie = self.movie
         widget = self.movie_widget
 
@@ -514,9 +517,11 @@ class Worker(QtCore.QRunnable):
 
 
 if __name__ == '__main__':
+    movie = Movie(29852, camera='SA1.1', machine='MAST', start_frame=10, end_frame=100, name='Movie_gui')
+
     app = QtWidgets.QApplication(sys.argv)
 
     app.aboutToQuit.connect(app.deleteLater)  # if using IPython Console
-    window = MovieGUI()
+    window = MovieGUI(movie)
 
     sys.exit(app.exec_())
