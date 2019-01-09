@@ -2,13 +2,16 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
+from datetime import datetime
+
+from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
+
 """
 Utility functions used in the filament tracker program
 """
 from past.builtins import basestring  # pip install future
 from pprint import pprint
 import string
-from datetime import datetime
 # try:
 #     from Tkinter import Tk  # python2 freia
 #     from tkFileDialog import askopenfilename
@@ -251,6 +254,17 @@ def safe_arange(start, stop, step):
         n = int(np.floor(n))+1
         stop = start + (n-1)*step
     out = np.linspace(start, stop, n)
+    return out
+
+def safe_isnan(value, false_for_non_numeric=True):
+    """Return false rather than throwing an error if the input type is not numberic"""
+    try:
+        out = np.isnan(value)
+    except TypeError as e:
+        if false_for_non_numeric:
+            out = False
+        else:
+            raise e
     return out
 
 def any_equal(object, list):

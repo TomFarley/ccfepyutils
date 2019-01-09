@@ -17,7 +17,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import scipy as sp
 
-from ccfepyutils.utils import args_for
+from ccfepyutils.utils import args_for, is_in
 from ccfepyutils.data_processing import data_split
 
 # fileConfig('../logging_config.ini')
@@ -45,7 +45,8 @@ def get_threshold(data, thresh_method='sigma', thresh_value=2.5):
 
 
 
-def locate_peaks(data, peak_method='argrelmax', thresh_method='sigma', thresh_value=2.5, exclude_ends=True, **kwargs):
+def locate_peaks(data, peak_method='argrelmax', thresh_method='sigma', thresh_value=2.5, exclude_ends=True,
+                 multiplet_rejection_win=None, multiplet_peak_params=None, **kwargs):
     """
     Return indices and coordinates of peaks in signal
     :param data: xr.DataArray - 1D DataArray in which to locate peaks
@@ -53,6 +54,8 @@ def locate_peaks(data, peak_method='argrelmax', thresh_method='sigma', thresh_va
     :param thresh_method: str - Peak amplitude threshold method
     :param thresh_value: - Peak amplitude threshold value
     :param exclude_ends: bool - Exclude one sided local maxima at ends of dataset
+    :param multiplet_rejection_win: x window in which to remove peaks with neighbouring peaks
+    :param multiplet_peak_params: dict of parameters for detction of multiplet peaks
     :param kwargs: Peak detection method specific keyword arguemnts
     :return: (peak_indices, peak_coor_values)
     """
@@ -79,6 +82,28 @@ def locate_peaks(data, peak_method='argrelmax', thresh_method='sigma', thresh_va
         info['thresh'] = thresh
         i_filter = y_peaks >= thresh
         i_peaks, x_peaks, y_peaks = i_peaks[i_filter], x_peaks[i_filter], y_peaks[i_filter]
+        info['npeaks'] = len(i_peaks)
+
+    if multiplet_rejection_win is not None:
+        # Remove peaks that are too close to each other (both occur within given x distance of each other)
+        if multiplet_peak_params is None:
+            # Use same parameters as main peak detection
+            i_remove = np.diff(x_peaks) < multiplet_rejection_win
+            i_remove = np.concatenate((i_remove, [False]))
+            i_remove[1:] += i_remove[:-1]
+        else:
+            i_peaks_m, x_peaks_m, y_peaks_m, info_m = locate_peaks(data, **multiplet_peak_params)
+            if len(i_peaks_m) > 0:
+                i_remove = np.diff(x_peaks_m) < multiplet_rejection_win
+                i_remove = np.concatenate((i_remove, [False]))
+                i_remove[1:] += i_remove[:-1]
+                x_peaks_remove = x_peaks_m[i_remove]
+            else:
+                x_peaks_remove = []
+            i_remove = is_in(x_peaks, x_peaks_remove)
+
+        i_peaks, x_peaks, y_peaks = i_peaks[~i_remove], x_peaks[~i_remove], y_peaks[~i_remove]
+        info['npeaks'] -= np.sum(i_remove)
 
     return i_peaks, x_peaks, y_peaks, info
 

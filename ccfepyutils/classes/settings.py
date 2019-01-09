@@ -14,9 +14,10 @@ from netCDF4 import Dataset
 import ccfepyutils
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.utils import make_iterable, remove_duplicates_from_list, is_subset, get_methods_class, t_now_str, \
-    to_list, ask_input_yes_no
+    to_list, ask_input_yes_no, safe_isnan, str2datetime
 from ccfepyutils.io_tools import mkdir, filter_files_in_dir, delete_file, attempt_n_times
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
+from ccfepyutils.classes.setting import SettingList, SettingBool, SettingFloat, SettingInt, SettingStr
 
 try:
     import cpickle as pickle
@@ -30,147 +31,6 @@ logger.setLevel(logging.DEBUG)
 
 settings_dir = ccfepyutils.settings_dir
 
-# TODO: Fix deepcopy of Setting objects
-class Setting(abc.ABC):
-    # __metaclass__ = abc.ABCMeta
-    type = None
-    
-    def __init__(self, settings, item):
-        self._settings = settings
-        self._item = item
-        try:
-            self._df = self._settings._df.loc[[item], :]
-        except KeyError as e:
-            # SettingList does not have a single item
-            self._df = self._settings._df
-
-    def __repr__(self):
-        class_name = re.search(".*\.(\w+)'>", str(self.__class__)).groups()[0]
-        return '<{}: {}={}>'.format(class_name, self._item, str(self))
-    
-    def __str__(self):
-        return str(self.value)
-
-    def __getitem__(self, item):
-        if isinstance(item, slice):
-            return self._settings._df.loc[self._item, :]
-        else:
-            if item in self._settings.column_sets_names:
-                item = self._settings.column_sets_names[item]
-            return self._settings._df.loc[self._item, item]
-
-    def __setitem__(self, item, value):
-        if item not in self._settings.columns:
-            raise ValueError('Item "{}" is not a setting column'.format(item))
-        self._settings._df.loc[self._item, item] = value
-
-    def __iter__(self):
-        raise NotImplementedError
-
-    @property
-    def columns(self):
-        return self._df.columns.values
-
-    @property
-    def value(self):
-        return self.type(self._df.loc[self._item, self.value_column])
-
-class SettingStr(Setting, str):
-    type = str
-    value_column = 'value_str'
-    def __new__(cls, settings, item):
-        value = str(settings._df.loc[item, cls.value_column])
-        return str.__new__(cls, value)
-
-    def __init__(self, settings, item):
-        str.__init__(self)
-        Setting.__init__(self, settings, item)
-
-    @property
-    def value(self):
-        val = super().value
-        if val == '*None*':
-            val = None
-        return val
-    
-    def format(self, *args, **kwargs):
-        return self.value.format(*args, **kwargs)
-
-class SettingInt(Setting, int):
-    type = int
-    value_column = 'value_num'
-    def __new__(cls, settings, item):
-        value = int(settings._df.loc[item, cls.value_column])
-        return int.__new__(cls, value)
-
-    def __init__(self, settings, item):
-        int.__init__(self)
-        Setting.__init__(self, settings, item)
-
-class SettingFloat(Setting, float):
-    type = float
-    value_column = 'value_num'
-    def __new__(cls, settings, item):
-        value = float(settings._df.loc[item, cls.value_column])
-        return float.__new__(cls, value)
-
-    def __init__(self, settings, item):
-        float.__init__(self)
-        Setting.__init__(self, settings, item)
-
-class SettingBool(Setting, int):
-    type = bool
-    value_column = 'value_num'
-    def __new__(cls, settings, item):
-        value = bool(settings._df.loc[item, cls.value_column])
-        return int.__new__(cls, value)
-
-    def __init__(self, settings, item):
-        int.__init__(self)
-        Setting.__init__(self, settings, item)
-
-    def __bool__(self):
-        return bool(self._settings._df.loc[self._item, 'value_num'])
-
-# TODO: Move new and init into Setting base class!
-
-class SettingList(Setting, list):  # TODO: implement SettingsList  !
-    type = list
-    # value_column = 'value_num'
-    # def __new__(cls, settings, item):
-    #     value = settings.list_item_values(settings, item)
-    #     return list.__new__(cls, value)
-
-    def __init__(self, settings, item):
-        list.__init__(self)
-        Setting.__init__(self, settings, item)
-        value = settings.list_item_values(settings, item)
-        self += value
-
-    def __str__(self):
-        return str(self.value)
-
-    def __iter__(self):
-        for x in self.value:
-            yield x
-
-    def __getitem__(self, item):
-        return self.value[item]
-
-    def __contains__(self, item):
-        return (item in self.value)
-
-    def __len__(self):
-        return len(self.value)
-
-    def __eq__(self, other):
-        return self.value == other
-
-    @property
-    def value(self):
-        return self.type(self._settings.list_item_values(self._settings, self._item))
-
-
 class Settings(object):
     """Object to store, save, load and interact with collections of settings for other classes
 
@@ -181,7 +41,27 @@ class Settings(object):
     Settings are saved for easy reuse in future. By default these files are saved in '~/.ccfetools/settings'. A SettingsLogFile is generated for each application which records the
     names and modification dates etc. of all settings for that application. When accessed a SettingsType object of the
     appropriate type is returned, providing access to setting meta data via indexing.
-    
+
+    Template settings spec
+    - Always have reference to template (possibily self)
+    - When settings created base them of template if exists by default (copy each setting)
+    - When settings loaded, supplement with missing settings from template (copy individual setting)
+    - When setting added, ask if should add to template if new (copy setting to template)
+    - When setting deleted from template ask if should be deleted from all dependent settings
+    New methods required:
+    - copy_item_to(application, [name], preserve_order=True, prompt=False) -
+    -/ is_item_in(item, application, [name]) - True/False
+    -/ is_item_equal_in(item, application, [name]) - True/False, (details)
+    -/ compare_to(application, name) - Same value, different value, missing in self, missing in other
+    -/ compare_log_times(application, name, type='modified')
+    - update_from_other(application, name, only_if_newer=True, add_missing_items=True, update_values=False)
+    - update_other(only_if_newer=True, add_missing_items=True, update_values=False)
+    -/ set_template()
+    - self.items: Inlclude base list indices in returned values
+
+    - Update init to compare template modification date to current modification date and update from template as appro
+
+
     NOTES:
         - The name of a setting must be unique for each named set of settings.
         - Settings files are only saved automatically when they are accessed. Use settings.save() to save manually.
@@ -270,23 +150,43 @@ class Settings(object):
         self._column_sets_names = None
         self._hash_id = None
         self._composite_settings = []  # list of composite settings instances that these settings currently belong to
+        self._template = None
 
     @classmethod
-    def get(cls, application=None, name=None, default_repeat=False):
+    def get(cls, application=None, name=None, add_missing_template_items=True, update_template=False,
+            auto_create_template=True, default_repeat=False):
+        if update_template:
+            auto_create_template = True
         if application is None:
             raise ValueError('No application supplied to Settings.get().\nExisting applications settings: {}'.format(
-                            cls.existing_applications()))
+                    cls.existing_applications()))
         if name is None:
             # ToDo: lookup most recently accessed setting name from log file
             raise ValueError('No settings set name supplied to Settings,get().\n'
                              'Existing settings for application "{}": {}'.format(
-                            application, cls.existing_settings(application)))
-        application, name = str(application), str(name)
-        s = Settings.get_instance(application, name)
-        if s is not None:
-            return s
-        else:
-            return Settings(application, name)
+                    application, cls.existing_settings(application)))
+        existing_instance = Settings.get_instance(application, name)
+        if existing_instance is not None:
+            logger.debug('Returning existing instance of {}'.format(repr(existing_instance)))
+            return existing_instance
+        settings = Settings(application, name)
+        settings._set_template(create_if_missing=auto_create_template)
+        existing_settings = settings.log_file.names
+
+        if add_missing_template_items and ('template' in existing_settings):
+            # - Compare to template, if missing fields add them
+            all_equal, df_out = settings.compare_to(application, 'template')
+            if not all_equal:
+                settings.update_from_other(application, 'template', add_missing_items=True, only_if_newer=False,
+                                           update_values=False, update_columns=False)
+            pass
+        if update_template:
+            # If loaded settings contain items not present in 'template', add them to template
+            # TODO: Implement
+            raise NotImplementedError
+
+
+        return settings
         
     @classmethod
     def collect(cls, application=None, name=None, core_values={}, blacklist=[], whitelist=[], exclude_if_col_true=(),
@@ -390,6 +290,8 @@ class Settings(object):
         item, category = self.get_item_index(self, item, _raise=False)
         if (category is not None) and (self[item] == value) and (len(kwargs) == 0):
             # No changes
+            # tmp - update legacy files
+            self._df.loc[item, 'value'] = str(value)
             return
         # Item doesn't exist or updating value or columns
         if isinstance(value, (list, tuple)):
@@ -676,7 +578,7 @@ class Settings(object):
         pass
     
     @in_state('saving', 'saved')
-    def save(self, state_transition=None):
+    def save(self, state_transition=None, update_template=True):
         self.check_consistency()
         if not self.file_exists:
             self.create_file()
@@ -687,6 +589,7 @@ class Settings(object):
             return 
         meta = {'t_created': self.t_created, 't_modified': self.t_modified, 't_accessed': self.t_accessed}
         n_attempts = 3
+        # TODO: Replace with attempt_ntimes
         for attempt in range(n_attempts):
             try:
                 #TODO: delete/overwrite previous values? Use with?
@@ -721,6 +624,9 @@ class Settings(object):
                 self.log_file.updated(self.name)
                 break
             time.sleep(3)
+        if update_template:
+            all_equal, df_out = self.compare_to(self.application, 'template')
+            raise NotImplementedError
 
     def delete_file(self, force=False):
         """Delete settings file for this settings instance"""
@@ -822,6 +728,140 @@ class Settings(object):
         new_settings.save()
         return new_settings
 
+    @classmethod
+    def is_item_in(cls, item, application, name):
+        """Return True if setting 'item' is also present in the settings (application, name).
+
+        If list of names supplied, return list of bools"""
+        names = make_iterable(name)
+        out = []
+        for name in names:
+            s = Settings.get(application=application, name=name)
+            if item in s.items:
+                out.append(True)
+            else:
+                out.append(False)
+        if len(out) == 1:
+            out = out[0]
+        return out
+
+    def is_item_equal_in(self, item, application, name):
+        """Return (True, info) if setting item is equal in settings (appliction, name), otherwise (False, info).
+
+        info is tuple of (descriptive_string, difference_data)
+        """
+        assert item in self
+        names = make_iterable(name)
+        out = []
+        for name in names:
+            s = Settings.get(application=application, name=name)
+            if not Settings.is_item_in(item, application, name):
+                # Item missing from other settings
+                out.append((False, ('missing other', 'missing from other ({}, {})'.format(application, name))))
+                continue
+            elif (not Settings.is_item_in(item, self.application, self.name)):
+                # Item missing from self
+                out.append((False, ('missing self', 'missing from self ({}, {})'.format(self.application, self.name))))
+                continue
+
+            if self[item] != s[item]:
+                # Values different
+                out.append((False, ('not equal', (self[item].value, s[item].value))))
+            else:
+                col_diffs = np.array([self._df.loc[item, col] == s._df.loc[item, col] or
+                                     (safe_isnan(self._df.loc[item, col]) and safe_isnan(s._df.loc[item, col]))
+                                     for col in self._df.columns])
+                if np.all(col_diffs):
+                    out.append((True, ('identical', )))
+                else:
+                    col_diff_values = (self._df.loc[item, ~col_diffs], s._df.loc[item, ~col_diffs])
+                    out.append((True, ('columns differ', col_diff_values)))
+        if len(out) == 1:
+            out = out[0]
+        return out
+
+    def compare_to(self, application, name):
+        """Compare settings to settings (appliction, name). Return Bool and DataFrame of differences."""
+        s = Settings.get(application, name)
+        all_items = set(self.items).union(s.items)
+        cols = ['({app},{name})'.format(app=ss.application, name=ss.name) for ss in (self, s)]
+        df_out = pd.DataFrame(columns=['equal']+cols+['columns'])
+        for item in all_items:
+            equal, info = self.is_item_equal_in(item, application, name)
+            df_out.loc[item, 'equal'] = equal
+            df_out.loc[item, cols[0]] = self[item].value
+            df_out.loc[item, cols[1]] = s[item].value
+            df_out.loc[item, 'columns'] = info[0]
+        all_equal = np.all(df_out['equal'])
+        return all_equal, df_out
+
+    def compare_log_times(self, application, name, time_type='modified'):
+        """Check if log time is more recent than other"""
+        s = Settings.get(application, name)
+        df_self = self.log_file._df.loc[self.name]
+        df_other = s.log_file._df.loc[name]
+        assert time_type in df_self.index
+        t_self = str2datetime(df_self[time_type], self.t_formats['natural'])
+        t_other = str2datetime(df_other[time_type], s.t_formats['natural'])
+        if t_self > t_other:
+            out = 'self is newer'
+        elif t_self < t_other:
+            out = 'self is older'
+        else:
+            out = 'same age'
+        return out
+
+    def copy_item_from(self, item, application, name, update_value=True, update_columns=True, preserve_order=True):
+        s = Settings.get(application, name)
+        assert item in s.items
+        if item not in self.items:
+            # TODO: handle list items...
+            self._df.loc[item, :] = s._df.loc[item, :]
+        else:
+            if update_value:
+                raise NotImplementedError
+
+        if preserve_order:
+            self.reorder_item(item, s[item]['order'])
+
+    def update_from_other(self, application, name, only_if_newer=True, add_missing_items=True,
+                          update_values=False, update_columns=False, save=True):
+        """Update settings in self according to values in (application, name)"""
+        if (not add_missing_items) and (not update_values):
+            return
+        # Get settings object to update from
+        s = Settings.get(application, name)
+        if only_if_newer:
+            # Return if comparisson settings are older
+            dt = self.compare_log_times(application, name)
+            if dt != 'self is older':
+                logger.debug('Not updating {} with {} as {}'.format(self, s, dt))
+                return
+        value_cols = [v[0] for v in self.default_column_sets['values']+self.default_column_sets['type']]
+        for item in s.items:
+            if add_missing_items and (item not in self.items):
+                # Get column values for item (excluding value columns)
+                kws = {col: s._df.loc[item, col] for col in s.columns if col not in value_cols}
+                # Add missing items to self
+                self(item, s[item].value, **kws)
+                # Make sure the new item is inserted in the same position in self as it was in s
+                self.reorder_item(item, s[item]['order'], save=False)
+            else:
+                if update_values:
+                    # Update value of existing setting
+                    if self[item] != s[item]:
+                        # Only update if different
+                        # This should handle list items correctly
+                        self[item] = s[item].value
+                if update_columns:
+                    # TODO: make sure column heading match
+                    # Copy column values from s
+                    non_value_cols = [c for c in self._df.columns if c not in value_cols]
+                    self._df.loc[item, non_value_cols] = s._df.loc[item, non_value_cols]
+        if save:
+            self.save()
+        logger.info('Updated {} according to {}'.format(self, s))
+
     def new_time(self, format='natural'):
         # TODO: update with config file
         # Find times of exisiting settings for application
@@ -856,6 +896,31 @@ class Settings(object):
         if not all(unique_type):
             raise ValueError('Inconsistent types:\n{}'.format(self.view(cols='type').loc[~unique_type]))
 
+    def _set_template(self, create_if_missing=True):
+        """Load template settings for this application"""
+        if self.name == 'template':
+            self._template = self
+        else:
+            self._template = Settings.get(application=self.application, name='template')
+            if len(self._template) > 0:
+                if 'template' not in self.log_file.names:
+                    # If settings file was not created locally it may not be present in the logfile
+                    self._template.save(ignore_state=True)
+            else:
+                existing_settings = self.log_file.names
+                if create_if_missing and (len(existing_settings) > 0) and ('template' not in existing_settings):
+                    # If settings have been created for this application, but no 'template' settings have been created
+                    # create template settings out of the most recently modified settings for this application
+                    most_recent = self.log_file.times['date_time_mod'].argmax()
+                    self._template = Settings.get_copy(self.application, most_recent, 'template')
+                    logger.info('Created "template" settings for "{}" from "{}"'.format(self.application, most_recent))
+                    answer = ask_input_yes_no('Save new template file')  # tmp
+                    if not answer:
+                        return
+                    self._template.save()
+        if len(self._template) == 0:
+            self._template = None
+        return self._template
 
     @in_state('modifying', 'modified')
     def _add_missing_columns(self):
@@ -890,13 +955,13 @@ class Settings(object):
     
     def _check_values(self):
         """Check values conform to standards"""
-        # Make sure value column is not empty
+        # Make sure value column is not empty. 'value_str' col will be nan if not string type
         mask = (self._df['value'] == '') & (self._df['value_str'] != '')
         for item in self._df.loc[mask, 'value'].index.values:
             col = self.get_value_column(self._df, item)
             value = self._df.loc[item, col]
             self(item, value=value)
-            logger.debug('Set missing "value" entry for {}={}'.format(item, value))
+            logger.debug('Filled missing "value" entry for {}={}'.format(item, value))
 
     # def add_column(self, value):
     #     if value in self.columns:
@@ -914,7 +979,7 @@ class Settings(object):
         :param application: application settings are for
         :return:
         """
-        log = SettingsLogFile(application)
+        log = SettingsLogFile.get(application)
         if log.file_exists:
             return log
         else:
@@ -1022,16 +1087,21 @@ class Settings(object):
         return col
 
     def reorder_item(self, item, new_order_index, save=True):
-        """Reorder settings"""
+        """Reorder item in settings, given new order index value for column 'order'"""
         df = self._df
+        # Set the new order value for this item
         self(item, order=new_order_index)
+        # Increase the index of each item with a higher index than the new index by 1
         higher_indices = df.index[(df['order'] >= new_order_index).values & (df.index != item)]
         for index in higher_indices:
             df.loc[index, 'order'] = df.loc[index, 'order'] + 1
+        # Make sure the dataframe is sorted by the order column
         df = df.sort_values('order', axis='index')
+        # Remove any gaps in the oder values
         df['order'] = np.arange(len(df))
         self._df = df
         if save:
+            self.state('modified')
             self.save()
 
     def update_from_dataframe(self, df):
@@ -1199,7 +1269,7 @@ class Settings(object):
     def application(self, value):
         assert isinstance(value, str)
         self._application = value
-        self.log_file = SettingsLogFile(self.application)
+        self.log_file = SettingsLogFile.get(self.application)
 
     @property
     def name(self):
@@ -1232,6 +1302,7 @@ class Settings(object):
 
     @property
     def items(self):
+        # TODO: Inlclude base list indices in returned values
         if self._df is not None:
             return self._df.index.values
         else:
@@ -1303,11 +1374,12 @@ class Settings(object):
 class SettingsLogFile(object):
     t_formats = {'compressed': "%y{dl}%m{dl}%d{dl}%H{dl}%M{dl}%S".format(dl=''),
                  'natural': "%H:%M:%S %d/%m/%y".format(dl='')}
+    instances = {}
     def __init__(self, application):
         """ """
         assert isinstance(application, str)
-        self._df = None
-        self.application = application  # setter calls load() method
+        self.application = application
+        self.instances[application] = self
 
     def __getitem__(self, name):
         """Get log information for setting set"""
@@ -1324,6 +1396,24 @@ class SettingsLogFile(object):
         else:
             cols = make_iterable(cols)
             return self._df.loc[name, cols]
+
+    @classmethod
+    def get(cls, application):
+        """Treat SettingsLogFile as singleton to signle instance is always in line with netcdf file"""
+        if application in cls.instances:
+            # Return existing instance
+            logfile = cls.instances[application]
+        else:
+            # Create new instance
+            logfile = SettingsLogFile(application)
+        return logfile
+
+    def __del__(self):
+        # Remove instance from instances when deleted
+        try:
+            self.instances.pop(self.application)
+        except KeyError as e:
+            logger.error('{}: {}'.format(self, e))
 
     def init(self):
         # TODO: add safety checks
@@ -1435,6 +1525,11 @@ class SettingsLogFile(object):
         os.remove(self.fn_path)
         logger.warning('Deleted settings log file: {}'.format(self.fn_path))
 
+    def refresh_logfile(self):
+        """Ensure all settings files in the settings/appliction directory are represented in the log file"""
+        # TODO: Implement
+        raise NotImplementedError
+
     def print(self):
         print(self)
 
@@ -1495,7 +1590,11 @@ class SettingsLogFile(object):
 
     @property
     def times(self):
-        return self._df['modified']
+        t_modified = self._df.loc[:, ['modified']]
+        for item, t in t_modified.iterrows():
+            t_modified.loc[item, 'date_time_mod'] = str2datetime(t['modified'], format=self.t_formats['natural'])
+                # [str2datetime(t, format=self.t_formats['natural']) for t in t_modified['modified']]
+        return t_modified
 
     @property
     def file_exists(self):
@@ -1538,7 +1637,9 @@ def compare_settings_hash(application, name, settings_obj, n_output=1, skip_iden
     return diff_table, differences
 
 if __name__ == '__main__':
-    s = Settings('test_tmp', 'default')
+    s = Settings.get('Invertor_resolution', '29840_eps_1')
+
+    s = Settings.get('test_tmp', 'default')
     print(s)
     s.add_columns(['Description', 'I/O', 'Precedence', 'Representation'])
     print(s)
@@ -1547,4 +1648,4 @@ if __name__ == '__main__':
     # print(s.columns)
     # print(s.items)
     print(s)
-    pas
+    pass
