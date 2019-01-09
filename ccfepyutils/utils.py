@@ -4,8 +4,6 @@ from __future__ import (absolute_import, division,
 
 from datetime import datetime
 
-from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
-
 """
 Utility functions used in the filament tracker program
 """
