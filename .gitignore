@@ -26,3 +26,5 @@ ccfepyutils.egg-info/
 *.p
 *.csv
 
+*.old*
+
