@@ -1,0 +1,27 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  GET_SOURCES_ATTEMPTS: 3
+
+stages:
+  - test
+
+.my_template: &MY_TEMPLATE
+    stage: test
+    before_script:
+    - pip3 install --upgrade pip setuptools
+    - pip3 install pytest-cov
+    - export PYTHONPATH=$PWD
+    - export IN_DOCKER=True
+    script:
+    - pip3 install .
+    - python3 setup.py test
+    tags:
+    - docker
+
+build_python3.5:
+    <<: *MY_TEMPLATE
+    image: python:3.5-slim
+
+build_python3.7:
+    <<: *MY_TEMPLATE
+    image: python:3.7-slim
