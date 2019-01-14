@@ -14,6 +14,7 @@ setup(name='ccfepyutils',
             'ccfepyutils': ['template_settings/values/*/*'],
             # 'ccfepyutils/template_settings': ['*']
       },
+      include_package_data=True,
       install_requires=["numpy >= 1.12.0", "scipy", "matplotlib", "pandas", "xarray", "natsort", "PyQt5", "future"],  # "cv2",
       python_requires='>=3',
       setup_requires=['pytest-runner'],
