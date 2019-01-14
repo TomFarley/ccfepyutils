@@ -8,8 +8,8 @@ setup(name='ccfepyutils',
       author='tfarley',
       author_email='tfarley@ukaea.uk',
       # license=ccfepyutils.__license__,
-      # packages=['ccfepyutils'],
-      packages=find_packages(exclude=['docs', 'external', 'misc', 'tests', 'third_party']),
+      packages=['ccfepyutils', 'ccfepyutils.classes', 'ccfepyutils.demos', 'ccfepyutils.guis', 'ccfepyutils.scripts'],
+      # packages=find_packages(exclude=['docs', 'external', 'misc', 'tests', 'third_party']),
       package_data={
             'ccfepyutils': ['template_settings/values/*/*'],
             # 'ccfepyutils/template_settings': ['*']
