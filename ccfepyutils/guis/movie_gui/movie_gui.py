@@ -160,10 +160,13 @@ class MovieGUI(QtWidgets.QMainWindow):
         enhancement_widget_names = list(image_enhancement_functions.keys())  #['extract_fg', 'extract_bg', 'reduce_noise', 'sharpen', 'add_abs_gauss_noise']  #: 'Extract_foreground'}
         current_enhancements = movie.settings['enhancements'].value
         for enhancement in enhancement_widget_names:
-            check_box = getattr(widget, 'cb_'+enhancement)
-            if enhancement in current_enhancements:
-                check_box.setChecked(True)
-            check_box.stateChanged.connect(self.update_enhancement(enhancement))
+            try:
+                check_box = getattr(widget, 'cb_'+enhancement)
+                if enhancement in current_enhancements:
+                    check_box.setChecked(True)
+                check_box.stateChanged.connect(self.update_enhancement(enhancement))
+            except:
+                logger.warning('No enhancement checkbox has been implement for enhancement: {}'.format(enhancement))
 
             # getattr(widget, 'tb_'+widget_name).stateChanged.connect(lambda: self.update_enhancements(toggle=enhancement))
 
