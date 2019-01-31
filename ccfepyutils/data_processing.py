@@ -222,9 +222,9 @@ def data_split(x, y=None, gap_length=3, data_length=10, gap_length_abs=None,
 
     # If return_longest is True, only return longest section of data without gaps, else return all data with gap removed
     ind = int(np.array([len(x) for x in xsplit]).argmax()) if return_longest else np.arange(len(xsplit)).astype(int)
-    isplit_all, xsplit = np.array(isplit_all), np.array(xsplit)
+    isplit_all, xsplit, ysplit = np.array(isplit_all), np.array(xsplit), np.array(ysplit)
     if y is not None:
-        return isplit_all[ind], xsplit[ind], np.array(ysplit[ind])
+        return isplit_all[ind], xsplit[ind], ysplit[ind]
     else:
         return isplit_all[ind], xsplit[ind], None
 
@@ -419,6 +419,10 @@ def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=50, nbins_
     if (not detect_delta_fuctions) and (len(x) < 2):
         return np.array([]), np.array([]), np.array([])
     if (nbins is None) and (bin_edges is None):
+        nbins = np.floor(len(x) / min_data_per_bin)
+        nbins = int(np.round(np.max([8, nbins])))
+        nbins = np.min((nbins, nbins_max))
+
         try:
             x_range = np.ptp(x)
         except:

@@ -259,6 +259,17 @@ def safe_arange(start, stop, step):
     out = np.linspace(start, stop, n)
     return out
 
+def safe_isnan(value, false_for_non_numeric=True):
+    """Return false rather than throwing an error if the input type is not numberic"""
+    try:
+        out = np.isnan(value)
+    except TypeError as e:
+        if false_for_non_numeric:
+            out = False
+        else:
+            raise e
+    return out
+
 def cast_safe(obj, new_type):
     """Cast obj to new_type, nesting if necessary, or change dtype for arrays"""
     assert isinstance(new_type, type)
