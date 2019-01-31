@@ -17,7 +17,7 @@ from ccfepyutils.utils import make_iterable, remove_duplicates_from_list, is_sub
     to_list, ask_input_yes_no, safe_isnan, str2datetime
 from ccfepyutils.io_tools import mkdir, filter_files_in_dir, delete_file, attempt_n_times
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
-from ccfepyutils.classes.setting import SettingList, SettingBool, SettingFloat, SettingInt, SettingStr
+from ccfepyutils.classes.setting import Setting, SettingList, SettingBool, SettingFloat, SettingInt, SettingStr
 
 try:
     import cpickle as pickle
@@ -153,8 +153,8 @@ class Settings(object):
         self._template = None
 
     @classmethod
-    def get(cls, application=None, name=None, add_missing_template_items=True, update_template=False,
-            auto_create_template=True, default_repeat=False):
+    def get(cls, application=None, name=None, add_missing_template_items=False, update_template=False,
+            auto_create_template=False, default_repeat=False):
         if update_template:
             auto_create_template = True
         if application is None:
@@ -295,7 +295,7 @@ class Settings(object):
         modified = False
         assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
         item, category = self.get_item_index(self, item, _raise=False)
-        if (category is not None) and (self[item] == value) and (len(kwargs) == 0):
+        if (category not in (None, 'list')) and (self[item] == value) and (len(kwargs) == 0):
             # No changes
             # tmp - update legacy files
             self._df.loc[item, 'value'] = str(value)
@@ -768,7 +768,8 @@ class Settings(object):
 
         info is tuple of (descriptive_string, difference_data)
         """
-        assert item in self
+        if item not in self:
+            raise ValueError(item)
         names = make_iterable(name)
         out = []
         for name in names:
@@ -788,7 +789,7 @@ class Settings(object):
             else:
                 col_diffs = np.array([self._df.loc[item, col] == s._df.loc[item, col] or
                                      (safe_isnan(self._df.loc[item, col]) and safe_isnan(s._df.loc[item, col]))
-                                     for col in self._df.columns])
+                                     for col in self._df.columns if col in s._df.columns])
                 if np.all(col_diffs):
                     out.append((True, ('identical', )))
                 else:
@@ -849,6 +850,7 @@ class Settings(object):
             return
         # Get settings object to update from
         s = Settings.get(application, name)
+        modified = False
         if only_if_newer:
             # Return if comparisson settings are older
             dt = self.compare_log_times(application, name)
@@ -871,12 +873,16 @@ class Settings(object):
                         # Only update if different
                         # This should handle list items correctly
                         self[item] = s[item].value
+                        modified = True
                 if update_columns:
                     # TODO: make sure column heading match
                     # Copy column values from s
                     non_value_cols = [c for c in self._df.columns if c not in value_cols]
                     self._df.loc[item, non_value_cols] = s._df.loc[item, non_value_cols]
-        if save:
+                    modified = True
+        if modified:
+            self.state = 'modified'
+        if save and modified:
             self.save()
         logger.info('Updated {} according to {}'.format(self, s))
 
