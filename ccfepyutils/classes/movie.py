@@ -18,10 +18,12 @@ from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
 from ccfepyutils.classes.data_stack import Stack, Slice
 from ccfepyutils.classes.settings import Settings
+from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, is_number, is_numeric, none_filter, to_array, make_iterable, args_for, \
-    is_subset, is_in, replace_in
+    is_subset, is_in, replace_in, dataframe_description_str
 from ccfepyutils.io_tools import pickle_load, locate_file
 from ccfepyutils.classes.plot import Plot
+from ccfepyutils.mpl_tools import annotate_axis
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -152,6 +154,23 @@ class Frame(Slice):
             return self.stack(raw=True, **{self.dim: self.value})
             # raise ValueError('Frame does not have a raw movie')
 
+    def hist(self, ax=None, label=None, annotate=True, update_existing=False, show=True, **kwargs):
+        if update_existing:
+            raise NotImplementedError
+
+        # xr.plot.hist(self.data, ax=ax)
+        plot = Plot.get(ax=ax)
+        data = self.data.values.flatten()
+        plot.plot(data, mode='pdf', ax=ax, label=label, **kwargs)
+
+        if annotate:
+            annotation_str = dataframe_description_str(self.data.to_dataframe()['pix_intensity'])
+            annotate_axis(ax, annotation_str, x=0.7, y=0.4, fontsize=7)
+        plot.set_axis_labels(ax=ax, xlabel='Pixel intensity')
+
+        if show:
+            plt.show()
+
     def plot(self, ax=None, annotate=True, update_existing=True, **kwargs):
         # TODO: Add automatic axis labeling once parameter class is complete
         kws = {'mode': 'image', 'cmap': 'gray', 'show': False, 'vmin': 0, 'vmax': None}
@@ -222,7 +241,7 @@ class Movie(Stack):
     slice_class = Frame
     time_format = '{:0.5f}s'
     def __init__(self, pulse=None, machine=None, camera=None, movie_path=None, settings='repeat', source=None, range=None,
-                 enhancer=None, name=None, **kwargs):
+                 enhancer=None, name=None, frames=None, **kwargs):
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
         self._reset_stack_attributes()  # Initialise attributes to None
@@ -238,13 +257,13 @@ class Movie(Stack):
         quantity = 'pix_intensity'
         
         # Initialise data xarray
-        super(Movie, self).__init__(x, y, z, quantity=quantity, stack_axis='x', name=name)
+        super().__init__(x, y, z, quantity=quantity, stack_axis='x', name=name)
 
         kws = self.settings.get_func_args(self.set_movie_source)
         self.set_movie_source(fn_path=movie_path, **kws)
 
-        kws = self.settings.get_func_args(self.set_frames)
-        self.set_frames(**kws)
+        kws = self.settings.get_func_args(self.set_frames) if frames is None else {}
+        self.set_frames(frames=frames, **kws)
         logger.debug('Initialised {}'.format(repr(self)))
 
     def _reset_movie_attributes(self):
@@ -325,7 +344,7 @@ class Movie(Stack):
         path, fn_patern, transforms = get_camera_data_path(machine, camera, pulse)
         return path, fn_patern, transforms
 
-    def set_frames(self, frames_user=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
+    def set_frames(self, frames=None, start_frame=None, end_frame=None, start_time=None, end_time=None,
                    nframes_user=None, duration=None, frame_stride=1, all=False, transforms=None):
         """Set frame range in file to read"""
         previously_loaded_frames = self._frame_range_info_all['frames']
@@ -337,10 +356,10 @@ class Movie(Stack):
 
         self._transforms = none_filter(self._transforms, transforms)  # update transforms if passed
 
-        frames_user, nframes_user, frame_range_user = self.get_frame_range(frames=frames_user,
-                                                                           start_frame=start_frame, end_frame=end_frame,
-                                                                           start_time=start_time, end_time=end_time,
-                                                                           nframes=nframes_user, duration=duration, stride=frame_stride)
+        frames_user, nframes_user, frame_range_user = self.get_frame_range(frames=frames,
+                                                                      start_frame=start_frame, end_frame=end_frame,
+                                                                      start_time=start_time, end_time=end_time,
+                                                                      nframes=nframes_user, duration=duration, stride=frame_stride)
         
         self._frame_range_info_user.update({'frame_range': frame_range_user, 'nframes': nframes_user, 'stride': frame_stride,
                                        'frames': frames_user})
@@ -411,6 +430,8 @@ class Movie(Stack):
             frame_range_info_all['t_range'] = t_range_all
 
             assert len(frames_all) == len(t_all) == nframes_all
+        else:
+            frame_range_all = frame_range_user
 
         assert len(frames_user) == len(t_user) == nframes_user, '{} != {} != {}'.format(
                                                             len(frames_user), len(t_user), nframes_user)
@@ -428,7 +449,8 @@ class Movie(Stack):
         self.settings['start_frame'] = frame_range_all[0]
         self.settings['end_frame'] = frame_range_all[1]
         stride = (np.ptp(frames_all)+1)/len(frames_all)
-        self.settings['stride'] = int(stride) if stride % 1 == 0 else np.nan
+        # 0 -> no applicable stride length (avoid np.nan for SettingInt error)
+        self.settings['stride'] = int(stride) if stride % 1 == 0 else 0
         self._data = None
         self._values = None
         self._enhanced_movie = None
@@ -696,6 +718,7 @@ class Movie(Stack):
             if len(n) == 0:
                 return
             self._data.loc[{'n': n}] = data
+        return self
         # logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
 
     def read_mraw_movie(self, n=None):
@@ -900,7 +923,7 @@ class Movie(Stack):
             logger.warning('Frame list contains duplicates')
         if unique:  # remove duplicates
             frame_nos = unique_frames
-        logger.debug('Frames in frame_list:  {}'.format(str(frame_nos)))
+        # logger.debug('Frames in frame_list:  {}'.format(str(frame_nos)))
         return frame_nos
 
     def extract_frame_stack(self, frames):
@@ -909,6 +932,9 @@ class Movie(Stack):
         frames = np.array(frames)
         self._init_xarray()
         # Make sure all frames in stack have been load - avoid nans!
+        nans = self._meta.loc[:, 'set'].isnull()
+        self._meta.loc[nans, 'set'] = False
+        self._meta['set'] = self._meta['set'].astype({'set': bool})
         frames_not_set = frames[~self._meta.loc[frames, 'set'].values]
         if len(frames_not_set) > 0:
             self.load_movie_data(n=frames_not_set)
@@ -1030,7 +1056,11 @@ class Movie(Stack):
             frames = self.frame_numbers
         frames = to_array(frames)
         enhancements = make_iterable(enhancements)
+        for key, value in kwargs.items():
+            if key in self.settings.items:
+                self.settings[key] = value
         self.set_enhancements(enhancements)
+        # TODO: Set frames again to include frame stack data for fg_extraction etc
         if not self._setup_enhanced_movie(enhancements) and is_subset(frames, self.enhanced_frames):
             logger.warning('Enhancements {} already applied to {}'.format(enhancements, repr(self)))
             return

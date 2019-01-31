@@ -1,14 +1,19 @@
 import configparser
+import itertools
 import os, time, gc
 import logging
 import pickle
 import re
 from pathlib import Path
+from datetime import datetime
+import collections
 
-import numpy as np
 from past.types import basestring
+import numpy as np
+import pandas as pd
 
-from ccfepyutils.utils import make_iterable, compare_dict, is_number, is_subset, str_to_number, args_for
+from ccfepyutils.utils import (make_iterable, compare_dict, is_number, is_subset, str_to_number, args_for,
+                               printProgress, argsort)
 from ccfepyutils.debug import get_traceback_location
 
 logger = logging.getLogger(__name__)
@@ -89,10 +94,10 @@ def getUserFile(type=""):
     filename = askopenfilename(message="Please select "+type+" file:")
     return filename
 
-def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, None), n_matches_expected=None,
-                        raise_on_incomplete_match=False,
+def filter_files_in_dir(path, fn_pattern='.*', group_keys=(), modified_range=(None, None), n_matches_expected=None,
+                        return_full_paths=False, modified_dir_filter=False, raise_on_incomplete_match=False,
                         raise_on_missing_dir=True, raise_on_no_matches=True, depth=0, include_empty_dirs=False,
-                        **kwargs):
+                        sort_keys=True, **kwargs):
     """Return dict of filenames in 'path' directory that match supplied regex pattern
 
     The keys of the returned dict are the matched groups for each file from the fn_pattern.
@@ -101,6 +106,9 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, N
     :param path: path where files are located (only needed to querying files modification dates etc)
     :param group_keys: list that links the ordering of the regex groups to the kwargs keys. Warnings are raised
                          if not all of the kwarg values are mmatched to files.
+    :param modified_range: Age range in days to accept [n_days_old_min, n_days_old_max]
+                            eg modified_range=[None, 3] filters all files modified in the last 3 days
+    :param return_full_paths: Prepend paths to output filenames
     :param raise_on_incomplete_match: raise an exception if not all kwarg values are located
     :param kwargs: values are substituted into the fn_pattern (provided the pattern contains a format key matching that
                     of the kwarg) with lists/arrays of values converted to the appropriate regex pattern.
@@ -120,13 +128,16 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, N
     # filenames_all = sorted(os.listdir(str(path)))
     out = {}
     n_matches = 0
+    # Loop over paths
     for i, (root, dirs, files) in enumerate(os.walk(str(path), topdown=True)):
         level = root.replace(str(path), '').count('/')
         if level > depth:
             break
-        out_i = filter_files(files, fn_pattern, path=root, group_keys=group_keys,
-                             raise_on_incomplete_match=raise_on_incomplete_match,
-                             raise_on_no_matches=False, verbose=False, **kwargs)
+        if modified_dir_filter:
+            raise NotImplementedError
+        out_i = filter_files(files, fn_pattern, path=root, group_keys=group_keys, n_matches_expected=n_matches_expected,
+                             modified_range=modified_range, raise_on_incomplete_match=raise_on_incomplete_match,
+                             raise_on_no_matches=raise_on_no_matches, verbose=False, **kwargs)
         if (len(out_i) == 0) and not include_empty_dirs:
             continue
         else:
@@ -141,13 +152,43 @@ def filter_files_in_dir(path, fn_pattern, group_keys=(), modified_range=(None, N
             raise IOError(message)
         else:
             logger.warning(message)
-    if (depth ==0) and (len(out) == 1):
-        out = list(out.values())[0]
+    if (depth == 0) and (len(out) == 1):
+        # If depth is 0, don't nest in directory dict
+        path = list(out.keys())[0]
+        out = out[path]
+        if return_full_paths:
+            # Prepend paths to fileneames
+            out = {key: os.path.join(path, fn) for key, fn in out.items()}
+    elif return_full_paths:
+        # Return single level dict of key: fn pairs with abs paths
+        out_tmp = out
+        out = {}
+        n_files = 0
+        for path, fns in out_tmp.items():
+            path = os.path.abspath(os.path.expanduser(path))
+            tmp = {key: os.path.join(path, fn) for key, fn in fns.items()}
+            out.update(tmp)
+            n_files += len(tmp)
+            assert len(out) == n_files, ('filter_files_in_dir returned multiple files with same file key: '
+                                         '{}/{} files in {}'.format(n_files-len(out), len(tmp), tmp))
+        assert len(out) == n_matches
+    elif sort_keys:
+        raise NotImplementedError
+    if sort_keys:
+        keys, fns = list(out.keys()), list(out.values())  # improve
+        i_sort = argsort(keys)
+        ordered_keys = np.array(keys)[i_sort]
+        if ordered_keys.ndim > 1:
+            # ndarray is not hashable
+            ordered_keys = [tuple(v) for v in ordered_keys]
+        out = collections.OrderedDict(zip(ordered_keys, np.array(fns)[i_sort]))
+        # out = {key: [[os.path.join(ps, f) for f in fns] for ps, fns in out_tmp.items()]}
+        # out = itertools.chain(*out)
     return out
 
 
-def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range=(None, None), raise_on_incomplete_match=False,
-                        raise_on_no_matches=True, verbose=True, **kwargs):
+def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range=(None, None), n_matches_expected=None,
+                 raise_on_incomplete_match=False, raise_on_no_matches=True, verbose=True, **kwargs):
     """Return dict of filenames from given set of filenames that match supplied regex pattern
 
     The keys of the returned dict are the matched groups for each file from the fn_pattern.
@@ -156,6 +197,8 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
     :param path: path where files are located (only needed to querying files modification dates etc)
     :param group_keys: list that links the ordering of the regex groups to the kwargs keys. Warnings are raised
                          if not all of the kwarg values are mmatched to files.
+    :param modified_range: Age range in days to accept [n_days_old_min, n_days_old_max]
+                            eg modified_range=[None, 3] filters all files modified in the last 3 days
     :param raise_on_incomplete_match: raise an exception if not all kwarg values are located
     :param kwargs: values are substituted into the fn_pattern (provided the pattern contains a format key matching that
                     of the kwarg) with lists/arrays of values converted to the appropriate regex pattern.
@@ -170,13 +213,15 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
     fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'])
     """
     # TODO: Use glob for path selection
-    from ccfepyutils.utils import PartialFormatter
-    fmt = PartialFormatter()
+    # from ccfepyutils.utils import PartialFormatter
+    # fmt = PartialFormatter()
 
     if (modified_range != (None, None)):
         assert path is not None, 'A path must be supplied to filter files by modified date'
         assert len(modified_range) == 2, 'Modifed range must have start and end'
         assert os.path.isdir(path)
+
+    n_files = len(filenames)
 
     # If kwargs are supplied convert them to re patterns
     re_patterns = {}
@@ -194,11 +239,21 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
         fn_pattern = fn_pattern.format(**re_patterns)
     except IndexError as e:
         pass
+    # Allow custom \e+ escape sequence to capture standard form numbers
+    # optional sign,
+    # .1 .12 .123 etc 9.1 etc 98.1 etc or # 1. 12. 123. etc 1 12 123 etc
+    #  followed by optional exponent part if desired
+    numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
+    fn_pattern = fn_pattern.replace('\e+', numeric_const_pattern)
     out = {}
     i = 0
-    for fn in filenames:
+    t0 = datetime.now()
+    for j, fn in enumerate(filenames):
         # Check if each filename matches the pattern
-        m = re.search(fn_pattern, fn)
+        if n_files > 500:
+            printProgress(j, n_files, t0=t0, nth_loop=50, prefix='Filtering files')
+        rx = re.compile(fn_pattern, re.VERBOSE)
+        m = rx.search(fn)
         if m is None:
             continue
         if path is not None:
@@ -206,9 +261,11 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
             t_now = time.time()
             t_day = 24*60*60
             t_age = t_now-os.path.getmtime(fn_path)
-            if (modified_range[0] is not None) and (t_age < modified_range[0]*t_day):
+            t_age /= t_day
+            # Modified_range = [n_days_old_min, n_days_old_max]
+            if (modified_range[0] is not None) and (t_age < modified_range[0]):
                 continue
-            if (modified_range[1] is not None) and (t_age < modified_range[1]*t_day):
+            if (modified_range[1] is not None) and (t_age > modified_range[1]):
                 continue
 
         ngroups = len(m.groups())
@@ -223,6 +280,9 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
             key = tuple(str_to_number(v) for v in m.groups())
         out[key] = fn
         i += 1
+        if (n_matches_expected is not None) and (i == n_matches_expected):
+            logger.debug('Located expected number of files: {}'.format(i))
+            break
 
     if len(out) == 0:
         message = 'Failed to locate any files with pattern "{}" in {}'.format(fn_pattern, filenames)
@@ -237,7 +297,7 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
             continue
         # List of located values for group cast to same type
         if ngroups == 0:
-            raise ValueError('fn_pattern doesn not contain any regex groups "()"')
+            raise ValueError('fn_pattern doesnt not contain any regex groups "()"')
         if ngroups == 1:
             located_values = list(out.keys())
         else:
@@ -251,6 +311,12 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
                 if verbose:
                     logger.warning(message)
     return out
+
+def age_of_file(fn_path):
+    t_now = time.time()
+    t_day = 24*60*60
+    t_age = t_now-os.path.getmtime(fn_path)
+    return t_age
 
 # def filter_files_in_dir(path, extension='.p', contain=None, not_contain=None):
 #
@@ -273,8 +339,38 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
 #
 #     return filenames
 
+def is_possible_filename(fn, ext_whitelist=('py', 'txt', 'png', 'p', 'npz', 'csv',), ext_blacklist=(),
+                         ext_max_length=3):
+    """Return True if 'fn' is a valid filename else False.
 
-def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
+    Return True if 'fn' is a valid filename (even if it and its parent directory do not exist)
+    To return True, fn must contain a file extension that satisfies:
+        - Not in blacklist of extensions
+        - May be in whitelist of extensions
+        - Else has an extension with length <= ext_max_length
+    """
+    fn = str(fn)
+    ext_whitelist = ['.' + ext for ext in ext_whitelist]
+    if os.path.isfile(fn):
+        return True
+    elif os.path.isdir(fn):
+        return False
+
+    ext = os.path.splitext(fn)[1]
+    l_ext = len(ext) - 1
+    if ext in ext_whitelist:
+        return True
+    elif ext in ext_blacklist:
+        return False
+
+    if (l_ext > 0) and (l_ext <= ext_max_length):
+        return True
+    else:
+        return False
+
+
+
+def mkdir(dirs, start_dir=None, depth=None, accept_files=True, info=None, verbose=False):
     """ Create a set of directories, provided they branch of from an existing starting directory. This helps prevent
     erroneous directory creation. Checks if each directory exists and makes it if necessary. Alternatively, if a depth
     is supplied only the last <depth> levels of directories will be created i.e. the path <depth> levels above must
@@ -308,6 +404,11 @@ def mkdir(dirs, start_dir=None, depth=None, info=None, verbose=False):
         if isinstance(d, Path):
             d = str(d)
         d = os.path.abspath(os.path.expanduser(d))
+        if is_possible_filename(d):
+            if accept_files:
+                d = os.path.dirname(d)
+            else:
+                raise ValueError('mkdir was passed a file path, not a directory: {}'.format(d))
         if depth is not None:
             depth = np.abs(depth)
             d_up = d
@@ -554,7 +655,13 @@ def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, r
             logger.warning('Failed to locate file in paths "{}" with formats: {}'.format(paths, fns))
         return None, None
 
-def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOError,), sleep_invterval=0.5,
+class AttemptError(Exception):
+    def __init__(self, message):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+
+def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, sleep_interval=0.5,
+                    exceptions=(IOError,), requried_output=None,
                     error_message='Call to {func} failed after {n_attempts} attempts',
                     call_on_fail=(), raise_on_fail=True, verbose=True):
     """Attempt I/O call multiple times with pauses in between to avoid read/write clashes etc."""
@@ -562,6 +669,9 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
         args = ()
     if kwargs is None:
         kwargs = {}
+    if requried_output is not None:
+        requried_output = make_iterable(requried_output)
+    args = make_iterable(args)
     call_on_fail = make_iterable(call_on_fail)
     attempt = 1
     success = False
@@ -570,19 +680,25 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
             # logger.debug('Attempt {} to call function "{}({})"'.format(
             #                 attempt, func.__name__, ', '.join([str(a) for a in args])))
             out = func(*args, **kwargs)
+            if (requried_output is not None) and (out not in requried_output):
+                raise AttemptError('Function output "{}" not in required values: {}'.format(out, requried_output))
             success = True
             # logger.debug('Suceeded on attempt {} to call function "{}({})"'.format(
             #                 attempt, func.__name__, ', '.join([str(a) for a in args])))
-        except exceptions as e:
-            logger.warning('Attempt {} to call function "{}({})" failed'.format(
-                            attempt, func.__name__, ', '.join([str(a) for a in args])))
+        except (exceptions + (AttemptError,)) as e:
+            logger.warning('Attempt {} to call function "{}({}, {})" failed'.format(
+                            attempt, func.__name__, ', '.join([str(a) for a in args]),
+                            ', '.join(['{}={}'.format(k, v) for k, v in kwargs.items()])))
             gc.collect()  # Attemp to avoid netcdf segfaults?
             if attempt <= n_attempts:
-                time.sleep(sleep_invterval)
+                time.sleep(sleep_interval)
                 attempt += 1
             else:
                 if error_message is not None:
-                    logger.error(error_message.format(func=func.__name__, n_attempts=n_attempts))
+                    try:
+                        logger.error(error_message.format(func=func.__name__, n_attempts=n_attempts))
+                    except Exception as e:
+                        raise e
                 for func in call_on_fail:
                     raise NotImplementedError  # Need args_for to pass positional args
                     args, kwargs = args_for(func, kwargs)
@@ -592,6 +708,8 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
                 else:
                     out = e
                     break
+        except Exception as e:
+            raise e
     return out, success
 
 
@@ -675,9 +793,11 @@ if __name__ == '__main__':
     # path = '/home/tfarley/elzar2/checkpoints/MAST/SynthCam/single_filament_scan/Corrected_inversion_data/6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3/'
     # fn_pattern = 'corr_inv-test1-n({n})-6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3.nc'
     # fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(4600,4650), depth=1)
-    path = '/home/tfarley/elzar2/checkpoints/MAST/SA1.1/29991/Corrected_inversion_data/'
-    fn_pattern = 'corr_inv-test1-n({n})-\w+.nc'
-    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(4600,4650), depth=1)
+    path = '/home/tfarley/elzar2/checkpoints/MAST/SA1.1/29852/Detected_blobs/'
+    # fn_pattern = 'corr_inv-test1-n({n})-\w+.nc'
+    fn_pattern = 'blobs-test1-n({n})-\w+.nc'
+    # Get files modifed in the last two days
+    fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(10500, 14500), depth=1, modified_range=(0, 2))
 
     fn = os.path.expanduser('~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
     # from nested_dict import nested_dict

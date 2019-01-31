@@ -64,7 +64,11 @@ def seg_line_plot(x, y, z, ax=None, z_out='color', in_range=None, out_range=None
         lc.set_array(z_scaled)
     else:
         lc = LineCollection(segments, cmap=None)#, norm=plt.Normalize(250, 1500))
-        lc.set_color(color)
+        try:
+            lc.set_color(color)
+        except ValueError as e:
+            lc.set_color('k')
+            logger.exception(e)
 
     if 'linewidth' in z_out:
         # Scale z values between min and max linewidths

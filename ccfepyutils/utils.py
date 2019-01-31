@@ -316,9 +316,22 @@ def is_in(items, collection):
     out = pd.Series(items).isin(collection).values
     return out
 
-def similarity_difflib(reference, option):
+def is_in_str(sub_strings, string):
+    assert isinstance(string, str)
+    sub_strings = make_iterable(sub_strings)
+    out = np.zeros_like(sub_strings, dtype=bool)
+    for i, sub_str in enumerate(sub_strings):
+        out[i] = sub_str in string
+    return out
+
+def similarity_difflib(reference, other):
     import difflib
-    similarity = difflib.SequenceMatcher(a=reference.lower(), b=option.lower()).ratio()
+    similarity = difflib.SequenceMatcher(a=reference, b=other).ratio()
+    return similarity
+
+def similarity_Levenshtein(reference, option):
+    import Levenshtein
+    similarity = Levenshtein.ratio(reference, option)
     return similarity
 
 def similarilty_to(reference, options, return_type='order', n_return=None,
@@ -1059,6 +1072,21 @@ def has_inflection(data):
     else:
         return False
 
+def dataframe_description_str(df, **kwargs):
+    description = df.describe()
+    annotation_str = ['{:5s}: {:10s}'.format(item, '{:0.3g}'.format(value)) for item, value in description.items()]
+    annotation_str = '\n'.join(annotation_str)
+    return annotation_str
+
+def append_to_df_index(df, new_indices, default_value=np.nan, default_type=None, sort_index=True):
+    """Return dataframe extended by new indicies"""
+    new_indices = copy(new_indices.remove_unused_levels())
+    df_append = pd.DataFrame(default_value, index=new_indices, columns=df.columns, dtype=default_type)
+    out = df.append(df_append)
+    if sort_index:
+        out.sort_index(axis=0)
+    return out
+
 class PartialFormatter(string.Formatter):
     """NOTE: Can use double braces for this! '{{no key passed to this}}'.format() -> '{no key passed to this}"""
     def __init__(self):
@@ -1087,8 +1115,6 @@ class PartialFormatter(string.Formatter):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from ccfepyutils.data_processing import moving_average, find_nearest, find_furthest
-
-    similarilty_to()
 
     safe_arange(1.32, 1.46, 0.003)
     l = [[4,5], [1,1], [2,1], [1,2]]

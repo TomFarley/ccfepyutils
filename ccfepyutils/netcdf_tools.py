@@ -57,13 +57,20 @@ def get_netcdf_atrribute(group, name):
 def get_netcdf_variable(group, name):
     return group[name][:]
 
-def dict_to_netcdf(root, name, dictionary):
+def dict_to_netcdf(root, group_name, dictionary, mode='a'):
     """Save values in dict to attributes in group"""
     assert isinstance(dictionary, dict)
-    group = root.createGroup(name)
-    for key, value in dictionary.items():
-        add_netcdf_standalone_variable(group, key, value)
-        # set_netcdf_atrribute(grp, key, value)
+
+    if isinstance(root, str):
+        with Dataset(root, mode, format="NETCDF4") as root:
+            group = root.createGroup(group_name)
+            for key, value in dictionary.items():
+                add_netcdf_standalone_variable(group, key, value)
+            # set_netcdf_atrribute(grp, key, value)
+    else:
+        group = root.createGroup(group_name)
+        for key, value in dictionary.items():
+            add_netcdf_standalone_variable(group, key, value)
 
 def netcdf_to_dict(group, name):
     """Load attributes in group to dict"""
