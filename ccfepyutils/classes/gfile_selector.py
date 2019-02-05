@@ -127,7 +127,7 @@ class GFileSelector(object):
                                             pulse='(\d{5})', gfile_time='([.\d]+)', raise_on_missing_dir=False)
                     for key, value in files.items():
                         key = tuple([str_to_number(k) for k in key])
-                        store.loc[key, ['fn', 'i_path', 'scheduler', 'n', 't']] = [value, i_path, True,
+                        store.loc[key, ['fn', 'i_path', 'scheduler', 'pulse', 't']] = [value, i_path, True,
                                                                                            key[0], key[1]]
         located_file_keys = []
         for i_path, path in enumerate(s['kinetic_gfile_paths']):
