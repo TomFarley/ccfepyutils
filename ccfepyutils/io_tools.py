@@ -370,7 +370,7 @@ def is_possible_filename(fn, ext_whitelist=('py', 'txt', 'png', 'p', 'npz', 'csv
 
 
 
-def mkdir(dirs, start_dir=None, depth=None, accept_files=True, info=None, verbose=False):
+def mkdir(dirs, start_dir=None, depth=None, accept_files=True, info=None, verbose=1):
     """ Create a set of directories, provided they branch of from an existing starting directory. This helps prevent
     erroneous directory creation. Checks if each directory exists and makes it if necessary. Alternatively, if a depth
     is supplied only the last <depth> levels of directories will be created i.e. the path <depth> levels above must
@@ -420,19 +420,21 @@ def mkdir(dirs, start_dir=None, depth=None, accept_files=True, info=None, verbos
                 continue
         if not os.path.isdir(d):  # Only create if it doesn't already exist
             if (start_dir is not None) and (start_dir not in d):  # Check dir stems from start_dir
-                logger.info('Directory {} was not created as does not start at {} .'.format(dirs,
+                if verbose > 0:
+                    logger.info('Directory {} was not created as does not start at {} .'.format(dirs,
                                                                                           os.path.relpath(start_dir)))
                 continue
             try:
                 os.makedirs(d)
-                logger.info('Created directory: {}   ({})'.format(d, get_traceback_location(level=2)))
+                if verbose > 0:
+                    logger.info('Created directory: {}   ({})'.format(d, get_traceback_location(level=2)))
                 if info:  # Write file describing purpose of directory etc
                     with open(os.path.join(d, 'DIR_INFO.txt'), 'w') as f:
                         f.write(info)
             except FileExistsError as e:
                 logger.warning('Directory already created in parallel thread/process: {}'.format(e))
         else:
-            if verbose:
+            if verbose > 1:
                 logger.info('Directory "' + d + '" already exists')
     return 0
 
