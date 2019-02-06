@@ -1662,6 +1662,8 @@ def compare_settings_hash(application, name, settings_obj, n_output=1, skip_iden
     return diff_table, differences
 
 if __name__ == '__main__':
+    s = Settings.get('Invertor')
+
     s = Settings.get('Invertor_resolution', '29840_eps_1')
 
     s = Settings.get('test_tmp', 'default')

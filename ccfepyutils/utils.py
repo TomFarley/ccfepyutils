@@ -845,7 +845,12 @@ def exists_equal(value, obj, indices):
 def argsort(itterable):
     #http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3382369#3382369
     #by unutbu
-    return sorted(range(len(itterable)), key=itterable.__getitem__)
+    try:
+        out = sorted(range(len(itterable)), key=itterable.__getitem__)
+    except TypeError as e:
+        itterable = [str(val) for val in itterable]
+        out = sorted(range(len(itterable)), key=itterable.__getitem__)
+    return out
 
 def args_for(func, kwargs, include=(), exclude=(), match_signature=True, named_dict=True, remove=True):
     """Return filtered dict of args from kwargs that match input for func.
