@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from past.types import basestring
 
 from ccfepyutils.utils import make_iterable, compare_dict, is_number, is_subset, str_to_number, args_for
@@ -595,12 +596,57 @@ def attempt_n_times(func, args=None, kwargs=None, n_attempts=3, exceptions=(IOEr
     return out, success
 
 
-def gen_hash_id(obj, mode='ripemd160'):
+def gen_hash_id(obj, algorithm='ripemd160'):
+    """Generate a unique hash string for the supplied object.
+
+    The string representation of the object, encoded into bytes, is used to generate the hash.
+    Previously the default hashing algorithm was ripemd160"""
     import hashlib
-    h = hashlib.new(mode)
+    h = hashlib.new(algorithm)
     h.update(bytes(str(obj), 'utf-8'))
     hash_id = h.hexdigest()
     return hash_id
+
+
+class HashId:
+
+    # def __new__(cls, obj, algorithm='md5', name=None, object_description=None, meta_data=None):
+    #     instance = str.__new__(cls, '')
+    #     return instance
+
+    def __init__(self, obj, algorithm='md5', name=None, object_description=None, meta_data=None):
+        self.name = name
+        self.object_description = object_description
+        self.hash_obj = obj
+        self.hash_meta = meta_data
+        self.algorithm = algorithm
+        self.hash_id = gen_hash_id(obj, algorithm)
+        # self += self.hash_id
+
+    def __repr__(self):
+        return '<HashId({}):{}>'.format(self.name, self.hash_id)
+
+    def __str__(self):
+        return '{}'.format(self.hash_id)
+
+    def __eq__(self, other):
+        out = False
+        if isinstance(other, str):
+            if other == self.hash_id:
+                out = True
+            elif HashId(other).hash_id == self.hash_id:
+                out = True
+        elif isinstance(HashId) and (other.hash_id == self.hash_id):
+            out = True
+        else:
+            if HashId(other).hash_id == self.hash_id:
+                out = True
+        return out
+
+    def info(self):
+        info = pd.Series({'hash_id': self.hash_id, 'hash_meta': self.hash_meta, 'algorithm': self.algorithm,
+                          'name': self.name, 'object_description': self.object_description})
+        return info
 
 
 def fn_filter(path, fn_pattern, recursive=False, unique=False):
