@@ -17,7 +17,7 @@ from ccfepyutils.utils import make_iterable, remove_duplicates_from_list, is_sub
     to_list, ask_input_yes_no, safe_isnan, str2datetime
 from ccfepyutils.io_tools import mkdir, filter_files_in_dir, delete_file, attempt_n_times
 from ccfepyutils.netcdf_tools import dict_to_netcdf, netcdf_to_dict
-from ccfepyutils.classes.setting import SettingList, SettingBool, SettingFloat, SettingInt, SettingStr
+from ccfepyutils.classes.setting import Setting, SettingList, SettingBool, SettingFloat, SettingInt, SettingStr
 
 try:
     import cpickle as pickle
@@ -153,8 +153,8 @@ class Settings(object):
         self._template = None
 
     @classmethod
-    def get(cls, application=None, name=None, add_missing_template_items=True, update_template=False,
-            auto_create_template=True, default_repeat=False):
+    def get(cls, application=None, name=None, add_missing_template_items=False, update_template=False,
+            auto_create_template=False, default_repeat=False):
         if update_template:
             auto_create_template = True
         if application is None:
@@ -199,9 +199,16 @@ class Settings(object):
         from .composite_settings import CompositeSettings
         exclude_if_col_true = make_iterable(exclude_if_col_true)
         settings = Settings.get(application, name)
+        for item, value in copy(kwargs).items():
+            if item in settings.items:
+                core_values[item] = kwargs.pop(item)
+            if (settings.list_item_indices(settings, item) is not False):
+                core_values[item] = kwargs.pop(item)
         for item, value in core_values.items():
             if isinstance(value, Setting):
                 value = value.value
+            if (item not in settings.items) and (settings.list_item_indices(settings, item) is False):
+                raise ValueError('Supplied core settings does not exist: {}, {}'.format(item, settings))
             settings.set(item, value, ignore=[None])
         composite_settings = CompositeSettings(application, name, blacklist=blacklist, whitelist=whitelist,
                                                exclude_if_col_true=exclude_if_col_true, update_values=kwargs)
@@ -288,7 +295,7 @@ class Settings(object):
         modified = False
         assert isinstance(item, str), 'Settings must be indexed with string, not "{}" ({})'.format(item, type(item))
         item, category = self.get_item_index(self, item, _raise=False)
-        if (category is not None) and (self[item] == value) and (len(kwargs) == 0):
+        if (category not in (None, 'list')) and (self[item] == value) and (len(kwargs) == 0):
             # No changes
             # tmp - update legacy files
             self._df.loc[item, 'value'] = str(value)
@@ -541,18 +548,19 @@ class Settings(object):
     @in_state('loading', 'loaded')
     def load(self):
         assert self.file_exists
-
+        # TODO: Reimplement reading meta data...
         def read_settings_file(fn_path):
-            with Dataset(fn_path) as root:
-                # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
-                self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
+            # with Dataset(fn_path) as root:
+            #     # self.__dict__.update(netcdf_to_dict(root, 'meta'))  # redundant info as stored in logfile
+            #     self._column_sets_names = netcdf_to_dict(root, 'column_sets_names')
             self._df = xr.open_dataset(fn_path, group='df').to_dataframe()
+            # self._column_sets_names = xr.open_dataset(fn_path, group='column_sets_names').to_dataframe()
 
         # Make multiple attempts reading file - sometimes inexplicably fails on first attempt
-        n_attempts = 4
+        n_attempts = 5
         error_message = 'Failed to read settings file after {{n_attempts}} attempts: {fn}'.format(fn=self.fn_path)
         attempt_n_times(read_settings_file, args=[self.fn_path], n_attempts=n_attempts, exceptions=(OSError,),
-                        sleep_invterval=3, error_message=error_message)
+                        sleep_interval=3, error_message=error_message)
 
         self.log_file.loaded(self.name)
         self.check_consistency()
@@ -586,47 +594,57 @@ class Settings(object):
         # Don't resave if already saved
         if self.state.previous_state == 'saved' or self.state.previous_state == 'modifying':
             self.state.reverse()
-            return 
-        meta = {'t_created': self.t_created, 't_modified': self.t_modified, 't_accessed': self.t_accessed}
+            return
+        gc.collect()
+        meta = pd.Series({'t_created': self.t_created, 't_modified': self.t_modified, 't_accessed': self.t_accessed})
+        meta = meta.to_xarray()
+        ds = self._df.to_xarray()
+        # col_sets = pd.Series(self.column_sets_names).to_xarray()
         n_attempts = 3
-        # TODO: Replace with attempt_ntimes
-        for attempt in range(n_attempts):
-            try:
-                #TODO: delete/overwrite previous values? Use with?
-                delete_file(self.fn_path, ignore_exceptions=())
-                with Dataset(self.fn_path, "w", format="NETCDF4") as root:
-                    dict_to_netcdf(root, 'meta', meta)
-                    dict_to_netcdf(root, 'column_sets_names', self.column_sets_names)
-                self._df.to_xarray().to_netcdf(self.fn_path, mode='a', group='df')
-
-            except PermissionError as e:
-                if attempt == n_attempts-1:
-                    logger.exception('Unable to write to settings log file "{app}({name})": {path}, {e}'.format(
-                        app=self.application, name=self.name, path=self.fn_path, e=e))
-                    raise e
-            except RuntimeError as e:
-                if attempt == n_attempts-1:
-                    logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
-                        app=self.application, name=self.name, path=self.fn_path, e=e))
-                    raise e
-            except OSError as e:
-                if attempt == n_attempts - 1:
-                    logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
-                        app=self.application, name=self.name, path=self.fn_path, e=e))
-                    raise e
-            except Exception as e:
-                logger.exception('Unanticipated error updating SettingsFile "{app}({name})": {path}, {e}'.format(
-                    app=self.application, name=self.name, path=self.fn_path, e=e))
-                raise e
-            else:
-                logger.info('Updated/saved SettingsFile values for application "{app}({name})": {path}'.format(
-                        app=self.application, name=self.name, path=self.fn_path))
-                self.log_file.updated(self.name)
-                break
-            time.sleep(3)
-        if update_template:
-            all_equal, df_out = self.compare_to(self.application, 'template')
-            raise NotImplementedError
+        attempt_n_times(ds.to_netcdf, self.fn_path, {'group': 'df', 'mode': 'w'}, n_attempts=n_attempts,
+                        exceptions=(IOError,), sleep_interval=2,
+                        error_message='Call to {}.save() df failed after {{n_attempts}} attempts'.format(self))
+        attempt_n_times(meta.to_netcdf, self.fn_path, {'group': 'meta', 'mode': 'a'}, n_attempts=n_attempts,
+                        exceptions=(IOError,), sleep_interval=2,
+                        error_message='Call to {}.save() meta failed after {{n_attempts}} attempts'.format(self))
+        attempt_n_times(dict_to_netcdf, (self.fn_path, 'column_sets_names', self.column_sets_names),
+                        n_attempts=n_attempts, exceptions=(IOError,), sleep_interval=2,
+                        error_message='Call to {}.save() col_groups failed after {{n_attempts}} attempts'.format(self))
+        logger.debug('Saved settings: {}'.format(self.__repr__()))
+        # for attempt in range(n_attempts):
+        #     try:
+        #         #TODO: delete/overwrite previous values? Use with?
+        #         delete_file(self.fn_path, ignore_exceptions=())
+        #         with Dataset(self.fn_path, "w", format="NETCDF4") as root:
+        #             dict_to_netcdf(root, 'meta', meta)
+        #             dict_to_netcdf(root, 'column_sets_names', self.column_sets_names)
+        #         self._df.to_xarray().to_netcdf(self.fn_path, mode='a', group='df')
+        #
+        #     except PermissionError as e:
+        #         if attempt == n_attempts-1:
+        #             logger.exception('Unable to write to settings log file "{app}({name})": {path}, {e}'.format(
+        #                 app=self.application, name=self.name, path=self.fn_path, e=e))
+        #             raise e
+        #     except RuntimeError as e:
+        #         if attempt == n_attempts-1:
+        #             logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
+        #                 app=self.application, name=self.name, path=self.fn_path, e=e))
+        #             raise e
+        #     except OSError as e:
+        #         if attempt == n_attempts - 1:
+        #             logger.exception('Failed to update Settings File for application "{app}({name})": {path}, {e}'.format(
+        #                 app=self.application, name=self.name, path=self.fn_path, e=e))
+        #             raise e
+        #     except Exception as e:
+        #         logger.exception('Unanticipated error updating SettingsFile "{app}({name})": {path}, {e}'.format(
+        #             app=self.application, name=self.name, path=self.fn_path, e=e))
+        #         raise e
+        #     else:
+        #         logger.info('Updated/saved SettingsFile values for application "{app}({name})": {path}'.format(
+        #                 app=self.application, name=self.name, path=self.fn_path))
+        #         self.log_file.updated(self.name)
+        #         break
+        #     time.sleep(3)
 
     def delete_file(self, force=False):
         """Delete settings file for this settings instance"""
@@ -750,7 +768,8 @@ class Settings(object):
 
         info is tuple of (descriptive_string, difference_data)
         """
-        assert item in self
+        if item not in self:
+            raise ValueError(item)
         names = make_iterable(name)
         out = []
         for name in names:
@@ -770,7 +789,7 @@ class Settings(object):
             else:
                 col_diffs = np.array([self._df.loc[item, col] == s._df.loc[item, col] or
                                      (safe_isnan(self._df.loc[item, col]) and safe_isnan(s._df.loc[item, col]))
-                                     for col in self._df.columns])
+                                     for col in self._df.columns if col in s._df.columns])
                 if np.all(col_diffs):
                     out.append((True, ('identical', )))
                 else:
@@ -831,6 +850,7 @@ class Settings(object):
             return
         # Get settings object to update from
         s = Settings.get(application, name)
+        modified = False
         if only_if_newer:
             # Return if comparisson settings are older
             dt = self.compare_log_times(application, name)
@@ -853,12 +873,16 @@ class Settings(object):
                         # Only update if different
                         # This should handle list items correctly
                         self[item] = s[item].value
+                        modified = True
                 if update_columns:
                     # TODO: make sure column heading match
                     # Copy column values from s
                     non_value_cols = [c for c in self._df.columns if c not in value_cols]
                     self._df.loc[item, non_value_cols] = s._df.loc[item, non_value_cols]
-        if save:
+                    modified = True
+        if modified:
+            self.state = 'modified'
+        if save and modified:
             self.save()
         logger.info('Updated {} according to {}'.format(self, s))
 
@@ -873,7 +897,7 @@ class Settings(object):
 
     def set(self, item, value, ignore=[None]):
         """Set existing setting provided it is not an ignore value"""
-        if item not in self.items:
+        if (item not in self.items) and (Settings.list_item_indices(self, item) is False):
             raise ValueError('Item "{}" is not in {}'.format(item, repr(self)))
         if value in ignore:
             return
@@ -1389,8 +1413,8 @@ class SettingsLogFile(object):
     def __call__(self, name, cols=None):
         """Get log information for setting set, specifying columns"""
         if name not in self._df.index:
-            raise ValueError('SettingsLogFile: No "{}" settings for name "{}". Options: {}'.format(
-                                                self.application, name, self._df.index))
+            raise ValueError('SettingsLogFile: No "{}" settings for application "{}". Options: {}'.format(
+                name, self.application, self._df.index))
         if cols is None:
             return self[name]
         else:
@@ -1452,7 +1476,7 @@ class SettingsLogFile(object):
         if not self.file_exists:
             self.init()
             return False
-        n_attempts = 3
+        n_attempts = 4
         for attempt in range(n_attempts):
             try:
                 self._df = xr.open_dataset(self.fn_path).to_dataframe()
@@ -1461,6 +1485,7 @@ class SettingsLogFile(object):
                     logger.error('Failed to open settingslogfile: {}'.format(self.fn_path))
                     # TODO: copy backedup file?
                     raise e
+                time.sleep(2)
         return True
     
     def created(self, name, time=None, overwrite=True):
@@ -1637,6 +1662,8 @@ def compare_settings_hash(application, name, settings_obj, n_output=1, skip_iden
     return diff_table, differences
 
 if __name__ == '__main__':
+    s = Settings.get('Invertor')
+
     s = Settings.get('Invertor_resolution', '29840_eps_1')
 
     s = Settings.get('test_tmp', 'default')

@@ -19,6 +19,34 @@ from ccfepyutils.classes.plot import Plot
 
 logger = logging.getLogger(__name__)
 
+def rescale_image(image, image_rescale_factor, image_rescale_operation='multiply'):
+    """Rescale image pixel intensities by scale factor"""
+    if image_rescale_operation == 'multiply':
+        out = image * image_rescale_factor
+    elif image_rescale_operation == 'divide':
+        out = image / image_rescale_factor
+    else:
+        raise NotImplementedError('Operation: "{}" not implemented'.format(image_rescale_operation))
+    return out
+
+def clip_image_intensity(image, image_clip_intensity_lower=None, image_clip_intensity_upper=None):
+    """Clip grayscale image pixel intensities to stay within range"""
+    out = image
+    if (image_clip_intensity_lower is not None) or (image_clip_intensity_upper is not None):
+        out = np.clip(image, image_clip_intensity_lower, image_clip_intensity_upper)
+    return out
+
+def extract_roi(image, roi_x_range=(0, -1), roi_y_range=(0, -1)):
+    """Return rectangular region of interest from image defined by corners (x0, y1), (y0, y1)"""
+    out = image[roi_x_range[0]:roi_x_range[1], roi_y_range[0]:roi_y_range[1]]
+    return out
+
+def mask_image(image, mask):
+    """Return image roi defined by mask"""
+    raise NotImplementedError
+    out = image[mask].reshape()
+    return out
+
 def to_grayscale(image):
     image_out = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return image_out
@@ -39,17 +67,17 @@ def to_original_type(image, original_max, original_type, from_type=8):
     image_out = (image * original_max / from_max).astype(original_type)
     return image_out
 
-def threshold(image, thresh_abs=None, thresh_frac=0.25, fill_value=0):
+def threshold_image(image, image_thresh_abs=None, image_thresh_frac=0.25, image_thresh_fill_value=0):
     """Set elements of data bellow the value to threshold_value"""
-    if thresh_abs is not None:
-        mask = np.where(image < thresh_abs)
-    elif thresh_frac is not None:
-        mask = np.where(image < (np.min(image) + thresh_frac * (np.max(image)-np.min(image))))
+    if image_thresh_abs is not None:
+        mask = np.where(image < image_thresh_abs)
+    elif image_thresh_frac is not None:
+        mask = np.where(image < (np.min(image) + image_thresh_frac * (np.max(image) - np.min(image))))
     out = copy(image)
-    out[mask] = fill_value
+    out[mask] = image_thresh_fill_value
     return out
 
-def reduce_noise(image, diameter=5, sigma_color=75, sigma_space=75):
+def reduce_image_noise(image, reduce_noise_diameter=5, reduce_noise_sigma_color=75, reduce_noise_sigma_space=75):
     """strong but slow noise filter
 
     :param: d: Diameter of each pixel neighborhood that is used during filtering. If it is non-positive, it is computed
@@ -65,9 +93,11 @@ def reduce_noise(image, diameter=5, sigma_color=75, sigma_space=75):
     #     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # except:
     #     pass
-    diameter, sigma_color, sigma_space = int(diameter), int(sigma_color), int(sigma_space)
+    reduce_noise_diameter, reduce_noise_sigma_color, reduce_noise_sigma_space = (int(reduce_noise_diameter),
+                                                        int(reduce_noise_sigma_color), int(reduce_noise_sigma_space))
     # image = cv2.guidedFilter(image, image, 3, 9)  # guide, src (in), radius, eps  -- requires OpenCV3
-    image = cv2.bilateralFilter(image, diameter, sigma_color, sigma_space)  # strong but slow noise filter
+    # strong but slow noise filter
+    image = cv2.bilateralFilter(image, reduce_noise_diameter, reduce_noise_sigma_color, reduce_noise_sigma_space)
     # image = cv2.fastNlMeansDenoising(image,None,7,21)
 
     # try:
@@ -77,7 +107,7 @@ def reduce_noise(image, diameter=5, sigma_color=75, sigma_space=75):
     image = to_original_type(image, original_max, original_type)
     return image
 
-def sharpen(image, ksize_x=15, ksize_y=15, sigma=16, alpha=1.5, beta=-0.5, gamma=0.0):
+def sharpen_image(image, ksize_x=15, ksize_y=15, sigma=16, alpha=1.5, beta=-0.5, gamma=0.0):
     """
     ksize – Gaussian kernel size. ksize.width and ksize.height can differ but they both must be positive and odd. Or, they can be zero’s and then they are computed from sigma* .
     sigmaX – Gaussian kernel standard deviation in X direction.
@@ -90,12 +120,12 @@ def sharpen(image, ksize_x=15, ksize_y=15, sigma=16, alpha=1.5, beta=-0.5, gamma
     sharpened = cv2.addWeighted(image, alpha, blured_image, beta, gamma)
     return sharpened
 
-def hist_equalisation(image, adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8), apply=True):
+def hist_image_equalisation(image, image_equalisation_adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8), apply=True):
     """Apply histogram equalisation to image"""
     if not apply:
         return image
     image_out, original_max, original_type = to_nbit(image, nbit=8)
-    if adaptive:
+    if image_equalisation_adaptive:
         clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
         image_out = clahe.apply(image_out)
     else:
@@ -103,14 +133,14 @@ def hist_equalisation(image, adaptive=True, clip_limit=2.0, tile_grid_size=(8, 8
     image_out = to_original_type(image_out, original_max, original_type)
     return image_out
 
-def gamma_enhance(image, gamma=1.2):
+def gamma_enhance_image(image, gamma=1.2):
     """Apply gamma enhancement to image"""
     image_out = image
     if gamma not in (None, 1, 1.0):
         image_out = image ** gamma
     return image_out
 
-def adjust_contrast(image, adjust_contrast=1.2):
+def adjust_image_contrast(image, adjust_contrast=1.2):
     image_out = image
     if adjust_contrast not in (None, 1, 1.0):
         image_ceil = 2**np.ceil(np.log2(np.max(image))) - 1
@@ -119,7 +149,7 @@ def adjust_contrast(image, adjust_contrast=1.2):
         image_out[image_out > image_ceil] = image_ceil
     return image_out
 
-def adjust_brightness(image, adjust_brightness=1.2):
+def adjust_image_brightness(image, adjust_brightness=1.2):
     image_out = image
     if adjust_brightness not in (None, 1, 1.0):
         image_ceil = 2**np.ceil(np.log2(np.max(image))) - 1
@@ -257,7 +287,7 @@ def contour_info(mask, image=None, extract_number=None, x_values=None, y_values=
         # TODO: convert pixel values to coordinate values
         raise NotImplementedError
         for key in []:
-            info[key+''] =info[key] * x_values
+            info[key+''] = info[key] * x_values
     if y_values is not None:
         raise NotImplementedError
 
@@ -276,8 +306,9 @@ def contour_info(mask, image=None, extract_number=None, x_values=None, y_values=
 #     return out
 
 image_enhancement_functions = {
-            'threshold': threshold, 'reduce_noise': reduce_noise, 'sharpen': sharpen, 'threshold': threshold,
-             'gamma_enhance': gamma_enhance, 'hist_equalisation': hist_equalisation, 'invert_image': invert_image,
+                'rescale': rescale_image, 'clip_intensity': clip_image_intensity, 'extract_roi': extract_roi,
+            'threshold': threshold_image, 'reduce_noise': reduce_image_noise, 'sharpen': sharpen_image,
+             'gamma_enhance': gamma_enhance_image, 'hist_equalisation': hist_image_equalisation, 'invert_image': invert_image,
              'canny_edge_detection': canny_edge_detection,
              'extract_bg': extract_bg, 'extract_fg': extract_fg,
              'add_abs_gauss_noise': add_abs_gauss_noise}

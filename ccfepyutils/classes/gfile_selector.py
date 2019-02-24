@@ -36,8 +36,8 @@ class GFileSelector(object):
         # TODO generalise to other origins other than scheduler and default
         self.settings = Settings.get('GFileSelector', settings)
         self.settings.update_from_dict(kwargs)
-        self.store = pd.DataFrame(index=pd.MultiIndex.from_product([[], []], names=['n', 't']),
-                                  columns=['fn', 'i_path', 'scheduler', 'n', 't'])
+        self.store = pd.DataFrame(index=pd.MultiIndex.from_product([[], []], names=['pulse', 't']),
+                                  columns=['fn', 'i_path', 'scheduler', 'pulse', 'n', 't'])
         # User supplied gfile to always return if not None
         self.fixed_gfile = none_filter(self.settings['fixed_gfile'].value, fix_gfile)
         # Remember previous gfile for easy recall
@@ -127,8 +127,9 @@ class GFileSelector(object):
                                             pulse='(\d{5})', gfile_time='([.\d]+)', raise_on_missing_dir=False)
                     for key, value in files.items():
                         key = tuple([str_to_number(k) for k in key])
-                        store.loc[key, ['fn', 'i_path', 'scheduler', 'n', 't']] = [value, i_path, True,
+                        store.loc[key, ['fn', 'i_path', 'scheduler', 'pulse', 't']] = [value, i_path, True,
                                                                                            key[0], key[1]]
+        located_file_keys = []
         for i_path, path in enumerate(s['kinetic_gfile_paths']):
             path = path.format(pulse=pulse, machine=machine)
             for ifn_pattern, fn_pattern in enumerate(s['kinetic_gfile_fn_formats']):
@@ -137,10 +138,13 @@ class GFileSelector(object):
                 files = filter_files_in_dir(path, fn_pattern, group_keys=('pulse', 'time'),
                                             pulse='(\d{5})', gfile_time='([.\d]+)', raise_on_missing_dir=False)
                 for key, value in files.items():
-                    store.loc[key, ['fn', 'i_path', 'scheduler', 'n', 't']] = [value, i_path, False, key[0], key[1]]
+                    if key not in located_file_keys:
+                        # If file has already been located don't overwrite with file at same t in lower priority dir
+                        store.loc[key, ['fn', 'i_path', 'scheduler', 'pulse', 't']] = [value, i_path, False, key[0], key[1]]
+                        located_file_keys.append(key)
 
         store = store.sort_index()
-        self.store['n'] = store.astype({'n': int})['n']
+        self.store['pulse'] = store.astype({'pulse': int})['pulse']
 
     def save_scheduler_gfile(self, pulse, time, machine='MAST', fn_format=None, path=None):
         """Save scheduler gfile to file for access without idam"""

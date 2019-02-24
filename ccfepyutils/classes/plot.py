@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import mpl_toolkits
 import matplotlib.gridspec as gridspec
+import matplotlib.ticker
 from mpl_toolkits.mplot3d import Axes3D
 
 from ccfepyutils.utils import make_iterable, make_iterables, args_for, to_array, is_scalar, none_filter, nsigfig
@@ -264,6 +265,8 @@ class Plot(object):
                     old_name = list(ax_names.keys())[list(ax_names.values()).index(index)]
                     del ax_names[old_name]
                 ax_names[name] = index
+        # elif isinstance(ax, int) and (ax < len(self.axes)):
+        #     ax = self.axes[ax]
         else:
             index = ax
             logger.debug('index {} not in self._gs_slices {}'.format(index, self._gs_slices))
@@ -357,7 +360,7 @@ class Plot(object):
             mode = self._get_modes(x, y, z)[0]  # take first compatible mode as default
         self._check_mode(x, y, z, mode)  # Check mode is compatible with supplied data
         if mode == 'pdf':
-            kws = args_for((plot_pdf, pdf), kwargs, include=self.plot_args, remove=True)
+            kws = args_for((plot_pdf, pdf, plot_1d), kwargs, include=self.plot_args, remove=True)
             bin_edges, bin_centres, counts = plot_pdf(x, ax, **kws)
             self.return_values = bin_edges, bin_centres, counts
         elif mode == 'line':
@@ -435,6 +438,7 @@ class Plot(object):
             self.fig.tight_layout()
 
     def set_axis_limits(self, xlim=None, ylim=None, ax=None):
+        # TODO: If None passed for either limit use eg ax.set_xlim(left=0)
         if ax == 'all':
             for ax in self.axes:
                 self.set_axis_limits(xlim=xlim, ylim=ylim, ax=ax)
@@ -480,6 +484,7 @@ class Plot(object):
 
     def legend(self, handles=None, labels=None, ax=None, legend=True, legend_fontsize=14, **kwargs):
         """Finalise legends of each axes"""
+        # TODO: Stop subsequent calls updating fontsize with default
         ax = none_filter(self._legend, ax)
         if ax in ('each axis', 'all'):
             axes = self.axes.flatten()
@@ -558,7 +563,11 @@ class Plot(object):
         else:
             assert settings is not None
             raise NotImplementedError
-        self.fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
+        try:
+            self.fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
+        except RuntimeError as e:
+            logger.exception('Failed to save plot to: {}'.format(path_fn))
+            raise e
         if verbose:
             logger.info('Saved plot "{}" to: {}'.format(self.fig.canvas.get_window_title(), path_fn))
 
@@ -574,9 +583,9 @@ class Plot(object):
                 self.legend()
             if tight_layout:
                 try:
-                    plt.tight_layout()
-                except ValueError as e:
-                    logger.exception('tight_layout failed with strange mpl error!')
+                    self.fig.tight_layout()
+                except (ValueError, RuntimeError) as e:
+                    logger.warning('tight_layout failed with strange mpl error!')
             plt.show()
         close_all_mpl_plots(close_all=close_previous_plot_windows, verbose=False)
 
@@ -623,7 +632,7 @@ def plot_pdf(x, ax, label=None, nbins=None, bin_edges=None, min_data_per_bin=10,
     ax.set_ylim(bottom=0)
     return bin_edges, bin_centres, counts
 
-def scatter_1d(x, y, ax, **kwargs):
+def scatter_1d(x, y, ax, ms=None, alpha=None, marker=None, **kwargs):
     ax.scatter(x, y, **kwargs)
 
 def error_bar_1d(x, y, ax, xerr=None, yerr=None, errorbar_kwargs=None, **kwargs):
@@ -674,7 +683,7 @@ def annotate_points(ax, x, y, point_annotations=None, annotate_points_kwargs=Non
         ax.annotate(label, (xi, yi), **kwargs)
 
 def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=True, cbar_range=None, cbar_label=None,
-             **kwargs):
+             cbar_fontsize=12, **kwargs):
     """ """
     assert not np.all([i is None for i in (x, y, z)])
 
@@ -694,11 +703,11 @@ def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=
     try:
         if not any(v is None for v in (x, y, z)):
             # Has x and y values
-            img = ax.contour(x, y, z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)  # prevent white lines between contour fils
+            img = ax.contour(x, y, z, levels, cmap=cmap, vmin=vmin, vmax=vmax, lw=0.5, zorder=-1, **kwargs)  # prevent white lines between contour fils, particularly in pdf
             img = ax.contourf(x, y, z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)
         else:
             # No x or y values
-            img = ax.contour(z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)  # prevent white lines between contour fils
+            img = ax.contour(z, levels, cmap=cmap, vmin=vmin, vmax=vmax, lw=0.5, zorder=-1, **kwargs)  # prevent white lines between contour fils, particularly in pdf
             img = ax.contourf(z, levels, cmap=cmap, vmin=vmin, vmax=vmax, **kwargs)
     except ValueError as e:
         logger.exception('Failed to plot contour. min(z)={}, max(z)={}'.format(np.min(z), np.max(z)))
@@ -710,14 +719,24 @@ def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=
     if colorbar and img:
         from mpl_toolkits.axes_grid1 import make_axes_locatable
         divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
+        cax = divider.append_axes('right', size='5%', pad=0.1)
         z_max = np.max(np.abs(z)) if cbar_range is None else np.max(np.abs(cbar_range))
-        if 0.08 > z_max > 0.008:
-            fmt = '%.3f' if colorbar != '%' else '%.3%'
-        elif 0.8 > z_max >= 0.08:
-            fmt = '%.2f' if colorbar != '%' else '%.2%'
+        if colorbar == '%':
+            fmt = '%.2%'
         else:
-            fmt = '%.2g' if colorbar != '%' else '%.2%'
+            if 0.08 > z_max > 0.008:
+                fmt = '%.3f'
+            elif 0.8 > z_max >= 0.08:
+                fmt = '%.2f'
+            else:
+                def fmt_sci(x, pos):
+                    a, b = '{:.1e}'.format(x).split('e')
+                    b = int(b)
+                    return r'${}\times 10^{{{}}}$'.format(a, b)
+                fmt = matplotlib.ticker.FuncFormatter(fmt_sci)
+                # fmt = '%.1e'  # '{:.1e}'
+                # fmt = None
+
         if cbar_label is None:
             cbar_label = ''
         # ticks = nsigfig(np.linspace(vmin, vmax, 6), 1) if cbar_range else None
@@ -729,24 +748,27 @@ def contourf(x, y, z, ax, levels=200, cmap='viridis', transpose=False, colorbar=
             img.set_array([])
 
         cbar = plt.colorbar(img, cax=cax, format=fmt, extend='neither')#  , ticks=ticks)
+        rotation = 'auto'  # 45
+        cbar.ax.tick_params(labelsize=cbar_fontsize, rotation=rotation)
+        # cbar.ax.ticklabel_format(scilimits=(2, 100))
         cbar.set_label(cbar_label)
         out['cbar'] = cbar
 
     return out
 
 def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cmap='viridis', set_axis_limits=False,
-           extent=None, show_axes=False, fill_canvas=False, transpose=False,
-           adjust_contrast=None, adjust_brightness=None, gamma_enhance=None,hist_equalisation=False, **kwargs):
+           extent=None, show_axes=False, fill_canvas=False, transpose=False, scale_data=None,
+           adjust_contrast=None, adjust_brightness=None, gamma_enhance=None, hist_equalisation=False, **kwargs):
     """Plot data as 2d image
 
     Note:
     - aspect = 'auto' useful for extreeme aspect ratio data
     - transpose = True useful since imshow and contourf expect arrays ordered (y, x)
 """
-    from ccfepyutils.image import gamma_enhance as _gamma_enhance
-    from ccfepyutils.image import adjust_brightness as _adjust_brightness
-    from ccfepyutils.image import adjust_contrast as _adjust_contrast
-    from ccfepyutils.image import hist_equalisation as _hist_equalisation
+    from ccfepyutils.image import gamma_enhance_image as _gamma_enhance
+    from ccfepyutils.image import adjust_image_brightness as _adjust_brightness
+    from ccfepyutils.image import adjust_image_contrast as _adjust_contrast
+    from ccfepyutils.image import hist_image_equalisation as _hist_equalisation
     if (x is not None) and (y is None) and (z is None):  # if 2d data passed to x treat x as z data
         x, y, z = y, z, x
     if x is None and y is None:
@@ -759,10 +781,12 @@ def imshow(ax, x=None, y=None, z=None, origin='lower', interpolation='none', cma
     if transpose:
         z = np.array(z).T
     # TODO: Use enhancer class here?
+    if scale_data is not None:
+        z = scale_data[0] + ((z-np.min(z)) / np.ptp(z)) * scale_data[1]
     z = _gamma_enhance(z, gamma_enhance)
     z = _adjust_contrast(z, adjust_contrast)
     z = _adjust_brightness(z, adjust_brightness)
-    z = _hist_equalisation(z, apply=hist_equalisation, adaptive=True)
+    z = _hist_equalisation(z, apply=hist_equalisation, image_equalisation_adaptive=True)
     if fill_canvas:
         ax.figure.subplots_adjust(0, 0, 1, 1)  # maximise figure margins so image fills full canvas
     if set_axis_limits:
@@ -933,7 +957,7 @@ def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, 
             alpha0i = alpha * alpha0
 
             ax.add_patch(Ellipse((x0, y0), major0i, minor0i, angle=angle0,
-                                  facecolor='none', edgecolor=color, lw=lw, alpha=alpha0, ls=ls, zorder=2, **kwargs))
+                                  facecolor='none', edgecolor=color, lw=lw, alpha=alpha0i, ls=ls, **kwargs))
 
         if label:
             plt.text(x0, y0, '{}'.format(i + 1), ha="center", family='sans-serif', size=10, color=color)
@@ -946,7 +970,8 @@ def plot_ellipses(ax, major, minor, angle, x=None, y=None, a=None, a_lims=None, 
             a /= (a_lims[1] - a_lims[0])  # Normalise amplitudes
             min_size = 4
             max_size = 25
-            ax.scatter(x, y, s=np.array(min_size + a * (max_size - min_size)), c=color, lw=0, alpha=0.6)
+            # ax.scatter(x, y, s=np.array(min_size + a * (max_size - min_size)), c=color, lw=0, alpha=0.6)
+            ax.scatter(x, y, s=6, c=color, lw=0, alpha=0.6)
 
 def plot_rectangles(ax, x_lims, y_lims, fill=False, alpha=None, facecolor=None,
                     edgecolor=None, linewidth=None, linestyle='solid',

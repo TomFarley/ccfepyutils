@@ -1,18 +1,19 @@
 import os
 from collections import OrderedDict
-from copy import copy
+from copy import copy, deepcopy
 import logging
 import inspect
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 import re
 
 from netCDF4 import Dataset
 
 import ccfepyutils
 from ccfepyutils.utils import make_iterable, t_now_str, get_methods_class
-from ccfepyutils.io_tools import mkdir
+from ccfepyutils.io_tools import mkdir, attempt_n_times
 from ccfepyutils.netcdf_tools import dict_to_netcdf
 from ccfepyutils.classes.settings import Settings
 from ccfepyutils.classes.state import State
@@ -99,9 +100,23 @@ class CompositeSettings(object):
         self._t_modified = t
         self._subsetting_mod_times[application] = s.log_file(s.name, 'modified')
 
-        for item in s.items:
+        list_items_updated = []
+        for item in deepcopy(s.items):
+            item_name_components = item.split(':')
             if item in update_values:
                 s[item] = update_values.pop(item)
+            elif (len(item_name_components) == 2):
+                item_list_name = item_name_components[0]
+                if (item_name_components[0] in update_values):
+                    # NOTE: Under this implementation, assignement will be repeated oritginal length of list times
+                    s[item_list_name] = update_values.pop(item_list_name)
+                    list_items_updated.append(item_list_name)
+                elif item_list_name in list_items_updated:
+                    # Item has just been set in previous loop iteration
+                    continue
+            elif (len(item_name_components) == 3) and (item_name_components[2] in update_values):
+                # Function settings not implemented here
+                pass
             df_nest = s._df
             exclude = False
             for excl_col in exclude_if_col_true:
@@ -251,12 +266,13 @@ class CompositeSettings(object):
         for item in self._df.index:
             yield item
 
-    def get_func_args(self, funcs, func_names=None, ignore_func_name=True):
+    def get_func_args(self, funcs, func_names=None, ignore_func_name=True, blacklist=()):
         """Get arguments for function from settings object
         :param: funcs - function instances or strings describing the function name"""
         if ignore_func_name is False:
             raise NotImplementedError
         funcs = make_iterable(funcs)
+        blacklist = make_iterable(blacklist)
         if func_names is not None:
             func_names = make_iterable(func_names)
         else:
@@ -274,6 +290,8 @@ class CompositeSettings(object):
                 name = kw.name
                 if ((name not in self.items) and
                     (not any(re.match('{}(:\d+)?$'.format(name), item) for item in self.items))):
+                    continue
+                if name in blacklist:
                     continue
                 # compatible_functions = self._df.loc[name, 'function'].strip().split(',')
                 # if (name in self) and ((func_name in compatible_functions) or ignore_func_name):
@@ -383,17 +401,17 @@ class CompositeSettings(object):
         mask = ~self._df['runtime']
         df_hash = self._df.loc[mask]
         df_runtime = self._df.loc[~mask]
-        hash_id = gen_hash_id(df_hash)
-        path = os.path.join(settings_dir, 'hash_records', application, name)
+        hash_id = gen_hash_id(df_hash['value'])  # Only use value column for hash_id generation, not fine meta data
+        path = os.path.join(settings_dir, 'hash_records', application)
         if not os.path.isdir(path):
             mkdir(path, depth=3)
-        fn = 'settings_hash_record-{}-{}-{}.nc'.format(application, name, hash_id)
+        fn = 'settings_hash_record-{}-{}.nc'.format(application, hash_id)
         fn_path = os.path.join(path, fn)
         t0 = t_now_str(format='natural')
         if not os.path.isfile(fn_path):
         # if True:
             meta = {'application': self._application, 'name': self._name, 'first_used': t0, 'last_used': t0,
-                    'protected': False}
+                    'protected': False, 'hash_id': hash_id}
             df_hash.to_xarray().to_netcdf(fn_path, mode='w', group='df')
             df_runtime.to_xarray().to_netcdf(fn_path, mode='a', group='runtime')
             with Dataset(fn_path, "a", format="NETCDF4") as root:
@@ -401,13 +419,40 @@ class CompositeSettings(object):
             logger.info('Created new settings hash file record: {}'.format(fn))
         else:
             logger.debug('Updating hash_id file: {}'.format(fn_path))
-            try:
-                with Dataset(fn_path, "r+", format="NETCDF4") as root:
-                    root['meta']['last_used'][0] = t0
-            except IndexError as e:
-                logger.warning('Settings_hash_record file does not contain "meta/last_used" variable: {}'.format(fn))
+            n_attempts = 3
+            for attempt in np.arange(n_attempts):
+                try:
+                    with Dataset(fn_path, "r+", format="NETCDF4") as root:
+                        root['meta']['last_used'][0] = t0
+                    break
+                except IndexError as e:
+                    logger.warning('Settings_hash_record file does not contain "meta/last_used" variable: {}'.format(fn))
+                    exc = e
+                except Exception as e:
+                    logger.warning('Unanticipated error {}: {}'.format(e, fn))
+                    exc = e
+            else:
+                logger.warning('Failed to update hash_id file after {} attempts'.format(n_attempts))
+                raise exc
+
         self._hash_id = hash_id
         return hash_id
+
+    @classmethod
+    def load_from_hash_id(cls, application, hash_id):
+        path = os.path.join(settings_dir, 'hash_records', application)
+        fn = 'settings_hash_record-{}-{}.nc'.format(application, hash_id)
+        fn_path = os.path.join(path, fn)
+        s = None
+        if os.path.isfile(fn_path):
+            t0 = t_now_str(format='natural')
+            df, success = attempt_n_times(xr.open_dataset, (fn_path,), kwargs={'group': 'df'})
+            df = df.to_dataframe()
+            s = Settings.get(application, hash_id)
+            s._df = df
+        else:
+            logger.warning('Hash_id file does not exist: {}'.format(fn_path))
+        return s
 
     @property
     def name(self):

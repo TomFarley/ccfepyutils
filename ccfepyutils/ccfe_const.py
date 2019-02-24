@@ -206,6 +206,10 @@ def linear(x, m, c):
     """y = m*x + c"""
     return m*x +c
 
+def linear_though_origin(x, m):
+    """y = m*x"""
+    return m*x
+
 def exp(x, lamda, k):
     """y = e^( -(x-k)/lamda )"""
     return np.exp(-(x-k)/lamda)
@@ -245,8 +249,13 @@ def auto_corr(t, tau, beta, k):
     """Fit to autocorrelation function from Militello2013"""
     return np.exp(-((t-k)/tau)**(beta-1))
 
-def gaussian(x, A, mu, sigma, c):
+def gaussian(x, A, mu, sigma):
     """ Gaussian distribution with centre mu and width sigma """
+
+    return A * (1/sqrt0(2*pi0*sigma**2)) * exp0(-(x-mu)**2/(2*sigma**2))
+
+def gaussian_c(x, A, mu, sigma, c):
+    """ Gaussian distribution with centre mu, width sigma and offset c """
 
     return A * (1/sqrt0(2*pi0*sigma**2)) * exp0(-(x-mu)**2/(2*sigma**2)) + c
     # return exp(x, A, (1/(2*sigma),0,-mu/(2*sigma)), 0)
@@ -310,9 +319,10 @@ def distributions():
 
         return amp * np.exp(exponent)
 
-functions = {'poly': poly, 'linear': linear, 'exp': exp, 'exp_a': exp_a, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 'normal':
-    gaussian, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 'lognormal': lognormal, 'gamma': gamma,
-             'auto_corr': auto_corr}
+functions = {'poly': poly, 'linear': linear, 'linear_though_origin': linear_though_origin,
+             'exp': exp, 'exp_a': exp_a, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 
+             'normal': gaussian, 'gaussian_c': gaussian_c, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 
+             'lognormal': lognormal, 'gamma': gamma, 'auto_corr': auto_corr}
 
 
 

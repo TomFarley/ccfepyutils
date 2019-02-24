@@ -84,7 +84,7 @@ class Fitter(object):
                 window_sizes = [0.1, 0.5]  # Spatial scale range of peaks
                 # local maxima on similar spatial scale to peaks
                 ind_high = np.where(y > np.min(y) + 0.5*np.ptp(y))
-                ind_max = argrelmax(y, order=int(len(x)*window_sizes[0]*0.5))[0]
+                ind_max = argrelmax(y, order=np.max([int(len(x)*window_sizes[0]*0.5), 3]), mode='wrap')[0]
                 if len(ind_max) == 0:
                     ind_max = argrelmax(y, order=2)[0]
                     if len(ind_max) == 0:
@@ -115,6 +115,12 @@ class Fitter(object):
             raise NotImplementedError('3D fitting not implemented yet')
 
         x, y = self.data(window=window)
+        i_not_nan = np.logical_and((~np.isnan(x)), (~np.isnan(y)))
+        if len(i_not_nan) == 0:
+            logger.warning('No (non nan) data to fit to: x={}, y={}'.format(x, y))
+            return func, None, None, None
+
+        x, y = x[i_not_nan], y[i_not_nan]
         if isinstance(func, string_types):
             if func in functions.keys():
                 func = functions[func]
@@ -179,7 +185,7 @@ class Fitter(object):
         return best
 
     def plot_fit(self, func='auto', p0=None, fit_window=None, extrapolate=[None, None], ax=None, show=False,
-                 fit_label='{Func} fit', color='repeat-10', plot_guess=False, **kwargs):
+                 fit_label='{Func} fit', color='repeat-10', alpha=0.9, plot_guess=False, **kwargs):
         """Plot fit
         Returns output from fit
         """
@@ -274,7 +280,7 @@ class Fitter(object):
             else:
                 raise ValueError('Function {} not recognised/supported'.format(fit))
 
-            kws = args_for(self.plot_fit, kwargs)
+            kws = args_for(self.plot_fit, kwargs, include=('ls', 'lw'))
             ax, func, popt, pcov, chi2r = self.plot_fit(func, p0=p0, ax=ax, fit_window=fit_window, show=False, **kws)
         else:
             ax, func, popt, pcov, chi2r = ax, None, None, None, None

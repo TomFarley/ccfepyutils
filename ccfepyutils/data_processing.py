@@ -410,15 +410,23 @@ def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=50, nbins_
     assert not ((nbins is not None) and (bin_edges is not None)), 'Only supply one bins argument'
     x = np.array(x)
     if filter_nans:
-        x = x[~np.isnan(x)]
-    if len(x) < 2:
+        try:
+            x = x[~np.isnan(x)]
+        except:
+            pass
+    if len(x) == 0:
+        return np.array([]), np.array([]), np.array([])
+    if (not detect_delta_fuctions) and (len(x) < 2):
         return np.array([]), np.array([]), np.array([])
     if (nbins is None) and (bin_edges is None):
         nbins = np.floor(len(x) / min_data_per_bin)
         nbins = int(np.round(np.max([8, nbins])))
         nbins = np.min((nbins, nbins_max))
 
-        x_range = np.ptp(x)
+        try:
+            x_range = np.ptp(x)
+        except:
+            pass
         av_data_per_unique_value = len(x) / len(set(x))
         contains_deltas = (av_data_per_unique_value > av_data_per_delta) or (x_range == 0)
 
@@ -476,9 +484,12 @@ def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=50, nbins_
             except Exception as e:
                 raise e
 
-    bins = bin_edges if (bin_edges is not None) else nbins
+    bins = np.sort(bin_edges) if (bin_edges is not None) else nbins
     # logger.info('Bins: {}'.format(bins))
-    counts, bin_edges = np.histogram(x, bins=bins, density=density)
+    try:
+        counts, bin_edges = np.histogram(x, bins=bins, density=density)
+    except Exception as e:
+        raise e
 
     counts = counts / np.max(counts) if max_1 else counts
     bin_centres = moving_average(bin_edges, 2)
