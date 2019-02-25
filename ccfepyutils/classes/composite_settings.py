@@ -111,6 +111,14 @@ class CompositeSettings(object):
                     # NOTE: Under this implementation, assignement will be repeated oritginal length of list times
                     s[item_list_name] = update_values.pop(item_list_name)
                     list_items_updated.append(item_list_name)
+
+                    # Bug fix for only subset of list being added to compostite settings
+                    # Add all items for list in one go, then continue
+                    for i, subitem_value in enumerate(s[item_list_name]):
+                        subitem = '{}:{}'.format(item_list_name, i)
+                        df = df.append(s._df.loc[subitem, :])
+                    items[item] = [s]
+                    continue
                 elif item_list_name in list_items_updated:
                     # Item has just been set in previous loop iteration
                     continue
@@ -386,11 +394,11 @@ class CompositeSettings(object):
         out = OrderedDict()
         for item in self.items:
             if re.match(r'^.*:\d+', item):
-                key = item.split(':')[-1]
+                item = item.split(':')[0]
             else:
-                key = item
+                item = item
             value = self[item]
-            out[key] = value
+            out[item] = value
         return out
 
     def hash_id(self):
