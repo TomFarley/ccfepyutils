@@ -17,6 +17,7 @@ from datetime import datetime
 #     from tkinter import filedialog as askopenfilename
 import numpy as np
 import pandas as pd
+from matplotlib import cbook
 from copy import copy
 import sys, os, inspect
 from collections import Mapping, Container
@@ -175,6 +176,32 @@ def is_numeric(value):
         except TypeError as e:
             numeric = False
     return numeric
+
+def str_to_number(string, cast=None, expect_numeric=False):
+    """ Convert string to int if integer, else float. If cannot be converted to number just return original string
+    :param string: string to convert number
+    :param cast: type to cast output to eg always float
+    :return: number
+    """
+    if isinstance(string, (int, float)):
+        # leave unchanged
+        return string
+    if isinstance(string, str) and ('_' in string):
+        # Do not convert strings with underscores and digits to numbers
+        out = string
+    else:
+        try:
+            out = int(string)
+        except ValueError as e:
+            try:
+                out = float(string)
+            except ValueError as e:
+                out = string
+    if isinstance(cast, type):
+        out = cast(out)
+    if not isinstance(out, (int, float)) and expect_numeric:
+        raise ValueError('Input {string} could not be converted to a number'.format(string))
+    return out
 
 def ndarray_0d_to_scalar(array):
     out = array
@@ -478,7 +505,94 @@ def compare_dict(dict1, dict2, tol=1e-12, top=True):
                     return False
     return True
 
-def isclose_within(values, reference, tol=1e-8, all=False, return_values=False):
+def compare_objs(obj1, obj2):
+    import xarray as xr
+    if type(obj1) != type(obj2):
+        return False
+    if isinstance(obj1, dict):
+        return compare_dicts(obj1, obj2)
+    elif isinstance(obj1, (list, tuple)):
+        return compare_lists(obj1, obj2)
+    elif isinstance(obj1, (np.ndarray, pd.Series, xr.DataArray)):
+        return compare_arrays(obj1, obj2)
+    elif isinstance(obj1, pd.DataFrame):
+        return compare_dataframes(obj1, obj2)
+    else:
+        return obj1 == obj2
+
+def compare_dicts(dict1, dict2):
+    equal = True
+    for key, value in dict1.items():
+        if key not in dict2:
+            equal = False
+        else:
+            if not compare_objs(dict1[key], dict2[key]):
+                equal = False
+    return equal
+
+def compare_lists(list1, list2):
+    if len(list1) != len(list2):
+        return False
+    equal = True
+    for a, b in zip(list1, list2):
+        if not compare_objs(a, b):
+            equal = False
+    return equal
+
+def compare_arrays(array1, array2):
+    # TODO: Match nans
+    if array1.shape != array2.shape:
+        out = False
+    elif array1.dtype != array2.dtype:
+        out = False
+    elif np.all(array1 == array2):
+        out = True
+    elif array1.dtype == np.dtype(object):
+        # Handle objects that are not equal to themselves eg nan, None
+        out = True
+        for item1, item2 in zip(array1, array2):
+            if item1 == item2:
+                sub_out = True
+            elif np.isnan(item1) and np.isnan(item2):
+                sub_out = True
+            elif (item1 is None) and (item2 is None):
+                sub_out = True
+            else:
+                sub_out = False
+            out *= sub_out
+    else:
+        equal_mask = array1 == array2
+        both_nan = np.isnan(array1) & np.isnan(array2)
+        out = equal_mask | both_nan
+        out = np.all(out)
+    return out
+
+def compare_dataframes(df1, df2):
+    # TODO: Match nans
+    if df1.shape != df2.shape:
+        out = False
+    elif (not np.all(df1.index == df2.index)):
+        out = False
+    elif (not np.all(df1.columns == df2.columns)):
+        out = False
+    elif (not np.all(df1.dtypes == df2.dtypes)):
+        out = False
+    elif np.dtype(object) not in df1.dtypes.values:
+        # Basic datatypes
+        equal_mask = df1 == df2
+        both_nan = np.isnan(df1) & np.isnan(df2)
+        out = equal_mask | both_nan
+        out = np.all(out)
+    else:
+        # Compare columnwise
+        out = True
+        for col in df1.columns:
+            array1 = df1[col].values
+            array2 = df2[col].values
+            out &= compare_arrays(array1, array2)
+    return out
+
+def isclose_within(values, reference, tol=1e-8, all=False):
     """Return true if elements of a appear in comparison_list (b) within tollerance
     From: http://stackoverflow.com/questions/39602004/can-i-use-pandas-dataframe-isin-with-a-numeric-tolerance-parameter
     """
@@ -511,109 +625,6 @@ def equal_string(obj, string):
         return False
 
 # def assert_raises(func)
-
-from matplotlib import cbook
-class DataCursor(object):
-    """A simple data cursor widget that displays the x,y location of a
-    matplotlib artist when it is selected."""
-    def __init__(self, artists,func=None, tolerance=5, offsets=(-20, 20), 
-                 template='x: %0.2f\ny: %0.2f', display_all=False):
-        """Create the data cursor and connect it to the relevant figure.
-        "artists" is the matplotlib artist or sequence of artists that will be 
-            selected. 
-        "tolerance" is the radius (in points) that the mouse click must be
-            within to select the artist.
-        "offsets" is a tuple of (x,y) offsets in points from the selected
-            point to the displayed annotation box
-        "template" is the format string to be used. Note: For compatibility
-            with older versions of python, this uses the old-style (%) 
-            formatting specification.
-        "display_all" controls whether more than one annotation box will
-            be shown if there are multiple axes.  Only one will be shown
-            per-axis, regardless. 
-        """
-        self.template = template
-        self.offsets = offsets
-        self.display_all = display_all
-        self.func = func
-        if not cbook.iterable(artists):
-            artists = [artists]
-        self.artists = artists
-        self.axes = tuple(set(art.axes for art in self.artists))
-        self.figures = tuple(set(ax.figure for ax in self.axes))
-        self.ids = []
-        self.annotations = {}
-        for ax in self.axes:
-            self.annotations[ax] = self.annotate(ax)
-
-        for artist in self.artists:
-            artist.set_picker(tolerance)
-        
-
-    def annotate(self, ax):
-        """Draws and hides the annotation box for the given axis "axI"."""
-        annotation = ax.annotate(self.template, xy=(0, 0), ha='left',
-                xytext=self.offsets, textcoords='offset points', va='bottom',
-                bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
-                )
-        annotation.set_visible(False)
-        return annotation
-
-    def __call__(self, event):
-        """Intended to be called through "mpl_connect"."""
-        # Rather than trying to interpolate, just display the clicked coords
-        # This will only be called if it's within "tolerance", anyway.
-        x, y = event.mouseevent.xdata, event.mouseevent.ydata
-        annotation = self.annotations[event.artist.axes]
-        if x is not None:
-            if not self.display_all:
-                # Hide any other annotation boxes...
-                for ann in self.annotations.values():
-                    ann.set_visible(False)
-            # Update the annotation in the current axis..
-            annotation.xy = x, y
-            if self.func is None:
-               
-                annotation.set_text(self.template % (x, y))        
-                annotation.set_visible(True)
-                event.canvas.draw()
-            else:
-                self.func(event,annotation)
-  
-    def connect(self,fig):
-        self.cid = fig.canvas.mpl_connect('pick_event', self) 
-                  
-    def disconnect(self,fig):
-        fig.canvas.mpl_disconnect(self.cid)
-	     
-    def clear(self,fig):
-        for ann in self.annotations.values():
-            ann.set_visible(False)
-        fig.canvas.draw()
-        
-        
-class ROISelector(object):
-    from matplotlib.widgets import RectangleSelector
-    def __init__(self,artist):
-            self.artist = artist
-            self.selector = RectangleSelector(self.artist.axes,self.on_select,
-                                       button=3, minspanx=5, minspany=5, spancoords='pixels',
-                                       rectprops = dict(facecolor='red', edgecolor = 'red',
-                                                        alpha=0.3, fill=True)) # drawtype='box'
-            self.coords = []
-            
-    def on_select(self,click,release):
-            x1,y1 = int(click.xdata),int(click.ydata)
-            x2,y2 = int(release.xdata),int(release.ydata)
-            self.coords =[(x1,y1),(x2,y2)]
-            
-    def activate(self):
-        self.selector.set_active(True)
-        
-    def deactivate(self):
-        self.selector.set_active(False)
-
 
 def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
                   decimals=2, nth_loop=2, barLength=50, flush=True):
@@ -1065,26 +1076,6 @@ def t_now_str(format="compressed", dl=''):
     string = datetime2str(datetime.now(), format=format)
     return string
 
-def str_to_number(string, cast=None):
-    """ Convert string to int if integer, else float. If cannot be converted to number just return original string
-    :param string: string to convert number
-    :param cast: type to cast output to eg always float
-    :return: number
-    """
-    if isinstance(string, (int, float)):
-        # leave unchanged
-        return string
-    try:
-        out = int(string)
-    except ValueError as e:
-        try:
-            out = float(string)
-        except ValueError as e:
-            out = string
-    if isinstance(cast, type):
-        out = cast(out)
-    return out
-
 def has_inflection(data):
     """Return True if 1D data has point of inflection ie increasing and decreasing sections"""
     diff = np.diff(data)
@@ -1132,6 +1123,107 @@ class PartialFormatter(string.Formatter):
             if self.bad_fmt is not None: return self.bad_fmt
             else: raise
 
+
+class DataCursor(object):
+    """A simple data cursor widget that displays the x,y location of a
+    matplotlib artist when it is selected."""
+
+    def __init__(self, artists, func=None, tolerance=5, offsets=(-20, 20),
+                 template='x: %0.2f\ny: %0.2f', display_all=False):
+        """Create the data cursor and connect it to the relevant figure.
+        "artists" is the matplotlib artist or sequence of artists that will be
+            selected.
+        "tolerance" is the radius (in points) that the mouse click must be
+            within to select the artist.
+        "offsets" is a tuple of (x,y) offsets in points from the selected
+            point to the displayed annotation box
+        "template" is the format string to be used. Note: For compatibility
+            with older versions of python, this uses the old-style (%)
+            formatting specification.
+        "display_all" controls whether more than one annotation box will
+            be shown if there are multiple axes.  Only one will be shown
+            per-axis, regardless.
+        """
+        self.template = template
+        self.offsets = offsets
+        self.display_all = display_all
+        self.func = func
+        if not cbook.iterable(artists):
+            artists = [artists]
+        self.artists = artists
+        self.axes = tuple(set(art.axes for art in self.artists))
+        self.figures = tuple(set(ax.figure for ax in self.axes))
+        self.ids = []
+        self.annotations = {}
+        for ax in self.axes:
+            self.annotations[ax] = self.annotate(ax)
+
+        for artist in self.artists:
+            artist.set_picker(tolerance)
+
+    def annotate(self, ax):
+        """Draws and hides the annotation box for the given axis "axI"."""
+        annotation = ax.annotate(self.template, xy=(0, 0), ha='left',
+                                 xytext=self.offsets, textcoords='offset points', va='bottom',
+                                 bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+                                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
+                                 )
+        annotation.set_visible(False)
+        return annotation
+
+    def __call__(self, event):
+        """Intended to be called through "mpl_connect"."""
+        # Rather than trying to interpolate, just display the clicked coords
+        # This will only be called if it's within "tolerance", anyway.
+        x, y = event.mouseevent.xdata, event.mouseevent.ydata
+        annotation = self.annotations[event.artist.axes]
+        if x is not None:
+            if not self.display_all:
+                # Hide any other annotation boxes...
+                for ann in self.annotations.values():
+                    ann.set_visible(False)
+            # Update the annotation in the current axis..
+            annotation.xy = x, y
+            if self.func is None:
+
+                annotation.set_text(self.template % (x, y))
+                annotation.set_visible(True)
+                event.canvas.draw()
+            else:
+                self.func(event, annotation)
+
+    def connect(self, fig):
+        self.cid = fig.canvas.mpl_connect('pick_event', self)
+
+    def disconnect(self, fig):
+        fig.canvas.mpl_disconnect(self.cid)
+
+    def clear(self, fig):
+        for ann in self.annotations.values():
+            ann.set_visible(False)
+        fig.canvas.draw()
+
+
+class ROISelector(object):
+    from matplotlib.widgets import RectangleSelector
+    def __init__(self, artist):
+        self.artist = artist
+        self.selector = RectangleSelector(self.artist.axes, self.on_select,
+                                          button=3, minspanx=5, minspany=5, spancoords='pixels',
+                                          rectprops=dict(facecolor='red', edgecolor='red',
+                                                         alpha=0.3, fill=True))  # drawtype='box'
+        self.coords = []
+
+    def on_select(self, click, release):
+        x1, y1 = int(click.xdata), int(click.ydata)
+        x2, y2 = int(release.xdata), int(release.ydata)
+        self.coords = [(x1, y1), (x2, y2)]
+
+    def activate(self):
+        self.selector.set_active(True)
+
+    def deactivate(self):
+        self.selector.set_active(False)
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
