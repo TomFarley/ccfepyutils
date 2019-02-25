@@ -216,7 +216,7 @@ def input_timeout(prompt='Input: ', timeout=1, raise_on_timeout=False, yes_no=Fa
             raise ValueError('Input "{}" not recognised yes/no option'.format(i))
     return i
 
-def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0):
+def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0, exclude_nans=False):
     """ Length of variable returning 1 instead of type error for scalars """
     # logger.debug(var)
     if var is None:
@@ -233,7 +233,12 @@ def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0):
                 return all_nan
         except TypeError as e:
             pass
-        return len(var)
+        if exclude_nans:
+            var = np.array(var)
+            nan_mask = np.isnan(var)
+            return len(var[~nan_mask])
+        else:
+            return len(var)
 
 def safe_zip(*args):
     """Return zip iterator even if supplied with scaler values"""

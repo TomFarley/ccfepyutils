@@ -603,13 +603,13 @@ class Settings(object):
         n_attempts = 3
         attempt_n_times(ds.to_netcdf, self.fn_path, {'group': 'df', 'mode': 'w'}, n_attempts=n_attempts,
                         exceptions=(IOError,), sleep_interval=2,
-                        error_message='Call to {}.save() df failed after {{n_attempts}} attempts'.format(self))
+                        error_message='Call to {}.save() df failed after {{n_attempts}} attempts'.format(repr(self)))
         attempt_n_times(meta.to_netcdf, self.fn_path, {'group': 'meta', 'mode': 'a'}, n_attempts=n_attempts,
                         exceptions=(IOError,), sleep_interval=2,
-                        error_message='Call to {}.save() meta failed after {{n_attempts}} attempts'.format(self))
+                        error_message='Call to {}.save() meta failed after {{n_attempts}} attempts'.format(repr(self)))
         attempt_n_times(dict_to_netcdf, (self.fn_path, 'column_sets_names', self.column_sets_names),
                         n_attempts=n_attempts, exceptions=(IOError,), sleep_interval=2,
-                        error_message='Call to {}.save() col_groups failed after {{n_attempts}} attempts'.format(self))
+                        error_message='Call to {}.save() col_groups failed after {{n_attempts}} attempts'.format(repr(self)))
         logger.debug('Saved settings: {}'.format(self.__repr__()))
         # for attempt in range(n_attempts):
         #     try:
