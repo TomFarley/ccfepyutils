@@ -934,6 +934,8 @@ def in_freia_batch_mode():
 
 def ask_input_yes_no(message, suffix=' ([Y]/n)? ', message_format='{message}{suffix}', default_yes=True):
     """Ask yes/no question to raw input"""
+    if default_yes is False:
+        suffix = ' (y/[N])? '
     question = message_format.format(message=message, suffix=suffix)
     answer = input(question)
     accept = ['y', 'yes']
