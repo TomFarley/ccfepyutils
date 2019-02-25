@@ -5,6 +5,7 @@ from __future__ import (absolute_import, division,
 """
 Utility functions used in the filament tracker program
 """
+import time
 from past.builtins import basestring  # pip install future
 from pprint import pprint
 import string
@@ -592,8 +593,8 @@ def compare_dataframes(df1, df2):
             out &= compare_arrays(array1, array2)
     return out
 
-def isclose_within(values, reference, tol=1e-8, all=False):
-    """Return true if elements of a appear in comparison_list (b) within tollerance
+def isclose_within(values, reference, tol=1e-8, all=False, return_values=False):
+    """Return vool_array/bool (if all=True) if elements of 'values' appear in 'reference' comparison_list within tollerance
     From: http://stackoverflow.com/questions/39602004/can-i-use-pandas-dataframe-isin-with-a-numeric-tolerance-parameter
     """
     # import pandas as pd
@@ -932,10 +933,13 @@ def in_freia_batch_mode():
     batch_mode = os.getenv('LOADL_ACTIVE', None)
     return batch_mode == 'yes'
 
-def ask_input_yes_no(message, suffix=' ([Y]/n)? ', message_format='{message}{suffix}', default_yes=True):
+def ask_input_yes_no(message, suffix=' ([Y]/n)? ', message_format='{message}{suffix}', default_yes=True, sleep=0.1):
     """Ask yes/no question to raw input"""
     if default_yes is False:
         suffix = ' (y/[N])? '
+    if sleep:
+        # Make sure logging output has time to clear before prompt is printed
+        time.sleep(sleep)
     question = message_format.format(message=message, suffix=suffix)
     answer = input(question)
     accept = ['y', 'yes']
