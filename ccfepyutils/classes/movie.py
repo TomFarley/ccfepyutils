@@ -713,11 +713,13 @@ class Movie(Stack):
         
         if n is None:
             self.set_data(data, reset=True)  # whole dataset
+            self._meta['set'] = True  # TODO: Check correct?
         else:
             n = make_iterable(n)
             if len(n) == 0:
                 return
             self._data.loc[{'n': n}] = data
+            self._meta.loc[n, 'set'] = True
         return self
         # logger.debug('{} loaded movie data from {}'.format(repr(self), self.fn_path))
 
@@ -755,7 +757,7 @@ class Movie(Stack):
                 # frames are read with 16 bit dynamic range, but values are 10 bit!
                 ret, frame, header = vid.read(transforms=self._transforms)
                 data[i_data, :, :] = frame
-                self._meta.loc[n, 'set'] = True
+                # self._meta.loc[n, 'set'] = True
                 i_data += 1
             else:
                 # TODO: Increment vid frame number without reading data
@@ -935,7 +937,11 @@ class Movie(Stack):
         nans = self._meta.loc[:, 'set'].isnull()
         self._meta.loc[nans, 'set'] = False
         self._meta['set'] = self._meta['set'].astype({'set': bool})
-        frames_not_set = frames[~self._meta.loc[frames, 'set'].values]
+        frames_not_set = list(frames[~self._meta.loc[frames, 'set'].values])
+        if self.data.loc[frames].isnull().any():
+            for n in frames:
+                if self.data.loc[n].isnull().any() and (n not in frames_not_set):
+                    frames_not_set.append(n)
         if len(frames_not_set) > 0:
             self.load_movie_data(n=frames_not_set)
         frame_stack = self._data.loc[{'n': frames}].values
@@ -1016,9 +1022,9 @@ class Movie(Stack):
         frames_not_set_raw = frames[~self._meta.loc[frames, 'set'].values]
         if len(frames_not_set_enhanced) > 0:
             if len(frames_not_set_raw) > 0:
-                # Make sure raw data has been loaded for all the relevant fames
+                # Make sure raw data has been loaded for all the relevant frames
                 self.load_movie_data(n=frames_not_set_raw)
-            # Make sure enhanced movie starts out with all relevent frames set to raw data
+            # Make sure enhanced movie starts out with all relevant frames set to raw data
             # frames_not_set = frames[~self._enhanced_movie._meta.loc[frames, 'set'].values]
             self._enhanced_movie._data.loc[{'n': frames_not_set_enhanced}] = self._data.loc[
                                                                                 {'n': frames_not_set_enhanced}]
