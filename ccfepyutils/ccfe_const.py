@@ -270,6 +270,15 @@ def lognormal(x, A, mu, sigma, c):
     """y = A / (sigma*sqrt(2*pi)*(x)) * exp(-(ln(x)-mu)**2/(sigma*sqrt(2)))"""
     return (A / (sigma*sqrt0(2*pi0)*x)) * exp0(-(log0(x)-mu)**2/(2*sigma**2)) + c
 
+def lognormal_k(x, A, mu, sigma, c, k):
+    """y = A / (sigma*sqrt(2*pi)*(x)) * exp(-(ln(x)-mu)**2/(sigma*sqrt(2)))"""
+    return (A / (sigma*sqrt0(2*pi0)*(x-k))) * exp0(-(log0(x-k)-mu)**2/(2*sigma**2)) + c
+
+def rice(x, nu, sigma):
+    """Rice distribution using bessel function"""
+    from scipy.special import iv
+    return x / (sigma)**2 * exp0(-(x**2 + nu**2)/(2*sigma**2)) * iv(0, x*nu/sigma**2)
+
 def gamma(x, a, B):
     return B**a * x**(a-1) * np.exp(-B*x) / sp.special.gamma(x)
 
@@ -322,8 +331,7 @@ def distributions():
 functions = {'poly': poly, 'linear': linear, 'linear_though_origin': linear_though_origin,
              'exp': exp, 'exp_a': exp_a, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 
              'normal': gaussian, 'gaussian_c': gaussian_c, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 
-             'lognormal': lognormal, 'gamma': gamma, 'auto_corr': auto_corr}
-
+             'lognormal': lognormal, 'lognormal_k': lognormal_k, 'rice': rice, 'gamma': gamma, 'auto_corr': auto_corr}
 
 
 func_obs = {'lognormal': lognormal}
