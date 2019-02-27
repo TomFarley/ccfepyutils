@@ -244,7 +244,7 @@ def input_timeout(prompt='Input: ', timeout=1, raise_on_timeout=False, yes_no=Fa
             raise ValueError('Input "{}" not recognised yes/no option'.format(i))
     return i
 
-def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0, exclude_nans=False):
+def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0, exclude_nans=False, **kwargs):
     """ Length of variable returning 1 instead of type error for scalars """
     # logger.debug(var)
     if var is None:
@@ -253,6 +253,8 @@ def safe_len(var, scalar=1, all_nan=0, none=0, ndarray_0d=0, exclude_nans=False)
         return ndarray_0d
     elif is_scalar(var):  # checks if has atribute __len__ etc
         return scalar
+    elif kwargs and var.__class__.__name__ in kwargs:
+        return kwargs[var.__class__.__name__]
     else:
         assert hasattr(var, '__len__')
         try:
