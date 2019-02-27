@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from pyIpx.movieReader import ipxReader, mrawReader, imstackReader
 
 from ccfepyutils.classes.data_stack import Stack, Slice
-from ccfepyutils.classes.settings import Settings
+# from ccfepyutils.classes.settings import Settings
 from ccfepyutils.classes.plot import Plot
 from ccfepyutils.utils import return_none, is_number, is_numeric, none_filter, to_array, make_iterable, args_for, \
     is_subset, is_in, replace_in, dataframe_description_str
@@ -30,16 +30,17 @@ logger.setLevel(logging.DEBUG)
 
 def get_camera_data_path(machine, camera, pulse):
     """Return path to movie file, looking up settings for camera"""
+    from setpy import Settings
     # TODO: get paths from settings/config file
     if is_number(pulse):
         pulse = str(int(pulse))
     # host_name = socket.gethostname()
     # host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
 
-    camera_settings = Settings.get('Movie_data_locations', '{}_{}'.format(machine, camera))
+    camera_settings = Settings('movie_data_locations', settings_name='{}_{}'.format(machine, camera))
     if len(camera_settings) == 0:
         raise ValueError('No Movie_data_locations settings exist for camera="{}", machine="{}". Options: {}'.format(
-            camera, machine, Settings.existing_settings('Movie_data_locations')))
+            camera, machine, Settings.saved_settings_files_for_application('Movie_data_locations')))
     
     path_options = camera_settings['path_options']
     fn_options = camera_settings['fn_options']
@@ -56,67 +57,6 @@ def get_camera_data_path(machine, camera, pulse):
         transforms = [] 
     return path, fn_format, transforms
 
-# def get_mast_camera_data_path(machine, camera, pulse):
-#     """Return path to movie file"""
-#     # TODO: get paths from settings/config file
-#     host_name = socket.gethostname()
-#     host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
-#     # TODO: Raise warning message if need to create new settings file for this machine etc
-#     s = Settings.get('MAST_movie_paths', host_name)
-#     if camera == 'SA1.1':
-#         # path = '~/data/camera_data/SA1/'
-#         path = s['SA1_movie_path'].value
-#         fn = 'C001H001S0001-{n:02d}.mraw'
-#     else:
-#         raise ValueError('Camera "{}" file lookup not yet supported'.format(camera))
-#     path = Path(path).expanduser().resolve()
-#     assert path.is_dir(), 'Movie data path doesnt exist'
-#     if is_number(pulse):
-#         pulse = str(int(pulse))
-#     assert isinstance(pulse, str)
-#     path = path / pulse / 'C001H001S0001' / fn
-#     if not path.parent.is_dir():
-#         raise IOError('Path "{}" does not exist'.format(str(path)))
-#     if not Path(str(path).format(n=0)).is_file():
-#         raise IOError('Cannot locate file "{}" in path {}'.format(fn, str(path)))
-#     return str(path), fn
-# 
-# def get_synthcam_data_path(machine, camera, pulse):
-#     """Return path to movie file"""
-#     # TODO: get paths from settings/config file
-#     if is_number(pulse):
-#         pulse = str(int(pulse))
-#     host_name = socket.gethostname()
-#     host_name = host_name.rstrip(string.digits)  # remove number at end of name in case of cluster nodes
-#     if machine == 'MAST':
-#         # TODO: Get path format from settings file
-#         if host_name == 'freia':
-#             path_options = ['~nwalkden/python_tools/cySynthCam/error_analysis/{pulse}/',
-#                             '~nwalkden/python_tools/elzar/elzar2/synthetic_imaging/{pulse}/']
-#         else:
-#             path_options = ['~/data/synth_frames/{machine}/{pulse}']
-#         fn_options = ['Frame_{n:d}.p', 'Frame_data_{n:d}.npz']
-#     else:
-#         raise ValueError('Machine "{}" file lookup not yet supported'.format(machine))
-#     path_kws = {'machine': machine, 'pulse': pulse}
-#     fn_kws = {'n': 0}
-#     path, fn_format = locate_file(path_options, fn_options, path_kws=path_kws, fn_kws=fn_kws,
-#                           return_raw_path=False, return_raw_fn=True, _raise=True, verbose=True)
-#     return path, fn_format
-
-# def get_mast_movie_transforms(machine, camera, pulse):
-#     """Get transforms to apply to each raw movie frame"""
-#     if camera == 'SA1.1':
-#         # transforms = ['transpose', 'reverse_y']
-#         # transforms = ['transpose']#, 'reverse_y']
-#         transforms = []
-#     return transforms
-#
-# def get_synthcam_transforms(machine, camera, pulse):
-#     """Get transforms to apply to each raw movie frame"""
-#     if machine == 'MAST':
-#         transforms = ['transpose', 'reverse_y']
-#     return transforms
 
 class Frame(Slice):
     """Frame object returned by Movie class"""
@@ -242,14 +182,17 @@ class Movie(Stack):
     time_format = '{:0.5f}s'
     def __init__(self, pulse=None, machine=None, camera=None, movie_path=None, settings='repeat', source=None, range=None,
                  enhancer=None, name=None, frames=None, **kwargs):
+        from setpy import Settings
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
         self._reset_stack_attributes()  # Initialise attributes to None
         self._reset_movie_attributes()  # Initialise attributes to None
         kwargs.update({key: value for key, value in zip(('pulse', 'machine', 'camera'), (pulse, machine, camera))
                        if value is not None})
-        self.settings = Settings.collect('Movie', settings, {'Movie_source': source, 'Movie_range': range,
-                                                             'Enhancer': enhancer}, **kwargs)
+        # self.settings = Settings.collect('Movie', settings, {'Movie_source': source, 'Movie_range': range,
+        #                                                      'Enhancer': enhancer}, **kwargs)
+        settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs)
+        self.settings = settings
         # TODO: lookup parameter objects
         x = defaultdict(return_none, name='n')
         y = defaultdict(return_none, name='x_pix')
@@ -259,10 +202,12 @@ class Movie(Stack):
         # Initialise data xarray
         super().__init__(x, y, z, quantity=quantity, stack_axis='x', name=name)
 
-        kws = self.settings.get_func_args(self.set_movie_source)
+        # kws = self.settings.get_func_args(self.set_movie_source)
+        kws = settings.args_for(self.set_movie_source)
         self.set_movie_source(fn_path=movie_path, **kws)
 
-        kws = self.settings.get_func_args(self.set_frames) if frames is None else {}
+        # kws = self.settings.get_func_args(self.set_frames) if frames is None else {}
+        kws = self.settings.args_for(self.set_frames) if frames is None else {}
         self.set_frames(frames=frames, **kws)
         logger.debug('Initialised {}'.format(repr(self)))
 
@@ -970,7 +915,7 @@ class Movie(Stack):
         """Reset enhanced movie if enhancements are to change"""
         if (not self.is_enhanced) or (self._enhancements != enhancements) or force:
             # Update attributes of self
-            self._enhancer = Enhancer(setting=self.settings['Enhancer'])  # TODO: specify enhancement settings
+            self._enhancer = Enhancer(setting=self.settings['enhancer'])  # TODO: specify enhancement settings
             self._enhancements = []  # Enhancements applied to _ENHANCED_movie
             self._meta.loc[:, 'enhanced'] = False
             # Set fresh enhanced movie to copy of self
@@ -1245,7 +1190,8 @@ class Enhancer(object):
     from ccfepyutils.image import image_enhancement_functions
 
     def __init__(self, setting='default'):
-        self.settings = Settings.get('Enhancer', setting)
+        from setpy import Settings
+        self.settings = Settings('enhancer', setting)
         # self.movie = movie
 
     def __repr__(self):
@@ -1284,7 +1230,7 @@ class Enhancer(object):
             ## TODO:
             func = funcs[enhancement]
             if len(kwargs) == 0:  # if keyword arguments havent been passed, look them up
-                kwargs.update(self.settings.get_func_args(func, **kwargs))
+                kwargs.update(self.settings.args_for(func, kwargs=kwargs))
             out = funcs[enhancement](image=out, **kwargs)
         return out
 
@@ -1299,7 +1245,7 @@ class Enhancer(object):
             # NOTE: Currently only extracts raw frames for frame stack - ie frame stack enhancement must come first
 
             # TODO: Add extract_frame_stack_window args to enhancer settings
-            kws = self.settings.get_func_args(movie.extract_frame_stack_window)
+            kws = self.settings.args_for(movie.extract_frame_stack_window)
 
             # Get specific frame stack settings for this function
             args = ['n_backwards', 'n_forwards', 'step_backwards', 'step_forwards', 'skip_backwards', 'skip_forwards']
