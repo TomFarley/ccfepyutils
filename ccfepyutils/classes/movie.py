@@ -40,7 +40,7 @@ def get_camera_data_path(machine, camera, pulse):
     camera_settings = Settings('movie_data_locations', settings_name='{}_{}'.format(machine, camera))
     if len(camera_settings) == 0:
         raise ValueError('No Movie_data_locations settings exist for camera="{}", machine="{}". Options: {}'.format(
-            camera, machine, Settings.saved_settings_files_for_application('Movie_data_locations')))
+            camera, machine, Settings.saved_settings_files_for_application('movie_data_locations')))
     
     path_options = camera_settings['path_options']
     fn_options = camera_settings['fn_options']
@@ -191,7 +191,8 @@ class Movie(Stack):
                        if value is not None})
         # self.settings = Settings.collect('Movie', settings, {'Movie_source': source, 'Movie_range': range,
         #                                                      'Enhancer': enhancer}, **kwargs)
-        settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs)
+        settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
+                            create_new=False)
         self.settings = settings
         # TODO: lookup parameter objects
         x = defaultdict(return_none, name='n')
@@ -422,19 +423,29 @@ class Movie(Stack):
             # Complete information about frame range
             if any((start_time, end_time, duration)):
                 raise NotImplementedError
-            if start_frame < 0:
-                start_frame = self._movie_meta['frame_range'][1] + start_frame + 1
-            if end_frame < 0:
-                end_frame = self._movie_meta['frame_range'][1] + end_frame + 1
-            if start_frame is not None and end_frame is not None:
-                assert start_frame <= end_frame
-            elif start_frame is not None and nframes is not None:
-                end_frame = start_frame + nframes - 1
-            else:
+            frame_inputs = [start_frame, end_frame, nframes]
+            if np.sum([v is not None for v in frame_inputs]) < 2:
                 raise ValueError('Insufficient input information to build frame range, {}-{} ({})'.format(
                         start_frame, end_frame, nframes))
             assert isinstance(stride, (int, float))
             stride = int(stride)
+            # Handle -ve frame numbers
+            movie_end_frame = self._movie_meta['frame_range'][1]
+            if (start_frame is not None) and start_frame < 0:
+                start_frame = movie_end_frame + start_frame + 1
+            if (end_frame is not None) and end_frame < 0:
+                end_frame = movie_end_frame + end_frame + 1
+            # Complete missing info
+            if start_frame is None:
+                start_frame = end_frame - (nframes + 1)
+            if end_frame is None:
+                end_frame = start_frame + (nframes - 1)
+            if nframes is None:
+                nframes = int(np.ceil((end_frame - start_frame) / stride)) + 1
+
+            assert start_frame <= end_frame
+            assert end_frame == (start_frame + (nframes -1) * stride)
+
             frames = np.arange(start_frame, end_frame+1, stride)
         else:
             frames = np.array(frames)
