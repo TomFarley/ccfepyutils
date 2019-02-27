@@ -12,7 +12,7 @@ import numpy as np
 
 from ccfepyutils.classes.movie import Movie
 from ccfepyutils.utils import safe_len
-from ccfepyutils.io_tools import pickle_load
+from ccfepyutils.io_tools import pickle_load, pickle_dump
 
 import logging
 from logging.config import fileConfig, dictConfig
@@ -35,6 +35,63 @@ class TestMovie(unittest.TestCase):
         self.assertTrue(isinstance(m, Movie))
         pass
 
+    def setUp(self):
+        self.pulse = 29852
+        self.machine = 'MAST'
+        self.camera = 'SA1.1'
+        self.start_frame = 13
+        self.end_frame = 16
+        self.nframes = self.end_frame - self.start_frame + 1
+        pass
+
+    def test_init(self):
+        logger.info('** Running test_init')
+        movie = Movie(self.pulse, self.machine, self.camera)
+        with self.assertRaises(ValueError):
+            Movie(29852, 'LHD-U', 'SA1.1')
+
+    def test_set_frames(self):
+        logger.info('** Running test_init')
+        movie = Movie(self.pulse, self.machine, self.camera)
+        movie.set_frames(start_frame=self.start_frame, end_frame=self.end_frame)
+        self.assertTrue(movie._frame_range_info_user['nframes'] == self.nframes)
+        movie.set_frames(start_frame=self.start_frame, nframes_user=self.nframes)
+        self.assertTrue(movie._frame_range_info_user['frame_range'][1] == self.end_frame)
+
+        with self.assertRaises(ValueError):
+            movie.set_frames(end_frame=20)
+
+        with self.assertRaises(AssertionError):
+            movie.set_frames(start_frame=100, end_frame=20)
+
+    def test_load_movie_data(self):
+        logger.info('** Running test_init')
+        movie = Movie(self.pulse, self.machine, self.camera)
+        movie.set_frames(start_frame=self.start_frame, end_frame=self.end_frame)
+        movie.load_movie_data()
+        pass
+
+    def test_index(self):
+        logger.info('** Running test_init')
+        movie = Movie(self.pulse, self.machine, self.camera)
+        movie.set_frames(start_frame=self.start_frame, end_frame=self.end_frame)
+        frame = movie[self.start_frame]
+        pass
+
+    def test_lookup(self):
+        logger.info('** Running test_lookup')
+        movie = Movie(self.pulse, self.machine, self.camera)
+        movie.set_frames(start_frame=self.start_frame, end_frame=self.end_frame)
+        t = movie.lookup('t', i=0)
+        pass
+
+    def test_enhance(self):
+        logger.info('** Running test_enhance')
+        movie = Movie(self.pulse, self.machine, self.camera)
+        movie.set_frames(start_frame=self.start_frame, end_frame=self.end_frame)
+        movie.enhance('threshold', frames='all')
+        movie[self.start_frame].plot()
+
     def test_frame_data(self):
         m = Movie(pulse=29852, machine='MAST', camera='SA1.1', frames=np.arange(12000, 12010))
 
@@ -47,8 +104,8 @@ class TestMovie(unittest.TestCase):
         m = Movie(pulse=29852, machine='MAST', camera='SA1.1', frames=np.arange(12000, 12010))
         m.enhance(['extract_fg', 'reduce_noise', 'sharpen'])
         frame = m[12000]
-        data_expected = pickle_load('./test_data/movie_data/frame_data_MAST_29852_SA1.1_12000_enhanced.p')
         data = frame.data
+        data_expected = pickle_load('./test_data/movie_data/frame_data_MAST_29852_SA1.1_12000_enhanced.p')
         self.assertTrue(np.all(data == data_expected))
 
 def suite():

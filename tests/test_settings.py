@@ -90,7 +90,39 @@ class TestSettings(unittest.TestCase):
                                 update_values=False, update_columns=False, save=False)
         self.assertTrue(s._df.equals(s_tmp._df))
 
+    def test_get_logfile(self):
+        logger.info('** Running test_get_logfile')
+        log = Settings.get_logfile('settings_test')
+        self.assertIsInstance(log, (SettingsLogFile, type(None)))
+        pass
 
+    def test_call(self):
+        logger.info('** Running test_call')
+        settings = Settings.get('settings_test', 'test1')
+        value = id(settings)
+        item = 'my_value_'+str(value)[:4]
+        settings(item, value, description=str(value))
+        self.assertEqual(settings[item], value)
+        logger.warning(settings[item]['description'])
+        logger.warning(str(value))
+        print(settings[item]['description'])
+        print(str(value))
+        self.assertEqual(settings[item]['description'], str(value))
+        pass
+
+    def test_view(self):
+        logger.info('** Running test_get_logfile')
+        settings = Settings.get('settings_test', 'test1')
+        self.assertIsInstance(settings, Settings)
+        self.assertIsInstance(settings.view(), pd.DataFrame)
+        pass
+
+    def test_delete_file(self):
+        logger.info('** Running test_delete_file')
+        settings = Settings.get('settings_test', 'tmp')
+        settings['tmp'] = 'tmp'
+        settings.save()
+        settings.delete_file(force=True)
 
 def suite():
     print('Setting test_tmp suit')
