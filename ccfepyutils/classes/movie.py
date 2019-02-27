@@ -1258,12 +1258,12 @@ class Enhancer(object):
             # TODO: Add extract_frame_stack_window args to enhancer settings
             kws = self.settings.args_for(movie.extract_frame_stack_window)
 
-            # Get specific frame stack settings for this function
-            args = ['n_backwards', 'n_forwards', 'step_backwards', 'step_forwards', 'skip_backwards', 'skip_forwards']
-            for arg in args:
-                func_arg = '{func_name}::{arg}'.format(func_name=func_name, arg=arg)
-                if func_arg in self.settings:
-                    kws[arg] = self.settings[func_arg]
+            # # Get specific frame stack settings for this function
+            # args = ['n_backwards', 'n_forwards', 'step_backwards', 'step_forwards', 'skip_backwards', 'skip_forwards']
+            # for arg in args:
+            #     func_arg = '{func_name}::{arg}'.format(func_name=func_name, arg=arg)
+            #     if func_arg in self.settings:
+            #         kws[arg] = self.settings[func_arg]
 
             frame_stack = movie.extract_frame_stack_window(n, raw=True, **kws)
             kwargs['frame_stack'] = frame_stack
