@@ -397,7 +397,7 @@ def mkdir(dirs, start_dir=None, depth=None, accept_files=True, info=None, verbos
 
     if isinstance(dirs, Path):
         dirs = str(dirs)
-    if isinstance(dirs, basestring):  # Nest single string in list for loop
+    if isinstance(dirs, (basestring, str)):  # Nest single string in list for loop
         dirs = [dirs]
     # import pdb; pdb.set_trace()
     for d in dirs:
@@ -799,6 +799,65 @@ def fn_filter_numeric_range(path_in, fn_pattern, numeric_range, sort_output=True
     if sort_output:
         filenames = sorted(filenames)
     return filenames
+
+def extract_fn_path(path_fn, path=None):
+    """Return separated path and filename for given inputs
+    path_fn could be a full path and filename or just a filename
+    path could be a filepath or None
+    """
+    if os.path.split(path_fn)[0] == '':
+        fn = path_fn
+        if (path is None):
+            path = './'
+    else:
+        # TODO: Consider appending path_fn to path? Check path_fn is relative?
+        assert (path is None), 'Path "{}" supplied when path_fn already contains path info: {}'.format(path, path_fn)
+        path = os.path.dirname(path_fn)
+        fn = os.path.basename(path_fn)
+
+    fn, ext = os.path.splitext(fn)
+    return path, fn, ext
+
+def combine_fn_path(path_fn, path=None):
+    """Return Path object given full file path or filename and path separately"""
+    path, fn, ext = extract_fn_path(path_fn, path=path)
+    path_fn = Path(path) / (fn+ext)
+    return path_fn
+
+def format_extension(extension, with_dot=False, none_for_empty=False):
+    """Add or remove leading '.' to file extension string"""
+    assert isinstance(extension, str)
+    if (extension == ''):
+        if none_for_empty:
+            extension = None
+        return extension
+
+    if with_dot:
+        if extension[0] != '.':
+            extension = '.' + extension
+    else:
+        if extension[0] == '.':
+            extension = extension[1:]
+    return extension
+
+def check_path_characters_are_safe(path_fn, allow_home_tilde=True, raise_error=True):
+    """"Check path only contains safe characters: A-Z a-z 0-9 _ - / ."""
+    assert isinstance(path_fn, (str, Path))
+    path_fn = str(path_fn)
+    assert len(path_fn) > 0
+
+    if allow_home_tilde and (path_fn[0]) == '~':
+        path_fn = path_fn[1:]
+
+    m = re.findall(r'[^A-Za-z0-9_\-/\.]', path_fn)
+    if m:
+        if raise_error:
+            raise ValueError('Path_fn "{}" contains invalid/unsafe characters: {}'.format(path_fn, m))
+        else:
+            out = False
+    else:
+        out = True
+    return out
 
 def regexp_int_range(low, high, compile=False):
     fmt = '%%0%dd' % len(str(high))
