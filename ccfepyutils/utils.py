@@ -556,7 +556,7 @@ def compare_arrays(array1, array2):
         for item1, item2 in zip(array1, array2):
             if item1 == item2:
                 sub_out = True
-            elif np.isnan(item1) and np.isnan(item2):
+            elif (is_numeric(item1) and np.isnan(item1)) and (is_numeric(item2) and np.isnan(item2)):
                 sub_out = True
             elif (item1 is None) and (item2 is None):
                 sub_out = True
