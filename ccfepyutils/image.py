@@ -228,7 +228,8 @@ def contour_info(mask, image=None, extract_number=None, x_values=None, y_values=
     info['ipix'] = np.array(np.where(mask > 0)).T
 
     # Get the points around the perimeter of the contour
-    im2, cont_points, hierarchy = cv2.findContours(mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    # im2, cont_points, hierarchy = cv2.findContours(mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    cont_points, hierarchy = cv2.findContours(mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     try:
         cont_points = cont_points[0]
     except IndexError as e:
