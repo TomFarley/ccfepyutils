@@ -14,7 +14,8 @@ from logging.config import fileConfig
 import numpy as np
 import pandas as pd
 
-from ccfepyutils.classes.settings import Settings
+# from ccfepyutils.classes.settings import Settings
+from setpy import Settings
 from ccfepyutils.io_tools import filter_files_in_dir, locate_file, mkdir
 from ccfepyutils.utils import none_filter, str_to_number, safe_arange
 
@@ -34,7 +35,8 @@ class GFileSelector(object):
 
     def __init__(self, settings, fix_gfile=None, start_gfile=None, **kwargs):
         # TODO generalise to other origins other than scheduler and default
-        self.settings = Settings.get('GFileSelector', settings)
+        # self.settings = Settings.get('GFileSelector', settings)
+        self.settings = Settings('gfileselector', settings)
         self.settings.update_from_dict(kwargs)
         self.store = pd.DataFrame(index=pd.MultiIndex.from_product([[], []], names=['pulse', 't']),
                                   columns=['fn', 'i_path', 'scheduler', 'pulse', 'n', 't'])

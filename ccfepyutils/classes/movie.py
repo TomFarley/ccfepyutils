@@ -191,6 +191,9 @@ class Movie(Stack):
                        if value is not None})
         # self.settings = Settings.collect('Movie', settings, {'Movie_source': source, 'Movie_range': range,
         #                                                      'Enhancer': enhancer}, **kwargs)
+        for key in ['start_frame', 'end_frame']:
+            if (key in kwargs) and (kwargs[key] is None):
+                kwargs.pop(key)
         settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
                             create_new=False)
         self.settings = settings
@@ -208,7 +211,7 @@ class Movie(Stack):
         self.set_movie_source(fn_path=movie_path, **kws)
 
         # kws = self.settings.get_func_args(self.set_frames) if frames is None else {}
-        kws = self.settings.args_for(self.set_frames) if frames is None else {}
+        kws = settings.args_for(self.set_frames) if frames is None else {}
         self.set_frames(frames=frames, **kws)
         logger.debug('Initialised {}'.format(repr(self)))
 
