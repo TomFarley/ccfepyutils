@@ -595,6 +595,52 @@ def compare_dataframes(df1, df2):
             out &= compare_arrays(array1, array2)
     return out
 
+def compare_dataframes_details(df1, df2, df1_name='df_1', df2_name='df_2',
+                               include_missing_in_diffs=True, log_difference=True, raise_on_difference=False):
+    assert isinstance(df1, pd.DataFrame)
+    assert isinstance(df2, pd.DataFrame)
+    assert np.all(df1.columns.isin(df2.columns)), 'Dataframes must have matching columns'
+    summary = {'same': [], 'different': [], 'missing': [], 'added': [], 'identical': False}
+
+    # Loop over df2 finding items unique to df2
+    for item in df2.index:
+        if item not in df1.index:
+            summary['added'].append(item)
+        else:
+            if compare_dataframes(df2.loc[[item]], df1.loc[[item]]):
+                summary['same'].append(item)
+            else:
+                summary['different'].append(item)
+
+    # Loop over df1 finding items unique to df1
+    for item in df1.index:
+        if item not in df2.index:
+            summary['missing'].append(item)
+
+    if len(summary['same']) != len(df2):
+        different_items = summary['different'] + summary['added']
+        if include_missing_in_diffs:
+            different_items += summary['missing']
+        cols_1 = {col: '{}_{}'.format(col, df1_name) for col in df1.columns}
+        cols_2 = {col: '{}_{}'.format(col, df2_name) for col in df2.columns}
+        different_items_in_df1 = [item for item in different_items if item in df1.index]
+        df_diffs = copy(df1.loc[different_items_in_df1]).rename(columns=cols_1)
+        df_diffs = df_diffs.reindex(different_items)
+        for col in cols_2:
+            df_diffs[cols_2[col]] = df2[col]
+        message = 'Dataframe comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
+                len(summary['same']), summary['different'], summary['missing'], df_diffs)
+        # print(df_diffs)
+        if raise_on_difference:
+            raise ValueError(message)
+        if log_difference:
+            logger.info(message)
+    else:
+        df_diffs = None
+        summary['identical'] = True
+
+    return summary, df_diffs
+
 def isclose_within(values, reference, tol=1e-8, all=False, return_values=False):
     """Return vool_array/bool (if all=True) if elements of 'values' appear in 'reference' comparison_list within tollerance
     From: http://stackoverflow.com/questions/39602004/can-i-use-pandas-dataframe-isin-with-a-numeric-tolerance-parameter
