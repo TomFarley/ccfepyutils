@@ -1017,7 +1017,7 @@ class Movie(Stack):
         """Apply mutiple enhancements to a set of frames in order"""
         # TODO: make t ect valid input
         self._init_xarray()
-        if frames == 'all':
+        if ((isinstance(frames, str)) and (frames == 'all')):
             frames = self.frame_numbers
         frames = to_array(frames)
         enhancements = make_iterable(enhancements)
