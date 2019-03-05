@@ -257,7 +257,7 @@ class CompositeSettings(object):
         return out
     
     def __contains__(self, item):
-        h = re.compile('{}:?\d*'.format(item))
+        h = re.compile(r'{}:?\d*'.format(item))
         for ind in self._df.index:
             m = h.match(ind)
             if m:
@@ -297,7 +297,7 @@ class CompositeSettings(object):
             for i, kw in enumerate(sig.parameters.values()):
                 name = kw.name
                 if ((name not in self.items) and
-                    (not any(re.match('{}(:\d+)?$'.format(name), item) for item in self.items))):
+                    (not any(re.match(r'{}(:\d+)?$'.format(name), item) for item in self.items))):
                     continue
                 if name in blacklist:
                     continue

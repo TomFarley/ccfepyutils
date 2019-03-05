@@ -419,7 +419,7 @@ class Settings(object):
 
     def __contains__(self, item):
         # Includes list items
-        h = re.compile('^{}:?\d*$'.format(item))
+        h = re.compile(r'^{}:?\d*$'.format(item))
         for ind in self._df.index:
             m = h.match(ind)
             if m:
@@ -1638,8 +1638,9 @@ def compare_settings_hash(application, name, settings_obj, n_output=1, skip_iden
     """ Compare settings to saved settings hashes"""
     if isinstance(settings_obj, dict):
         settings_obj = Settings.from_dict(application, name, settings_obj, runtime=False)
-    hash_path = os.path.expanduser('~/.ccfetools/settings/hash_records/{app}/{name}/'.format(app=application, name=name))
-    fn_pattern = 'settings_hash_record-(\w+).nc'
+    hash_path = os.path.expanduser(r'~/.ccfetools/settings/hash_records/{app}/{name}/'.format(app=application,
+                                                                                              name=name))
+    fn_pattern = r'settings_hash_record-(\w+).nc'
     files = filter_files_in_dir(hash_path, fn_pattern, ['hash_id'])
     differences = {}
     diff_table = pd.DataFrame(columns=['n_same', 'n_changes', 'n_missing', 'n_different'])
