@@ -192,16 +192,19 @@ def extract_fg(image, frame_stack, method='min'):
     out = image - bg
     return out
 
-def add_abs_gauss_noise(image, sigma_frac=0.05, sigma_abs=None, mean=0.0, return_noise=False):
+def add_abs_gauss_noise(image, sigma_frac_abs_gauss_noise=0.05, sigma_abs_abs_gauss_noise=None,
+                        mean_abs_gauss_noise=0.0, return_noise=False, seed_abs_gauss_noise=None):
     """ Add noise to frame to emulate experimental random noise. A positive definite gaussian distribution is used
     so as to best model the noise in background subtracted frame data
     """
-    if sigma_abs is not None:
-        scale = sigma_abs
+    if sigma_abs_abs_gauss_noise is not None:
+        scale = sigma_abs_abs_gauss_noise
     else:
         # Set gaussian width to fraction of image intensity range
-        scale = sigma_frac * np.ptp(image)
-    noise = np.abs(np.random.normal(loc=mean, scale=scale, size=image.shape))
+        scale = sigma_frac_abs_gauss_noise * np.ptp(image)
+    if seed_abs_gauss_noise is not None:
+        np.random.seed(seed=seed_abs_gauss_noise)
+    noise = np.abs(np.random.normal(loc=mean_abs_gauss_noise, scale=scale, size=image.shape))
     if not return_noise:
         image = image + noise
         return image
