@@ -8,7 +8,7 @@ Utility functions used in the filament tracker program
 import time
 from past.builtins import basestring  # pip install future
 from pprint import pprint
-import string
+import string, re
 from datetime import datetime
 # try:
 #     from Tkinter import Tk  # python2 freia
@@ -369,6 +369,26 @@ def is_in_str(sub_strings, string):
     for i, sub_str in enumerate(sub_strings):
         out[i] = sub_str in string
     return out
+
+def is_in_fuzzy(patterns, options, contains=True, ignore_case=True):
+    """Return string elements of options that partially match a pattern ignoring case"""
+    matches_all = []
+    options = make_iterable(options)
+    args = [re.IGNORECASE] if ignore_case else []
+    for pattern in make_iterable(patterns):
+        assert isinstance(pattern, str)
+        if contains:
+            r = re.compile(pattern, *args)
+            matches = list(filter(r.search, options))
+        else:
+            # Add end characters for exact match
+            r = re.compile(r'^'+pattern+r'$', *args)
+            matches = list(filter(r.match, options))
+        if matches:
+            matches_all += matches
+    # Remove any duplicates due to multiple patterns matching a given option
+    # matches_all = list(set(matches_all))
+    return matches_all
 
 def similarity_difflib(reference, other):
     import difflib
