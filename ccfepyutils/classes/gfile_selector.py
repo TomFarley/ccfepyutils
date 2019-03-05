@@ -15,7 +15,6 @@ import numpy as np
 import pandas as pd
 
 # from ccfepyutils.classes.settings import Settings
-from setpy import Settings
 from ccfepyutils.io_tools import filter_files_in_dir, locate_file, mkdir
 from ccfepyutils.utils import none_filter, str_to_number, safe_arange
 
@@ -34,6 +33,7 @@ class GFileSelector(object):
         idam = False
 
     def __init__(self, settings, fix_gfile=None, start_gfile=None, **kwargs):
+        from setpy import Settings
         # TODO generalise to other origins other than scheduler and default
         # self.settings = Settings.get('GFileSelector', settings)
         self.settings = Settings('gfileselector', settings)
