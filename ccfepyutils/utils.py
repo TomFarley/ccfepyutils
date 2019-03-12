@@ -603,7 +603,7 @@ def compare_dataframes(df1, df2):
     elif np.dtype(object) not in df1.dtypes.values:
         # Basic datatypes
         equal_mask = df1 == df2
-        both_nan = np.isnan(df1) & np.isnan(df2)
+        both_nan = df1.isnull() & df2.isnull()
         out = equal_mask | both_nan
         out = np.all(out)
     else:
