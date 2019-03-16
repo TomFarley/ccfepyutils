@@ -497,7 +497,7 @@ class Plot(object):
                 if len(handles_current) > 1:  # Only produce legend if more than one artist has a label
                     args = () if handles is None else (handles, labels)
                     leg = ax.legend(fontsize=legend_fontsize, *args, **kwargs)
-                    leg.set_draggable()
+                    leg.set_draggable(True)
             except ValueError as e:
                 #  https: // github.com / matplotlib / matplotlib / issues / 10053
                 logger.error('Not sure how to avoid this error: {}'.format(e))

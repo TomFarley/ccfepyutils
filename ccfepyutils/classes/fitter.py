@@ -288,7 +288,7 @@ class Fitter(object):
         if legend:
             try:
                 leg = ax.legend(loc='best', fancybox=True, title=None)
-                leg.set_draggable()
+                leg.set_draggable(True)
                 leg.get_frame().set_alpha(0.7)
             except ValueError as e:
                 if 'The truth value of an array with more than one element is ambiguous' in str(e):
