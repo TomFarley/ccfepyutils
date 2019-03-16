@@ -374,7 +374,7 @@ class PulseData(collections.MutableMapping):
                 horizontalalignment='left', verticalalignment='bottom')
                 length = '-'
             leg = plt.legend(loc='best', fancybox=True, title='Pulse: {}\nFlat top: {}s'.format(self.pulse, length))
-            leg.draggable()
+            leg.set_draggable()
             leg.get_frame().set_alpha(0.8)
 
             plt.savefig('/home/tfarley/tmp/pulse_filter/flattop_p{}_{}.png'.format(self.pulse, set['signal']), tight=True)
@@ -539,7 +539,7 @@ class PulseData(collections.MutableMapping):
                     bbox=dict(boxstyle="round, pad=0.5", fc="w", alpha=0.7))
         try:
             leg = ax.legend(loc='best', fancybox=True, title=None)
-            leg.draggable()
+            leg.set_draggable()
             leg.get_frame().set_alpha(0.8)
         except AttributeError as e:
             logger.warning('Failed to create legend')
