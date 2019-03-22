@@ -231,7 +231,7 @@ def filter_files(filenames, fn_pattern, path=None, group_keys=(), modified_range
             re_patterns[key] = '{}'.format('|'.join([str(v) for v in value]))
         elif isinstance(value, str):
             # Replace python format codes eg {time:0.3f} with regex pattern eg ([.\d]{3,4})
-            fmt_pattern = '{{{key:}[^_]*}}'.format(key=key).replace('{', '\{').replace('}', '\}')
+            fmt_pattern = r'{{{key:}[^_]*}}'.format(key=key).replace(r'{', r'\{').replace(r'}', r'\}')
             fn_pattern = re.sub(fmt_pattern, value, fn_pattern)
     # fn_pattern = fn_pattern.format(**re_patterns)
     try:
@@ -317,6 +317,38 @@ def age_of_file(fn_path):
     t_day = 24*60*60
     t_age = t_now-os.path.getmtime(fn_path)
     return t_age
+
+def delete_files_recrusive(pattern, path=None, delete_files=True, delete_directories=False, prompt_user=True):
+    from ccfepyutils.utils import ask_input_yes_no
+    if path is None:
+        path = '.'
+    path = Path(path).resolve()
+    h = re.compile(pattern)
+    to_be_removed = {'files': [], 'dirs': []}
+    for root, dirs, files in os.walk(path):
+        if delete_directories:
+            for dir0 in filter(lambda x: h.match(x), dirs):
+                path_fn = os.path.join(root, dir0)
+                to_be_removed['dirs'].append(path_fn)
+                if not prompt_user:
+                    os.remove(path_fn)
+        if delete_files:
+            for file in filter(lambda x: h.match(x), files):
+                path_fn = os.path.join(root, file)
+                to_be_removed['files'].append(path_fn)
+                if not prompt_user:
+                    os.remove(path_fn)
+    if prompt_user:
+        print(f'Files/directories to be deleted: \n{to_be_removed}')
+        if ask_input_yes_no('Delete files'):
+            for key in ('files', 'dirs'):
+                for file in to_be_removed[key]:
+                    os.remove(file)
+            print('Files were deleted')
+        else:
+            print('No files were deleted')
+    else:
+        print(f'The following files were deleted: \n{to_be_removed}')
 
 # def filter_files_in_dir(path, extension='.p', contain=None, not_contain=None):
 #
@@ -926,4 +958,4 @@ if __name__ == '__main__':
     # file['Benchmarker']['type'] = 'ProximityBenchmarker'
     # file['Tracker']['settings'] = 'repeat'
     # # file['elzar_path']['path'] = os.path.expanduser('~/elzar/')
-    # create_config_file(fn, file)
+    # 
