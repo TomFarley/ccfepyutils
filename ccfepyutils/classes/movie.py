@@ -180,22 +180,25 @@ class Movie(Stack):
     _frame_range_keys = ['frame_range', 'nframes', 'stride', 'frames', 't_range', 't']
     slice_class = Frame
     time_format = '{:0.5f}s'
-    def __init__(self, pulse=None, machine=None, camera=None, movie_path=None, settings='repeat', source=None, range=None,
-                 enhancer=None, name=None, frames=None, **kwargs):
+    def __init__(self, pulse=None, machine=None, camera=None, movie_path=None, settings='repeat', source=None,
+                 moive_range=None, enhancer=None, name=None, frames=None, create_new_settings=False, **kwargs):
         from setpy import Settings
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
         self._reset_stack_attributes()  # Initialise attributes to None
         self._reset_movie_attributes()  # Initialise attributes to None
-        kwargs.update({key: value for key, value in zip(('pulse', 'machine', 'camera'), (pulse, machine, camera))
+        keys = ('pulse', 'machine', 'camera', 'movie_source', 'movie_range', 'enhancer')
+        values = (pulse, machine, camera, source, moive_range, enhancer)
+        kwargs.update({key: value for key, value in zip(keys, values)
                        if value is not None})
         # self.settings = Settings.collect('Movie', settings, {'Movie_source': source, 'Movie_range': range,
         #                                                      'Enhancer': enhancer}, **kwargs)
+        kwargs = {key: value for key, value in kwargs.items() if value is not None}
         for key in ['start_frame', 'end_frame']:
             if (key in kwargs) and (kwargs[key] is None):
                 kwargs.pop(key)
         settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
-                            create_new=False)
+                            create_new=create_new_settings)
         self.settings = settings
         # TODO: lookup parameter objects
         x = defaultdict(return_none, name='n')
