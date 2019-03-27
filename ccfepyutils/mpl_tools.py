@@ -508,10 +508,66 @@ def show_if(show, close_all=False):
         plt.show()
 
 def annotate_axis(ax, string, x=0.85, y=0.955, fontsize=16,
-                  bbox=dict(facecolor='w', ec=None, lw=0, alpha=0.5, boxstyle='round'),
-                horizontalalignment='center', verticalalignment='center'):
-    ax.text(x, y, string, fontsize=fontsize, bbox=bbox,
-            horizontalalignment=horizontalalignment, verticalalignment=verticalalignment, transform=ax.transAxes)
+                  bbox=(('facecolor', 'w'), ('ec', None), ('lw', 0), ('alpha', 0.5), ('boxstyle', 'round')),
+                horizontalalignment='center', verticalalignment='center', multialignment='left', **kwargs):
+    if isinstance(bbox, (tuple, list)):
+        bbox = dict(bbox)
+    ax.text(x, y, string, fontsize=fontsize, bbox=bbox, horizontalalignment=horizontalalignment,
+            verticalalignment=verticalalignment, transform=ax.transAxes, **kwargs)
+
+def format_axis(ax, xlabel=None, ylabel=None, xlim=None, ylim=None,
+                xtick_intervals=None, ytick_intervals=None, tick_labelsize=None,
+                xscale=None, yscale=None, xticks=None, yticks=None, xaxis_visible=None, yaxis_visible=None):
+    """Apply range of formatting options to axes"""
+    from matplotlib.ticker import AutoMinorLocator
+    import matplotlib.ticker as ticker
+
+    # Set axis title labels
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel)
+
+    # Set axis limits
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    # Set interval between major and minor tick intervals
+    if xtick_intervals is not None:
+        assert isinstance(xtick_intervals, (list, tuple, np.ndarray)) and (len(xtick_intervals) == 2)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(xtick_intervals[0]))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(xtick_intervals[1]))
+    if ytick_intervals is not None:
+        assert isinstance(ytick_intervals, (list, tuple, np.ndarray)) and (len(ytick_intervals) == 2)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(ytick_intervals[0]))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(ytick_intervals[1]))
+
+    # Set axis scale to log etc
+    if xscale is not None:
+        ax.set_xscale(xscale)
+    if yscale is not None:
+        ax.set_yscale(yscale)
+
+    if xticks is not None:
+        ax.get_xaxis().set_ticks(xticks)
+    if yticks is not None:
+        ax.get_yaxis().set_ticks(yticks)
+
+    # Set fontsize of tick labels
+    if tick_labelsize is not None:
+        ax.tick_params(axis='both', labelsize=tick_labelsize)
+
+    # Set axis ticks and ticklabels invisible
+    if xaxis_visible is not None:
+        ax.get_xaxis().set_visible(xaxis_visible)
+    if yaxis_visible is not None:
+        ax.get_yaxis().set_visible(yaxis_visible)
+    
+    # Turn off tick labels, keep tick marks
+    # ax.tick_params(top=False, bottom=True, left=True, right=False, labelleft=False, labelbottom=True)
+
 
 if __name__ == '__main__':
     fig = plt.figure()
