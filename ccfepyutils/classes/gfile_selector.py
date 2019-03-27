@@ -77,7 +77,7 @@ class GFileSelector(object):
             self.save_scheduler_gfile(pulse, time, machine)
             self.store_gfile_info(pulse, machine=machine, scheduler=allow_scheduler_efit)
 
-        if pulse not in self.store['n']:
+        if pulse not in self.store.index.get_level_values('pulse'):
             raise IOError('No gfiles located for pulse "{}" (allow_scheduler_efit={})'.format(
                 pulse, allow_scheduler_efit))
         if current_file is not None:
@@ -100,14 +100,14 @@ class GFileSelector(object):
         path_closest = self.path_index_to_path(closest['i_path'], scheduler=closest['scheduler'].all()).format(
             pulse=pulse, machine=machine)
         new_file = (path_closest, fn_closest)
-        t_diff = closest['t'].values - time
+        t_diff = closest['t'].values[0] - time
 
-        if np.abs(t_diff) >= dt_switch_gfile:
+        if (np.abs(t_diff) >= dt_switch_gfile) and (not np.isclose(np.abs(t_diff), dt_switch_gfile)):
             message = 'Closest available gfile is outside of desired time window {} +/- {}: {}'.format(
                 time, dt_switch_gfile, new_file)
             if raise_on_inexact_match:
                 raise ValueError(message)
-            else:
+            elif time != 0:
                 logger.warning(message)
 
         logger.debug('Closest gfile at t={} changed from \n"{}" to \n"{}"'.format(time, current_file, new_file))
@@ -138,7 +138,7 @@ class GFileSelector(object):
                 # fn_re = re.sub('\{pulse[^_]*\}', '(\d{5})', fn_pattern)
                 # fn_re = re.sub('\{gfile_time[^_]*\}', '([.\d]+)', fn_re)
                 files = filter_files_in_dir(path, fn_pattern, group_keys=('pulse', 'time'),
-                                            pulse='(\d{5})', gfile_time='([.\d]+)', raise_on_missing_dir=False)
+                                            pulse=r'(\\d{5})', gfile_time=r'([.\\d]+)', raise_on_missing_dir=False)
                 for key, value in files.items():
                     if key not in located_file_keys:
                         # If file has already been located don't overwrite with file at same t in lower priority dir
