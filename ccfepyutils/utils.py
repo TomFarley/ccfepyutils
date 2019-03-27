@@ -221,6 +221,37 @@ def ndarray_0d_to_scalar(array):
         #     raise NotImplementedError(array.dtype)
     return out
 
+def equivalent_numpy_python_type(value, to_type='python', none_type=type(None),
+                                 datetime_type=pd._libs.tslibs.timestamps.Timestamp, raise_on_other=False):
+    """Return equivalent numpy/python data datatype for given type"""
+    value_type = value if isinstance(value, type) else type(value)
+    # type_dict = {np.str_: str, np.bool_: bool, np.integer: int, np.floating: float, type(None): none_type}
+    type_dict = {str: np.str_, bool: np.bool_, int: np.integer, float: np.floating,
+                 type(None): none_type, datetime: datetime_type}
+
+    for python_type, numpy_type in type_dict.items():
+        if issubclass(value_type, (python_type, numpy_type)):
+            break
+    else:
+        if raise_on_other:
+            raise NotImplementedError(f'Type {value}')
+        else:
+            # Return type unchanged
+            return value_type
+    if to_type == 'numpy':
+        out_type = numpy_type
+    elif to_type == 'python':
+        out_type = python_type
+    else:
+        raise ValueError(numpy_type)
+    return out_type
+
+def cast_numpy_python(value, to_type='python'):
+    """Cast to equivalent numpy/python data datatype for given input type"""
+    new_type = equivalent_numpy_python_type(value, to_type=to_type)
+    new_value = new_type(value)
+    return new_value
+
 def input_timeout(prompt='Input: ', timeout=1, raise_on_timeout=False, yes_no=False, default_yes=True):
     import sys, select, time
     # print(prompt, end='')
@@ -303,6 +334,17 @@ def safe_isnan(value, false_for_non_numeric=True):
             out = False
         else:
             raise e
+    return out
+
+def safe_in(item, iterable, in_strings=True):
+    """Return True if item in iterable, returning False if iterable is not iterable"""
+    try:
+        if (not in_strings) and isinstance(iterable, str):
+            out = item in [iterable]
+        else:
+            out = item in iterable
+    except TypeError as e:
+        out = False
     return out
 
 def cast_safe(obj, new_type):
@@ -584,11 +626,13 @@ def compare_arrays(array1, array2):
                 sub_out = False
             out *= sub_out
     else:
-        equal_mask = array1 == array2
+        # equal_mask = array1 == array2
+        # Handle floating point imprecision
+        equal_mask = np.isclose(array1, array2)
         both_nan = np.isnan(array1) & np.isnan(array2)
         out = equal_mask | both_nan
         out = np.all(out)
-    return out
+    return bool(out)
 
 def compare_dataframes(df1, df2):
     # TODO: Match nans
@@ -613,7 +657,7 @@ def compare_dataframes(df1, df2):
             array1 = df1[col].values
             array2 = df2[col].values
             out &= compare_arrays(array1, array2)
-    return out
+    return bool(out)
 
 def compare_dataframes_details(df1, df2, df1_name='df_1', df2_name='df_2',
                                include_missing_in_diffs=True, log_difference=True, raise_on_difference=False):
@@ -1001,8 +1045,11 @@ def in_freia_batch_mode():
     batch_mode = os.getenv('LOADL_ACTIVE', None)
     return batch_mode == 'yes'
 
-def ask_input_yes_no(message, suffix=' ([Y]/n)? ', message_format='{message}{suffix}', default_yes=True, sleep=0.1):
+def ask_input_yes_no(message, suffix=' ([Y]/n)? ', message_format='{message}{suffix}', default_yes=True,
+                     batch_mode_default=True, sleep=0.1):
     """Ask yes/no question to raw input"""
+    if in_freia_batch_mode():
+        return batch_mode_default
     if default_yes is False:
         suffix = ' (y/[N])? '
     if sleep:
@@ -1018,7 +1065,6 @@ def ask_input_yes_no(message, suffix=' ([Y]/n)? ', message_format='{message}{suf
     else:
         out = False
     return out
-
 
 def set_windowless_matplotlib_backend():
     try:
