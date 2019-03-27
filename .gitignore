@@ -25,6 +25,7 @@ ccfepyutils.egg-info/
 *.tmp
 *.p
 *.csv
+.nfs0*
 
 *.old*
 
