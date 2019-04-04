@@ -31,13 +31,13 @@ def get_threshold(data, thresh_method='sigma', thresh_value=2.5):
     if thresh_value == 'abs':
         thresh = thresh_value
     elif thresh_method == 'sigma':
-        thresh = np.mean(data) + thresh_value * np.std(data)
+        thresh = np.nanmean(data) + thresh_value * np.nanstd(data)
     elif thresh_method == 'mean':
-        thresh = thresh_value * np.mean(data)
+        thresh = thresh_value * np.nanmean(data)
     elif thresh_method == 'percentile':
-        thresh = np.percentile(data, thresh_value)
+        thresh = np.nanpercentile(data, thresh_value)
     elif thresh_method is None:
-        thresh = np.min(data)
+        thresh = np.nanmin(data)
     else:
         raise ValueError('thresh_type = "{}" not recognised'.format(thresh_method))
     return thresh
@@ -208,7 +208,7 @@ def locate_peaks_cwt(x, y, width_range=None, domain_range=[0.05, 0.2], centre=Tr
 def conditional_average(x, y, x_peaks, window_width, return_average=True):
     # TODO: implement i_peaks options
     if len(x_peaks) == 0:
-        return [], []
+        return np.array([]), np.array([])
     peak_shapes = []
     # Avoid floating point comparison problems giving variable len for windows
     window_width *= 1.001
