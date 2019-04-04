@@ -634,29 +634,50 @@ def compare_arrays(array1, array2):
         out = np.all(out)
     return bool(out)
 
-def compare_dataframes(df1, df2):
+def compare_dataframes(df1, df2, fail_fast=True):
+    """Return True if supplied dataframes are identical accounting for nans etc"""
     # TODO: Match nans
-    if df1.shape != df2.shape:
-        out = False
-    elif (not np.all(df1.index == df2.index)):
-        out = False
-    elif (not np.all(df1.columns == df2.columns)):
-        out = False
-    elif (not np.all(df1.dtypes == df2.dtypes)):
-        out = False
-    elif np.dtype(object) not in df1.dtypes.values:
+    # t0 = datetime.now()
+    out = True
+    if fail_fast:
+        if df1.shape != df2.shape:
+            out = False
+        elif (not np.all(df1.index == df2.index)):
+            out = False
+        elif (not np.all(df1.columns == df2.columns)):
+            out = False
+        elif (not np.all(df1.dtypes == df2.dtypes)):
+            out = False
+        if out is False:
+            return False
+    # t1 = datetime.now()
+    # try:
+    if np.dtype(object) not in df1.dtypes.values:
         # Basic datatypes
         equal_mask = df1 == df2
         both_nan = df1.isnull() & df2.isnull()
         out = equal_mask | both_nan
         out = np.all(out)
     else:
+        # t2 = datetime.now()
         # Compare columnwise
-        out = True
         for col in df1.columns:
             array1 = df1[col].values
             array2 = df2[col].values
             out &= compare_arrays(array1, array2)
+    # except Exception as e:
+    #     logger.warning(e)
+    #     out = False
+    # t3 = datetime.now()
+
+    # times = [t0, t2, t3]
+    # interval_total = times[-1] - times[0]
+    # intervals = {f'{i}->{i+1}': str(tj - ti) for i, (ti, tj) in enumerate(zip(times, times[1:]))}
+    # intervals_frac = {f'{i}->{i+1}': f'{(tj-ti)/interval_total:0.2%}' for i, (ti, tj) in
+    #                   enumerate(zip(times, times[1:]))}
+    # print(f'compare_dataframes time: {interval_total}')
+    # print(f'compare_dataframes intervals: {intervals_frac}')
+
     return bool(out)
 
 def compare_dataframes_details(df1, df2, df1_name='df_1', df2_name='df_2',
@@ -665,45 +686,63 @@ def compare_dataframes_details(df1, df2, df1_name='df_1', df2_name='df_2',
     assert isinstance(df2, pd.DataFrame)
     assert np.all(df1.columns.isin(df2.columns)), 'Dataframes must have matching columns'
     summary = {'same': [], 'different': [], 'missing': [], 'added': [], 'identical': False}
-
-    # Loop over df2 finding items unique to df2
-    for item in df2.index:
-        if item not in df1.index:
-            summary['added'].append(item)
-        else:
-            if compare_dataframes(df2.loc[[item]], df1.loc[[item]]):
-                summary['same'].append(item)
-            else:
-                summary['different'].append(item)
-
-    # Loop over df1 finding items unique to df1
-    for item in df1.index:
-        if item not in df2.index:
-            summary['missing'].append(item)
-
-    if len(summary['same']) != len(df2):
-        different_items = summary['different'] + summary['added']
-        if include_missing_in_diffs:
-            different_items += summary['missing']
-        cols_1 = {col: '{}_{}'.format(col, df1_name) for col in df1.columns}
-        cols_2 = {col: '{}_{}'.format(col, df2_name) for col in df2.columns}
-        different_items_in_df1 = [item for item in different_items if item in df1.index]
-        df_diffs = copy(df1.loc[different_items_in_df1]).rename(columns=cols_1)
-        df_diffs = df_diffs.reindex(different_items)
-        for col in cols_2:
-            df_diffs[cols_2[col]] = df2[col]
-        message = 'Dataframe comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
-                len(summary['same']), summary['different'], summary['missing'], df_diffs)
-        # print(df_diffs)
-        if raise_on_difference:
-            raise ValueError(message)
-        if log_difference:
-            logger.info(message)
-    else:
-        df_diffs = None
+    # t0 = datetime.now()
+    identical = compare_dataframes(df1, df2, fail_fast=False)
+    # t1 = datetime.now()
+    if identical:
+        # Succeed fast - only do detailed breakdown if not identical
+        summary['same'] = list(df1.index)
         summary['identical'] = True
+        df_diffs = None
+    else:
+        # Loop over df2 finding items unique to df2
+        for item in df2.index:
+            if item not in df1.index:
+                summary['added'].append(item)
+            else:
+                if compare_dataframes(df2.loc[[item]], df1.loc[[item]]):
+                    summary['same'].append(item)
+                else:
+                    summary['different'].append(item)
 
-    return summary, df_diffs
+        # Loop over df1 finding items unique to df1
+        for item in df1.index:
+            if item not in df2.index:
+                summary['missing'].append(item)
+
+        if len(summary['same']) != len(df2):
+            different_items = summary['different'] + summary['added']
+            if include_missing_in_diffs:
+                different_items += summary['missing']
+            cols_1 = {col: '{}_{}'.format(col, df1_name) for col in df1.columns}
+            cols_2 = {col: '{}_{}'.format(col, df2_name) for col in df2.columns}
+            different_items_in_df1 = [item for item in different_items if item in df1.index]
+            df_diffs = copy(df1.loc[different_items_in_df1]).rename(columns=cols_1)
+            df_diffs = df_diffs.reindex(different_items)
+            for col in cols_2:
+                df_diffs[cols_2[col]] = df2[col]
+            message = 'Dataframe comparison; Same: {}, Different: {}, Missing: {}\n{}'.format(
+                    len(summary['same']), summary['different'], summary['missing'], df_diffs)
+            # print(df_diffs)
+            if raise_on_difference:
+                raise ValueError(message)
+            if log_difference:
+                logger.info(message)
+        else:
+            df_diffs = None
+            summary['identical'] = True
+        identical = summary['identical']
+    # t2 = datetime.now()
+
+    # times = [t0, t1, t2]
+    # interval_total = times[-1] - times[0]
+    # intervals = {f'{i}->{i+1}': str(tj - ti) for i, (ti, tj) in enumerate(zip(times, times[1:]))}
+    # intervals_frac = {f'{i}->{i+1}': f'{(tj-ti)/interval_total:0.2%}' for i, (ti, tj) in
+    #                   enumerate(zip(times, times[1:]))}
+    # print(f'compare_dataframes_details time: {interval_total}')
+    # print(f'compare_dataframes_details intervals: {intervals_frac}')
+
+    return identical, summary, df_diffs
 
 def isclose_within(values, reference, tol=1e-8, all=False, return_values=False):
     """Return vool_array/bool (if all=True) if elements of 'values' appear in 'reference' comparison_list within tollerance
