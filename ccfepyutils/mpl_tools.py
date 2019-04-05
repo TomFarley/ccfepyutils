@@ -451,19 +451,30 @@ def set_yaxis_percent(ax, dp=0):
     ax.yaxis.set_major_formatter(formatter)
     return ax
 
-def save_fig(fn, fig=None, directory=None, transparent=True, bbox_inches='tight', dpi=90, save=True, mkdir_depth=None,
-             mkdir_start=None, description=''):
+def save_fig(path_fn, fig=None, path=None, transparent=True, bbox_inches='tight', dpi=90, save=True, image_formats=None,
+             mkdir_depth=None, mkdir_start=None, description=''):
     if not save:
         return
     if fig is None:
         fig = plt.gcf()
-    if directory is not None:
-        fn = os.path.join(directory, fn)
-    fn = os.path.expanduser(fn)
+    if path is not None:
+        path_fn = os.path.join(path, path_fn)
+    path_fn = os.path.expanduser(path_fn)
     if (mkdir_depth is not None) or (mkdir_start is not None):
-        mkdir(os.path.dirname(fn), depth=mkdir_depth, start_dir=mkdir_start)
-    fig.savefig(fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
-    logger.info('Saved {} plot to: {}'.format(description, fn))
+        mkdir(os.path.dirname(path_fn), depth=mkdir_depth, start_dir=mkdir_start)
+
+    if image_formats is None:
+        path_fns = [path_fn]
+    else:
+        # Handle filesnames without extension with periods in
+        path_fn0, ext = os.path.splitext(path_fn)
+        path_fn0 = path_fn0 if len(ext) <= 4 else path_fn
+        path_fns = []
+        for ext in image_formats:
+            path_fns.append('{}.{}'.format(path_fn0, ext))
+    for path_fn in path_fns:
+        fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
+    logger.info('Saved {} plot to: {}'.format(description, path_fns))
 
 def color_shade(color, percentage):
     """Crude implementation to make color darker or lighter until matplotlib function is available:
@@ -509,11 +520,12 @@ def show_if(show, close_all=False):
 
 def annotate_axis(ax, string, x=0.85, y=0.955, fontsize=16,
                   bbox=(('facecolor', 'w'), ('ec', None), ('lw', 0), ('alpha', 0.5), ('boxstyle', 'round')),
-                horizontalalignment='center', verticalalignment='center', multialignment='left', **kwargs):
+                  horizontalalignment='center', verticalalignment='center', multialignment='left', **kwargs):
     if isinstance(bbox, (tuple, list)):
         bbox = dict(bbox)
     ax.text(x, y, string, fontsize=fontsize, bbox=bbox, horizontalalignment=horizontalalignment,
             verticalalignment=verticalalignment, transform=ax.transAxes, **kwargs)
+
 
 def format_axis(ax, xlabel=None, ylabel=None, xlim=None, ylim=None,
                 xtick_intervals=None, ytick_intervals=None, tick_labelsize=None,
@@ -564,7 +576,7 @@ def format_axis(ax, xlabel=None, ylabel=None, xlim=None, ylim=None,
         ax.get_xaxis().set_visible(xaxis_visible)
     if yaxis_visible is not None:
         ax.get_yaxis().set_visible(yaxis_visible)
-    
+
     # Turn off tick labels, keep tick marks
     # ax.tick_params(top=False, bottom=True, left=True, right=False, labelleft=False, labelbottom=True)
 
