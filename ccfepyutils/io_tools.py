@@ -29,6 +29,41 @@ try:
 except Exception as e:
     string_types = (str,)  # python3
 
+def path_contains_fn(path_fn):
+    _, ext = os.path.splitext(path_fn)
+    if ext == '':
+        out = False
+    else:
+        out = True
+    return out
+
+def split_path(path_fn, include_fn=False):
+    if path_contains_fn(path_fn):
+        path, fn = os.path.split(path_fn)
+    else:
+        path, fn = path_fn, None
+
+    directories = list(Path(path).parts)
+    if include_fn and (fn is not None):
+        directories.append(fn)
+    return directories, fn
+
+def insert_subdir_in_path(path_fn, subdir, position=-1, keep_fn=True, create_dir=True):
+    """Insert a subdirectory in a path"""
+    parts, fn = split_path(path_fn, include_fn=False)
+    if position < 0:
+        position = len(parts) + 1 + position
+    parts.insert(position, subdir)
+    new_path = '/'.join(parts)
+    if new_path[:2] == '//':
+        new_path = new_path[1:]
+    if not os.path.isdir(new_path) and create_dir:
+        depth = abs(position) if position < 0 else (len(parts)+2 - position)
+        mkdir(new_path, depth=depth)
+    if keep_fn and (fn is not None):
+        new_path = os.path.join(new_path, fn)
+    return new_path
+
 def create_config_file(fn, dic):
     """Create ini config file structured around supplied dictionary"""
     config = configparser.ConfigParser()
@@ -135,6 +170,8 @@ def filter_files_in_dir(path, fn_pattern='.*', group_keys=(), modified_range=(No
             break
         if modified_dir_filter:
             raise NotImplementedError
+        # TODO: Raise separate error for no matches with depth>0
+        raise_on_no_matches = raise_on_no_matches and (depth == 0)
         out_i = filter_files(files, fn_pattern, path=root, group_keys=group_keys, n_matches_expected=n_matches_expected,
                              modified_range=modified_range, raise_on_incomplete_match=raise_on_incomplete_match,
                              raise_on_no_matches=raise_on_no_matches, verbose=False, **kwargs)
@@ -172,8 +209,7 @@ def filter_files_in_dir(path, fn_pattern='.*', group_keys=(), modified_range=(No
             assert len(out) == n_files, ('filter_files_in_dir returned multiple files with same file key: '
                                          '{}/{} files in {}'.format(n_files-len(out), len(tmp), tmp))
         assert len(out) == n_matches
-    elif sort_keys:
-        raise NotImplementedError
+
     if sort_keys:
         keys, fns = list(out.keys()), list(out.values())  # improve
         i_sort = argsort(keys)
@@ -927,17 +963,51 @@ def read_netcdf_group(fn_path, group):
             match_data = match_data.copy(deep=True)
     return match_data
 
+
+def merge_pdfs(fns_in, fn_out):
+    """Merge list of pdf files into a single document"""
+    from PyPDF2 import PdfFileReader, PdfFileWriter
+    pdf_writer = PdfFileWriter()
+
+    fns_in = make_iterable(fns_in)
+    for path in fns_in:
+        pdf_reader = PdfFileReader(path)
+        for page in range(pdf_reader.getNumPages()):
+            # Add each page to the writer object
+            pdf_writer.addPage(pdf_reader.getPage(page))
+
+    # Write out the merged PDF
+    with open(fn_out, 'wb') as out:
+        pdf_writer.write(out)
+    logger.info(f'Combined {len(input_fns)} pdf documents into file: {fn_out}')
+
+def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_{page_no}.pdf', pages='all'):
+    from PyPDF2 import PdfFileReader, PdfFileWriter
+    pages = make_iterable(pages)
+    input_stem = Path(input_fn).resolve().stem
+    pdf = PdfFileReader(input_fn)
+    for page_no in range(pdf.getNumPages()):
+        if (page_no in pages) or (pages = ['all'])
+            pdf_writer = PdfFileWriter()
+            pdf_writer.addPage(pdf.getPage(page_no))
+
+            fn_out = fn_out_pattern.format(input_stem=input_stem, page_no=page_no)
+            with open(fn_out, 'wb') as output_pdf:
+                pdf_writer.write(output_pdf)
+            logger.info(f'Wrote page {page_no} of pdf {input_fn} to: {fn_out}')
+
+
 if __name__ == '__main__':
     # path = '/home/tfarley/elzar2/checkpoints/MAST/SynthCam/single_filament_scan/Corrected_inversion_data/6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3/'
     # fn_pattern = 'corr_inv-test1-n({n})-6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3.nc'
     # fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(4600,4650), depth=1)
-    path = '/home/tfarley/elzar2/checkpoints/MAST/SA1.1/29852/Detected_blobs/'
+    path = r'/home/tfarley/elzar2/checkpoints/MAST/SA1.1/29852/Detected_blobs/'
     # fn_pattern = 'corr_inv-test1-n({n})-\w+.nc'
-    fn_pattern = 'blobs-test1-n({n})-\w+.nc'
+    fn_pattern = r'blobs-test1-n({n})-\w+.nc'
     # Get files modifed in the last two days
     fns = filter_files_in_dir(path, fn_pattern, group_keys=['n'], n=np.arange(10500, 14500), depth=1, modified_range=(0, 2))
 
-    fn = os.path.expanduser('~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
+    fn = os.path.expanduser(r'~/repos/elzar2/elzar2/default_settings/elzar_defaults.ini')
     # from nested_dict import nested_dict
     # file = nested_dict()
     # file['Paths']['elzar_path'] = '~/elzar/:'
