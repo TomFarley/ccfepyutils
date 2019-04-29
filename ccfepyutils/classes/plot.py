@@ -14,7 +14,8 @@ import logging
 from logging.config import fileConfig, dictConfig
 # fileConfig('../logging_config.ini')
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 batch_mode = os.getenv('LOADL_ACTIVE', None)
 if batch_mode == 'yes':
@@ -36,7 +37,7 @@ from ccfepyutils.io_tools import pos_path
 from ccfepyutils.classes.state import State, in_state
 from ccfepyutils.classes.fitter import Fitter
 from ccfepyutils.data_processing import pdf
-from ccfepyutils.mpl_tools import set_cycler, colormap_names, repeat_color, close_all_mpl_plots
+from ccfepyutils.mpl_tools import set_cycler, colormap_names, repeat_color, close_all_mpl_plots, save_fig
 try:
     string_types = (basestring, unicode)  # python2
 except Exception as e:
@@ -552,35 +553,14 @@ class Plot(object):
                     return axes_subset[j]
         raise RuntimeError("2D axis wasn't replaced with 3D one")
 
-    def save(self, save=False, settings=None, image_formats=None, prefix='', description=None, allow_relative=True,
+    def save(self, save=False, image_formats=None, image_format_subdirs='subsequent', description=None,
              bbox_inches='tight', transparent=True, dpi=90, verbose=True):
-        # TODO: Use mpl_tools save_fig func
         if save is False:  # Don't save!
             return
-        elif isinstance(save, string_types):
-            if not pos_path(save, allow_relative=allow_relative):  # string path
-                raise IOError('Not valid save path: {}'.format(save))
-            if image_formats is None:
-                path_fns = [save]
-            else:
-                # Handle filesnames without extension with periods in
-                path_fn0, ext = os.path.splitext(save)
-                path_fn0 = path_fn0 if len(ext) <= 4 else save
-                path_fns = []
-                for ext in image_formats:
-                    path_fns.append('{}.{}'.format(path_fn0, ext))
-        else:
-            assert settings is not None
-            raise NotImplementedError
-        try:
-            for path_fn in path_fns:
-                self.fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
-
-        except RuntimeError as e:
-            logger.exception('Failed to save plot to: {}'.format(path_fns))
-            raise e
-        if verbose:
-            logger.info('Saved plot "{}" to: {}'.format(self.fig.canvas.get_window_title(), path_fns))
+        if description is None:
+            description = self.fig.canvas.get_window_title()
+        save_fig(save, fig=self.fig, image_formats=image_formats, description=description, bbox_inches=bbox_inches,
+                 transparent=transparent, dpi=dpi, verbose=verbose)
 
     def save_image(self, z, fn, bit_depth=12):
         """Save image to file preserving resolution"""
