@@ -6,6 +6,7 @@ from copy import deepcopy
 
 import numpy as np
 import scipy as sp
+from scipy.interpolate import interp1d
 from scipy import stats
 import matplotlib
 from ccfepyutils import batch_mode
@@ -302,15 +303,27 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     return np.convolve( m[::-1], y, mode='valid')
 
 
-def moving_average (values, window, force_odd=False):
-    """ Return moving average with window length
+def moving_average(y, window_width, pad_y=True, force_odd_window=False):
+    """ Return moving average with given window length.
+    Set pad_y = True to preserve input signal length
     """
     # Make sure window odd
-    if force_odd and (window % 2 != 1):
-        window += 1
-    weights = np.repeat(1.0, window)/window
+    if force_odd_window and (window_width % 2 != 1):
+        window_width += 1
+    window_width = int(np.round(window_width))
+
+    # Flat top function for convolution
+    weights = np.repeat(1.0, window_width) / window_width
+
+    # Pad edges to preserve length
+    if pad_y:
+        try:
+            y = np.pad(y, (window_width // 2, window_width - 1 - window_width // 2), mode='edge')
+        except TypeError as e:
+            raise e
+
     try:
-        sma = np.convolve(values, weights, 'valid')
+        sma = np.convolve(y, weights, mode='valid')
     except:
         pass
     return sma
@@ -385,6 +398,158 @@ def smooth(x, window_len=10, window='hanning'):
     y = y[window_len:-window_len]
     assert(len(y) == len(x))
     return y
+
+def rfft(y, x=None, normalise_by_length=True, plot=False):
+    assert len(y) > 2
+    if x is None:
+        x = np.arange(len(y))
+
+    # Fourier transform of real signal (disregard negative frequencies that are symetrical, avoid fftshift)
+    spectrum = np.fft.rfft(y)
+
+    # (Time) step along x axis
+    dx = x[1] - x[0] if x is not None else 1
+    # (Freqency) step
+    df = 1 / dx
+    # x = np.arange(len(y))
+    x_freq = np.linspace(0, df, len(spectrum))
+
+    # (Frequency) normalised to length of window
+    # df_norm = df / nx
+    # f = np.arange(-Fs / 2, Fs / 2, dF)
+
+    if normalise_by_length:
+        # Length of signal
+        ny = len(y)
+        spectrum /= ny
+
+    if plot:
+        rfft_plot(spectrum=spectrum, x=x_freq, apply_rfft=False)
+    return x_freq, spectrum
+
+def rfft_noise_removal(signal, noise, x_signal=None, x_noise=None, smooth_window_signal=35,
+                       smooth_window_noise=35, smooth_window_scale_factor=15, normalise_by_length=True, plot=True):
+    """Filter signal by subtracting frequencies present in noise signal"""
+    freq_signal, spectrum_signal = rfft(signal, x=x_signal, normalise_by_length=normalise_by_length, plot=False)
+    freq_noise, spectrum_noise = rfft(noise, x=x_noise, normalise_by_length=normalise_by_length, plot=False)
+
+
+    # Smooth and interpolate noise amplitude spectrum onto same resolution as signal spectrum
+    # amplitude_signal_smoothed = moving_average(np.abs(spectrum_signal), smooth_window_signal, pad_y=True, force_odd_window=True)
+    # amplitude_noise_smoothed = moving_average(np.abs(spectrum_noise), smooth_window_noise, pad_y=True, force_odd_window=True)
+    amplitude_signal = np.abs(spectrum_signal)
+    amplitude_noise = np.abs(spectrum_noise)
+    amplitude_signal_smoothed = smooth(amplitude_signal, smooth_window_signal, window='hanning')
+    amplitude_noise_smoothed = smooth(amplitude_noise, smooth_window_noise, window='hanning')
+
+    interpolator = interp1d(freq_noise, amplitude_noise_smoothed, kind='cubic')
+    amplitude_noise_interpolated = interpolator(freq_signal)
+    amplitude_ratio = amplitude_noise_interpolated / amplitude_signal_smoothed
+    amplitude_scale_factor = (1 - np.clip(amplitude_ratio, 0, 1))
+    # amplitude_scale_factor = moving_average(amplitude_scale_factor, smooth_window_scale_factor, pad_y=True)
+    amplitude_scale_factor = smooth(amplitude_scale_factor, smooth_window_scale_factor, window='hanning')
+    amplitude_filtered = amplitude_signal * amplitude_scale_factor
+
+    spectrum_filtered = spectrum_signal * amplitude_scale_factor
+
+    # Subtract noise frequencies from main signal
+    # phase_signal = np.angle(spectrum_signal)
+    # amplitude_filtered = np.abs(spectrum_signal) - amplitude_noise_interpolated
+    # spectrum_filtered = amplitude_filtered * np.exp(1j * phase_signal)
+
+    signal_filtered = np.fft.irfft(spectrum_filtered)
+
+    amplitudes = {'signal_filtered': amplitude_filtered, 'signal_raw': amplitude_signal, 'noise': amplitude_noise_interpolated}
+    spectra = {'signal_filtered': spectrum_filtered, 'signal_raw': spectrum_signal, 'noise': spectrum_noise}
+    frequencies = {'signal': freq_signal, 'noise': freq_noise}
+
+    filter_debug_plot = False
+    if filter_debug_plot:
+        fig, ax = plt.subplots(1,1)
+        plt.plot(freq_signal, amplitude_signal_smoothed, alpha=0.5, label='signal smoothed')
+        plt.plot(freq_signal, amplitude_noise_interpolated, alpha=0.5, label='noise smoothed')
+        plt.plot(freq_noise, amplitude_noise, alpha=0.5, label='noise raw')
+        plt.plot(freq_signal, amplitude_ratio * np.max(amplitude_noise_interpolated), alpha=0.5, label='ratio')
+        plt.plot(freq_signal, amplitude_scale_factor * np.max(amplitude_noise_interpolated), alpha=0.5, label='scale factor')
+        plt.plot(freq_signal, amplitude_filtered, alpha=0.5, label='signal filtered')
+        plt.legend()
+        plt.show()
+
+    if plot:
+        fig, ax = plt.subplots(1,1)
+        ax.plot(x_signal, signal, label='Raw signal')
+        ax.plot(x_signal, signal_filtered, label='Filtered signal')
+        ax.legend()
+        plt.show()
+
+    return signal_filtered, spectra, amplitudes, frequencies, amplitude_scale_factor
+
+def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None, apply_rfft=True,
+              normalise_x=False, label=None, x_label=None, show=True, **kwargs):
+    """Plot complex output from rfft"""
+    from ccfepyutils.mpl_tools import format_axis, annotate_axis
+
+    if apply_rfft:
+        x_freq, spectrum = rfft(y, x=x, normalise_by_length=True, plot=False)
+    else:
+        x_freq, spectrum = x, y
+
+    if x_freq is None:
+        x_freq = np.arange(len(y))
+
+    x_label = 'Frequency'
+    # if normalise_x:
+    #     x_plot = x_plot / len(x)
+
+    if all(ax is None for ax in (ax_real, ax_imag, ax_phase, ax_mag)):
+        fig, ((ax_real, ax_imag), (ax_mag, ax_phase)) = plt.subplots(2, 2, sharex=True)
+    else:
+        for ax in (ax_real, ax_imag, ax_phase, ax_mag):
+            if ax is not None:
+                fig = ax.figure
+                break
+
+    if ax_real is not None:
+        spectrum_real = np.real(spectrum)
+        ax_real.plot(x_freq, spectrum_real, label=label, **kwargs)
+        ax_real.set_ylim(np.percentile(spectrum_real, 1), np.percentile(spectrum_real, 99))
+        # ax_real.set_xlabel(x_label)
+        # ax_real.set_ylabel('FFT (real)')
+        annotate_axis(ax_real, 'FFT (real)', x=0.5, y=0.9)
+
+    if ax_imag is not None:
+        spectrum_imag = np.imag(spectrum)
+        ax_imag.plot(x_freq, spectrum_imag, label=label, **kwargs)
+        ax_imag.set_ylim(np.percentile(spectrum_imag, 1), np.percentile(spectrum_imag, 99))
+        # ax_imag.set_xlabel(x_label)
+        # ax_imag.set_ylabel('FFT (imaginary)')
+        annotate_axis(ax_imag, 'FFT (imaginary)', x=0.5, y=0.9)
+        format_axis(ax_imag, yticks=[])
+
+    if ax_mag is not None:
+        spectrum_mag = np.abs(spectrum)
+        ax_mag.plot(x_freq, spectrum_mag, label=label, **kwargs)
+        ax_mag.set_ylim(0, np.percentile(spectrum_mag, 99))
+        ax_mag.set_xlabel(x_label)
+        # ax_mag.set_ylabel('FFT (magnitude)')
+        annotate_axis(ax_mag, 'FFT (magnitude)', x=0.5, y=0.9)
+
+    if ax_phase is not None:
+        spectrum_phase = np.angle(spectrum)
+        ax_phase.plot(x_freq, spectrum_phase*180/np.pi, label=label, **kwargs)
+        ax_phase.set_xlabel(x_label)
+        # ax_phase.set_ylabel('FFT (phase)')
+        annotate_axis(ax_phase, 'FFT (phase)', x=0.5, y=0.9)
+        format_axis(ax_phase, yticks=[])
+
+    if show:
+        plt.tight_layout()
+        plt.subplots_adjust(wspace=0.0, hspace=0.0)
+        plt.legend()
+
+        plt.show()
+
+    return fig, ((ax_real, ax_imag), (ax_mag, ax_phase))
 
 def auto_correlation(signal, detrend=False, norm=True):
     """Return auto correlation function of signal"""
@@ -492,7 +657,7 @@ def pdf(x, nbins=None, bin_edges=None, min_data_per_bin=10, nbins_max=50, nbins_
         raise e
 
     counts = counts / np.max(counts) if max_1 else counts
-    bin_centres = moving_average(bin_edges, 2)
+    bin_centres = moving_average(bin_edges, 2, pad_y=False)
     return bin_edges, bin_centres, counts
 
 def _find_dist_extrema(arr, point, index=True, normalise=False, func=np.argmin):

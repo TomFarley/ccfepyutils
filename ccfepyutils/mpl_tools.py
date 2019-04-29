@@ -5,7 +5,7 @@ import logging, warnings, os, itertools
 import numpy as np
 from matplotlib.collections import LineCollection
 
-from ccfepyutils.io_tools import mkdir
+from ccfepyutils.io_tools import mkdir, insert_subdir_in_path, pos_path
 from ccfepyutils.utils import make_iterable, safe_len
 
 logger = logging.getLogger(__name__)
@@ -451,30 +451,46 @@ def set_yaxis_percent(ax, dp=0):
     ax.yaxis.set_major_formatter(formatter)
     return ax
 
-def save_fig(path_fn, fig=None, path=None, transparent=True, bbox_inches='tight', dpi=90, save=True, image_formats=None,
-             mkdir_depth=None, mkdir_start=None, description=''):
+def save_fig(path_fn, fig=None, path=None, transparent=True, bbox_inches='tight', dpi=90, save=True,
+             image_formats=None, image_format_subdirs='subsequent',
+             mkdir_depth=None, mkdir_start=None, description='', verbose=True):
     if not save:
-        return
+        return False
     if fig is None:
         fig = plt.gcf()
     if path is not None:
         path_fn = os.path.join(path, path_fn)
-    path_fn = os.path.expanduser(path_fn)
+    path_fn = os.path.realpath(os.path.expanduser(path_fn))
+    if not pos_path(path_fn, allow_relative=True):  # string path
+        raise IOError('Not valid save path: {}'.format(path_fn))
+
     if (mkdir_depth is not None) or (mkdir_start is not None):
         mkdir(os.path.dirname(path_fn), depth=mkdir_depth, start_dir=mkdir_start)
 
     if image_formats is None:
-        path_fns = [path_fn]
+        _, ext = os.path.splitext()
+        path_fns = {ext: path_fn}
     else:
         # Handle filesnames without extension with periods in
         path_fn0, ext = os.path.splitext(path_fn)
         path_fn0 = path_fn0 if len(ext) <= 4 else path_fn
-        path_fns = []
-        for ext in image_formats:
-            path_fns.append('{}.{}'.format(path_fn0, ext))
-    for path_fn in path_fns:
-        fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
-    logger.info('Saved {} plot to: {}'.format(description, path_fns))
+        path_fns = {}
+        for i, ext in enumerate(image_formats):
+            path_fn = '{}.{}'.format(path_fn0, ext)
+            if ((image_format_subdirs == 'all') or (image_format_subdirs is True) or
+                    ((image_format_subdirs == 'subsequent') and (i > 0))):
+                path_fn = insert_subdir_in_path(path_fn, ext, -1, create_dir=True)
+            path_fns[ext] = path_fn
+    for ext, path_fn in path_fns.items():
+        try:
+            fig.savefig(path_fn, bbox_inches=bbox_inches, transparent=transparent, dpi=dpi)
+        except RuntimeError as e:
+            logger.exception('Failed to save plot to: {}'.format(path_fn))
+            raise e
+    if verbose:
+        logger.info('Saved {} plot to:\n{}'.format(description, path_fns))
+        print('Saved {} plot to:'.format(description))
+        print(path_fns)
 
 def color_shade(color, percentage):
     """Crude implementation to make color darker or lighter until matplotlib function is available:

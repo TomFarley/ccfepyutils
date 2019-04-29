@@ -987,7 +987,7 @@ def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_{page_no}.pdf', pag
     input_stem = Path(input_fn).resolve().stem
     pdf = PdfFileReader(input_fn)
     for page_no in range(pdf.getNumPages()):
-        if (page_no in pages) or (pages = ['all'])
+        if (page_no in pages) or (pages == ['all']):
             pdf_writer = PdfFileWriter()
             pdf_writer.addPage(pdf.getPage(page_no))
 
