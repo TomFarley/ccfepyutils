@@ -468,7 +468,7 @@ def save_fig(path_fn, fig=None, path=None, transparent=True, bbox_inches='tight'
         mkdir(os.path.dirname(path_fn), depth=mkdir_depth, start_dir=mkdir_start)
 
     if image_formats is None:
-        _, ext = os.path.splitext()
+        _, ext = os.path.splitext(path_fn)
         path_fns = {ext: path_fn}
     else:
         # Handle filesnames without extension with periods in
@@ -491,6 +491,28 @@ def save_fig(path_fn, fig=None, path=None, transparent=True, bbox_inches='tight'
         logger.info('Saved {} plot to:\n{}'.format(description, path_fns))
         print('Saved {} plot to:'.format(description))
         print(path_fns)
+
+def legend(ax, handles=None, labels=None, legend=True, only_multiple_artists=True, zorder=None, **kwargs):
+    """Finalise legends of each axes"""
+    kws = {'fontsize': 14, 'framealpha': 0.7, 'facecolor': 'white', 'fancybox': True}
+    leg = None
+    try:
+        handles_current, labels_current = ax.get_legend_handles_labels()
+        # Only produce legend if more than one  artist has a label
+        if (not only_multiple_artists) or (len(handles_current) > 1) or (handles is not None):
+            args = () if handles is None else (handles, labels)
+            kws.update(kwargs)
+            leg = ax.legend(*args, **kws)
+            leg.set_draggable(True)
+            if zorder is not None:
+                leg.set_zorder(zorder)
+    except ValueError as e:
+        #  https: // github.com / matplotlib / matplotlib / issues / 10053
+        logger.error('Not sure how to avoid this error: {}'.format(e))
+    if not legend:
+        leg = ax.legend()
+        leg.remove()
+    return leg
 
 def color_shade(color, percentage):
     """Crude implementation to make color darker or lighter until matplotlib function is available:

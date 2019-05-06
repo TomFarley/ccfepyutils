@@ -325,7 +325,7 @@ def moving_average(y, window_width, pad_y=True, force_odd_window=False):
     try:
         sma = np.convolve(y, weights, mode='valid')
     except:
-        pass
+        sma = None
     return sma
 
 
@@ -484,7 +484,7 @@ def rfft_noise_removal(signal, noise, x_signal=None, x_noise=None, smooth_window
 
     return signal_filtered, spectra, amplitudes, frequencies, amplitude_scale_factor
 
-def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None, apply_rfft=True,
+def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None, apply_rfft=True, annotate=True,
               normalise_x=False, label=None, x_label=None, show=True, **kwargs):
     """Plot complex output from rfft"""
     from ccfepyutils.mpl_tools import format_axis, annotate_axis
@@ -515,7 +515,8 @@ def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None,
         ax_real.set_ylim(np.percentile(spectrum_real, 1), np.percentile(spectrum_real, 99))
         # ax_real.set_xlabel(x_label)
         # ax_real.set_ylabel('FFT (real)')
-        annotate_axis(ax_real, 'FFT (real)', x=0.5, y=0.9)
+        if annotate:
+            annotate_axis(ax_real, 'FFT (real)', x=0.5, y=0.9)
 
     if ax_imag is not None:
         spectrum_imag = np.imag(spectrum)
@@ -523,7 +524,8 @@ def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None,
         ax_imag.set_ylim(np.percentile(spectrum_imag, 1), np.percentile(spectrum_imag, 99))
         # ax_imag.set_xlabel(x_label)
         # ax_imag.set_ylabel('FFT (imaginary)')
-        annotate_axis(ax_imag, 'FFT (imaginary)', x=0.5, y=0.9)
+        if annotate:
+            annotate_axis(ax_imag, 'FFT (imaginary)', x=0.5, y=0.9)
         format_axis(ax_imag, yticks=[])
 
     if ax_mag is not None:
@@ -532,14 +534,16 @@ def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None,
         ax_mag.set_ylim(0, np.percentile(spectrum_mag, 99))
         ax_mag.set_xlabel(x_label)
         # ax_mag.set_ylabel('FFT (magnitude)')
-        annotate_axis(ax_mag, 'FFT (magnitude)', x=0.5, y=0.9)
+        if annotate:
+            annotate_axis(ax_mag, 'FFT (magnitude)', x=0.5, y=0.9)
 
     if ax_phase is not None:
         spectrum_phase = np.angle(spectrum)
         ax_phase.plot(x_freq, spectrum_phase*180/np.pi, label=label, **kwargs)
         ax_phase.set_xlabel(x_label)
         # ax_phase.set_ylabel('FFT (phase)')
-        annotate_axis(ax_phase, 'FFT (phase)', x=0.5, y=0.9)
+        if annotate:
+            annotate_axis(ax_phase, 'FFT (phase)', x=0.5, y=0.9)
         format_axis(ax_phase, yticks=[])
 
     if show:
@@ -550,6 +554,23 @@ def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None,
         plt.show()
 
     return fig, ((ax_real, ax_imag), (ax_mag, ax_phase))
+
+def spectrogram_plot(signal, x, path_fn_plot=None, show=True, **kwargs):
+    from ccfepyutils.mpl_tools import save_fig
+    fig, ax = plt.subplots(1, 1)
+    fs = float(1 / (x[1] - x[0]))
+    f, t, spectrogram = sp.signal.spectrogram(signal, fs, mode='psd', **kwargs)  # , t)
+    # Not sure why frequency seems to need doubling!?
+    pmesh = ax.pcolormesh(t, f / 1e3, spectrogram, norm=matplotlib.colors.LogNorm())
+    cbar = plt.colorbar(pmesh, ax=ax)
+    cbar.set_label('Power spectral density')
+    plt.ylabel('$f$ [kHz]')
+    plt.xlabel('$t$ [s]')
+    plt.tight_layout()
+    save_fig(path_fn_plot, fig, save=bool(path_fn_plot))
+    if show:
+        plt.show()
+    return fig, ax, (f, t, spectrogram)
 
 def auto_correlation(signal, detrend=False, norm=True):
     """Return auto correlation function of signal"""

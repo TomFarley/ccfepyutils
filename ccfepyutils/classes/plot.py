@@ -483,7 +483,8 @@ class Plot(object):
             ax = self.ax(ax)
             return set_cycler(cycler, ax=ax)
 
-    def legend(self, handles=None, labels=None, ax=None, legend=True, legend_fontsize=14, **kwargs):
+    def legend(self, handles=None, labels=None, ax=None, legend=True, legend_fontsize=14,
+               only_multiple_artists=True, **kwargs):
         """Finalise legends of each axes"""
         # TODO: Stop subsequent calls updating fontsize with default
         ax = none_filter(self._legend, ax)
@@ -495,7 +496,9 @@ class Plot(object):
             # TODO: check if more than one legend handels exist
             try:
                 handles_current, labels_current = ax.get_legend_handles_labels()
-                if len(handles_current) > 1:  # Only produce legend if more than one artist has a label
+                if (not only_multiple_artists) or (len(handles_current) > 1):  # Only produce legend if more than one
+                    # artist
+                    # has a label
                     args = () if handles is None else (handles, labels)
                     leg = ax.legend(fontsize=legend_fontsize, *args, **kwargs)
                     leg.set_draggable(True)

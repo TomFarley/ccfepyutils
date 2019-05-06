@@ -161,8 +161,8 @@ class Fitter(object):
         y0 = func(x, *popt)
         # chi2 = np.abs(np.sum((y-y0)**2/y0))  # correct version?
         # chi2 = np.abs(np.sum((y-y0)**2/y))  # should be y0?
-        chi2 = np.abs(np.sum((y-y0)**2))  # should be y0?
-        chi2r = chi2 / len(popt)
+        chi2 = float(np.abs(np.sum((y-y0)**2)))  # should be y0?
+        chi2r = float(chi2 / len(popt))
 
         logger.debug('{} fitted with chi2: {:0.0f}, chi2r: {:0.0f}, popt: {}'.format(func.__name__, chi2, chi2r, popt))
         return func, popt, pcov, chi2r
