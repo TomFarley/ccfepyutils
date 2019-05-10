@@ -981,21 +981,26 @@ def merge_pdfs(fns_in, fn_out):
         pdf_writer.write(out)
     logger.info(f'Combined {len(input_fns)} pdf documents into file: {fn_out}')
 
-def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_{page_no}.pdf', pages='all'):
-    """Extract pages from pdf (portable document format) file to a new file"""
+def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_p{page_min}-{page_max}.pdf', pages='all'):
+    """Extract pages from pdf (portable document format) file to a new file.
+
+    Page numbering starts at 1"""
     from PyPDF2 import PdfFileReader, PdfFileWriter
     pages = make_iterable(pages)
     input_stem = Path(input_fn).resolve().stem
+    pdf_out_writer = PdfFileWriter()
     pdf = PdfFileReader(input_fn)
-    for page_no in range(pdf.getNumPages()):
+    for page_no in (np.arange(pdf.getNumPages())+1):
         if (page_no in pages) or (pages == ['all']):
-            pdf_writer = PdfFileWriter()
-            pdf_writer.addPage(pdf.getPage(page_no))
+            print(f'extracting page {page_no}')
+            pdf_out_writer.addPage(pdf.getPage(page_no))
+        else:
+            print(f'Skipping page {page_no}')
 
-            fn_out = fn_out_pattern.format(input_stem=input_stem, page_no=page_no)
-            with open(fn_out, 'wb') as output_pdf:
-                pdf_writer.write(output_pdf)
-            logger.info(f'Wrote page {page_no} of pdf {input_fn} to: {fn_out}')
+    fn_out = fn_out_pattern.format(input_stem=input_stem, page_min=min(pages), page_max=max(pages))
+    with open(fn_out, 'wb') as output_pdf:
+        pdf_out_writer.write(output_pdf)
+    logger.info(f'Wrote pages {pages} of pdf {input_fn} to: {fn_out}')
 
 
 if __name__ == '__main__':
