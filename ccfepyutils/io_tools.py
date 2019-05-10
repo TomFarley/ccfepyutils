@@ -965,7 +965,7 @@ def read_netcdf_group(fn_path, group):
 
 
 def merge_pdfs(fns_in, fn_out):
-    """Merge list of pdf files into a single document"""
+    """Merge list of pdf (portable document format) files into a single document"""
     from PyPDF2 import PdfFileReader, PdfFileWriter
     pdf_writer = PdfFileWriter()
 
@@ -982,6 +982,7 @@ def merge_pdfs(fns_in, fn_out):
     logger.info(f'Combined {len(input_fns)} pdf documents into file: {fn_out}')
 
 def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_{page_no}.pdf', pages='all'):
+    """Extract pages from pdf (portable document format) file to a new file"""
     from PyPDF2 import PdfFileReader, PdfFileWriter
     pages = make_iterable(pages)
     input_stem = Path(input_fn).resolve().stem
