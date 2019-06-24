@@ -522,20 +522,46 @@ def color_shade(color, percentage):
     c = np.clip(np.array(c)+percentage/100., 0, 1)
     return c
 
+def get_previous_artist_color(ax=None, artist_ranking=('line', 'pathcollection'), artist_ranking_str=None):
+    artist_type_options = ('line', 'pathcollection')
+    if ax is None:
+        ax = plt.gca()
+    if (artist_ranking_str is not None) and any([a in artist_ranking_str for a in artist_type_options]):
+        artist_ranking = [a for a in artist_type_options if a in artist_ranking_str]
+
+    for artist_type in artist_ranking:
+        assert artist_type in artist_type_options
+        if artist_type == 'line' and len(ax.lines) != 0:
+            artist = ax.lines[-1]
+            color = artist.get_color()
+            break
+        elif artist_type == 'pathcollection' and len(ax.collections) != 0:
+            artists = [a for a in ax.collections if isinstance(a, matplotlib.collections.PathCollection)]
+            if len(artists) > 0:
+                artist = artists[-1]
+                color = artist.get_facecolor()[0]  # [:2]
+                break
+    else:
+        logger.warning("Can't repeat line color - no previous lines or path collections on axis")
+        return 'k'
+    return color
+
 def get_previous_line_color(ax=None):
     """Return color of previous line plotted to axis"""
     if ax is None:
         ax = plt.gca()
-    if len(ax.lines) == 0:
-        logger.warning("Can't repeat line color - no previous lines on axis")
+    if len(ax.lines) != 0:
+        color = ax.lines[-1].get_color()
+    else:
+        logger.warning("Can't repeat line color - no previous lines or path collections on axis")
         return 'k'
-    color = ax.lines[-1].get_color()
+
     return color
 
 def repeat_color(string, ax=None):
     if ax is None:
         ax = plt.gca()
-    color = get_previous_line_color(ax)
+    color = get_previous_artist_color(ax, artist_ranking_str=string)
     if '+' in string or '-' in string:
         percentage = float(string.split('+')[-1].split('-')[-1])
         c = color_shade(color, percentage)
