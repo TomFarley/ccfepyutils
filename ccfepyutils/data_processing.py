@@ -555,17 +555,20 @@ def rfft_plot(y, x=None, ax_real=None, ax_imag=None, ax_phase=None, ax_mag=None,
 
     return fig, ((ax_real, ax_imag), (ax_mag, ax_phase))
 
-def spectrogram_plot(signal, x, path_fn_plot=None, show=True, **kwargs):
+def spectrogram_plot(signal, x, ax=None, path_fn_plot=None, show=True, **kwargs):
     from ccfepyutils.mpl_tools import save_fig
-    fig, ax = plt.subplots(1, 1)
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.figure
     fs = float(1 / (x[1] - x[0]))
     f, t, spectrogram = sp.signal.spectrogram(signal, fs, mode='psd', **kwargs)  # , t)
     # Not sure why frequency seems to need doubling!?
     pmesh = ax.pcolormesh(t, f / 1e3, spectrogram, norm=matplotlib.colors.LogNorm())
     cbar = plt.colorbar(pmesh, ax=ax)
     cbar.set_label('Power spectral density')
-    plt.ylabel('$f$ [kHz]')
-    plt.xlabel('$t$ [s]')
+    ax.set_ylabel('$f$ [kHz]')
+    ax.set_xlabel('$t$ [s]')
     plt.tight_layout()
     save_fig(path_fn_plot, fig, save=bool(path_fn_plot))
     if show:
