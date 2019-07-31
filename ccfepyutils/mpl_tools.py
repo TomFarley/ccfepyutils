@@ -1,12 +1,12 @@
 ## Function from http://stackoverflow.com/questions/8247973/how-do-i-specify-an-arrow-like-linestyle-in-matplotlib
 
-import logging, warnings, os, itertools
+import logging, warnings, os, itertools, re
 
 import numpy as np
 from matplotlib.collections import LineCollection
 
 from ccfepyutils.io_tools import mkdir, insert_subdir_in_path, pos_path
-from ccfepyutils.utils import make_iterable, safe_len
+from ccfepyutils.utils import make_iterable, safe_len, is_numeric
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -190,9 +190,68 @@ def arrowplot(axes, x, y, narrs=30, dspace=0.5, direc='pos', \
                         arrowprops=dict( headwidth=hw, frac=1., ec=c, fc=c,alpha=alpha),
                         alpha=alpha)
 
-    axes.plot(x, y, pix_color= c, alpha=alpha)
+    # axes.plot(x, y, pix_color= c, alpha=alpha)
+    axes.plot(x, y, color= c, alpha=alpha)
     # axes.set_xlim(x.min()*.9,x.max()*1.1)
     # axes.set_ylim(y.min()*.9,y.max()*1.1)
+
+def add_arrow(line, positions='middle', direction='right', size=15, color=None):
+    """
+    add an arrow to a line.
+    
+    NOTE: assumes montonic line data
+
+    line:       Line2D object
+    position:   x-position of the arrow. If None, mean of xdata is taken
+    direction:  'left' or 'right'
+    size:       size of the arrow in fontsize points
+    color:      if None, line color is taken.
+    """
+    if color is None:
+        color = line.get_color()
+
+    xdata = line.get_xdata()
+    ydata = line.get_ydata()
+
+    if isinstance(positions, str):
+        if positions == 'middle':
+            positions = xdata.mean()
+        elif re.match(r'(\d)th_link', positions):
+            n = int(re.match(r'(\d)th_link', positions).groups()[0])
+            positions = np.mean(list(zip(xdata, xdata[1:])), axis=1)
+            positions = positions[::n]
+        elif re.match(r'(\d)_arrows', positions):
+            n = re.match(r'(\d)_arrows', positions).groups()[0]
+            positions = np.linspace(np.min(xdata), np.max(xdata), n)
+        else:
+            raise ValueError(positions)
+    positions = make_iterable(positions)
+    
+    for position in positions:
+        # find closest index
+        start_ind = np.where((xdata - position)<=0)[0][-1]
+        # start_ind = np.argmin(np.absolute(xdata - position))
+        if direction == 'right':
+            end_ind = start_ind + 1
+        else:
+            end_ind = start_ind - 1
+    
+        if end_ind == len(xdata):
+            start_ind -= 1
+            end_ind -= 1
+
+        start = (xdata[start_ind], ydata[start_ind])
+        # TODO: keyword options for where in link to add arrow: start, middle, end, pos, frac ?
+        # end = (np.mean(xdata[[start_ind, end_ind]]), np.mean(ydata[[start_ind, end_ind]]))
+        end = (xdata[end_ind], ydata[end_ind])
+
+        ann = line.axes.annotate('',
+            xytext=start, xy=end,
+            arrowprops=dict(arrowstyle="->", color=color),
+            size=size,
+            annotation_clip=True
+        )
+        ann.arrow_patch.set_clip_box(line.axes.bbox)  # Not annotation going outside axis
 
 def scatter_fit(x, y, fit='linear', label=None, color='blue', ax=None, x_label=None, y_label=None, fit_only=False,
                 remove_outliers=False, outlier_thresh=0.7, y_eq_x=False, **kwargs):
@@ -461,8 +520,8 @@ def save_fig(path_fn, fig=None, path=None, transparent=True, bbox_inches='tight'
     if path is not None:
         path_fn = os.path.join(path, path_fn)
     path_fn = os.path.realpath(os.path.expanduser(path_fn))
-    if not pos_path(path_fn, allow_relative=True):  # string path
-        raise IOError('Not valid save path: {}'.format(path_fn))
+    # if not pos_path(path_fn, allow_relative=True):  # string path
+    #     raise IOError('Not valid save path: {}'.format(path_fn))
 
     if (mkdir_depth is not None) or (mkdir_start is not None):
         mkdir(os.path.dirname(path_fn), depth=mkdir_depth, start_dir=mkdir_start)
@@ -591,18 +650,25 @@ def annotate_axis(ax, string, x=0.85, y=0.955, fontsize=16,
             verticalalignment=verticalalignment, transform=ax.transAxes, **kwargs)
 
 
-def format_axis(ax, xlabel=None, ylabel=None, xlim=None, ylim=None,
+def format_axis(ax, xlabel=None, ylabel=None, axis_label_fontsize=None,
+                xlim=None, ylim=None,
                 xtick_intervals=None, ytick_intervals=None, tick_labelsize=None,
-                xscale=None, yscale=None, xticks=None, yticks=None, xaxis_visible=None, yaxis_visible=None):
+                xscale=None, yscale=None, xticks=None, yticks=None, xaxis_visible=None, yaxis_visible=None,
+                tight_layout=True):
     """Apply range of formatting options to axes"""
     from matplotlib.ticker import AutoMinorLocator
     import matplotlib.ticker as ticker
 
     # Set axis title labels
     if xlabel is not None:
-        ax.set_xlabel(xlabel)
+        ax.set_xlabel(xlabel, fontsize=axis_label_fontsize)
+    elif axis_label_fontsize is not None:
+        ax.set_xlabel(ax.get_xlabel(), fontsize=axis_label_fontsize)
+
     if ylabel is not None:
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel(ylabel, fontsize=axis_label_fontsize)
+    elif axis_label_fontsize is not None:
+        ax.set_ylabel(ax.get_ylabel(), fontsize=axis_label_fontsize)
 
     # Set axis limits
     if xlim is not None:
@@ -640,6 +706,9 @@ def format_axis(ax, xlabel=None, ylabel=None, xlim=None, ylim=None,
         ax.get_xaxis().set_visible(xaxis_visible)
     if yaxis_visible is not None:
         ax.get_yaxis().set_visible(yaxis_visible)
+
+    if tight_layout:
+        plt.tight_layout()
 
     # Turn off tick labels, keep tick marks
     # ax.tick_params(top=False, bottom=True, left=True, right=False, labelleft=False, labelbottom=True)
