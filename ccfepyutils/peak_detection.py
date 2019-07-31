@@ -65,7 +65,7 @@ def locate_peaks(data, peak_method='argrelmax', thresh_method='sigma', thresh_va
     assert isinstance(data, xr.DataArray)
     if data.ndim != 1:
         raise ValueError('data is {}D. Peak detection requires 1D signal: {}'.format(data.ndim, data))
-    info = {}
+    info = {'peak_method': peak_method}
     y = data.values
     x = data.coords[data.dims[0]].values
     func = funcs[peak_method]
