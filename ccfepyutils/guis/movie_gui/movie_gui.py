@@ -520,7 +520,7 @@ class Worker(QtCore.QRunnable):
 
 
 if __name__ == '__main__':
-    movie = Movie(29852, camera='SA1.1', machine='MAST', start_frame=10, end_frame=100, name='Movie_gui')
+    movie = Movie('29852', camera='SA1.1', machine='MAST', start_frame=10, end_frame=100, name='Movie_gui')
 
     app = QtWidgets.QApplication(sys.argv)
 

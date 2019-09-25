@@ -21,10 +21,10 @@ Info:
 
 from collections import defaultdict
 import numpy as np
-from numpy import exp as exp0
-from numpy import log as log0
-from numpy import sqrt as sqrt0
-from numpy import pi as pi0
+from numpy import exp as exp_
+from numpy import log as log_
+from numpy import sqrt as sqrt_
+from numpy import pi as pi_
 import scipy as sp
 import pandas as pd
 
@@ -210,6 +210,26 @@ def linear_though_origin(x, m):
     """y = m*x"""
     return m*x
 
+def quadratic0(x, a):
+    """y = a*x^2"""
+    return a * x**2
+
+def quadratic(x, a, k):
+    """y = a*(x-k)^2"""
+    return a * (x-k)**2
+
+def quadratic0_c(x, a, c):
+    """y = a*x^2"""
+    return a * x**2 + c
+
+def quadratic_c(x, a, k, c):
+    """y = a*(x-k)^2 + c"""
+    return a * (x-k)**2 + c
+
+def exp0(x, lamda):
+    """y = e^( -(x)/lamda )"""
+    return np.exp(-(x)/lamda)
+
 def exp(x, lamda, k):
     """y = e^( -(x-k)/lamda )"""
     return np.exp(-(x-k)/lamda)
@@ -217,6 +237,10 @@ def exp(x, lamda, k):
 def exp_a(x, A, lamda, k):
     """y = A e^( -(x-k)/lamda )"""
     return A * np.exp(-(x-k)/lamda)
+
+def exp_a0(x, A, lamda):
+    """y = A e^( -(x)/lamda )"""
+    return A* np.exp(-(x)/lamda)
 
 def exp_c(x, lamda, k, c):
     """y = e^( -(x-k)/lamda ) + c"""
@@ -252,32 +276,35 @@ def auto_corr(t, tau, beta, k):
 def gaussian(x, A, mu, sigma):
     """ Gaussian distribution with centre mu and width sigma """
 
-    return A * (1/sqrt0(2*pi0*sigma**2)) * exp0(-(x-mu)**2/(2*sigma**2))
+    return A * (1/sqrt_(2*pi_*sigma**2)) * exp_(-(x-mu)**2/(2*sigma**2))
 
 def gaussian_c(x, A, mu, sigma, c):
     """ Gaussian distribution with centre mu, width sigma and offset c """
 
-    return A * (1/sqrt0(2*pi0*sigma**2)) * exp0(-(x-mu)**2/(2*sigma**2)) + c
+    return A * (1/sqrt_(2*pi_*sigma**2)) * exp_(-(x-mu)**2/(2*sigma**2)) + c
     # return exp(x, A, (1/(2*sigma),0,-mu/(2*sigma)), 0)
 
 def gaussian_upright(x, A, mu, sigma, c):
     """ Gaussian distribution with centre mu and width sigma """
     if A <= 0:  # for purpose of curve fitting return inf if have negative amplitude
         return 1e50
-    return A * 1/sqrt0(2*pi0*sigma**2) * exp0(-(x-mu)**2/(2*sigma**2)) + c
+    return A * 1/sqrt_(2*pi_*sigma**2) * exp_(-(x-mu)**2/(2*sigma**2)) + c
 
 def lognormal(x, A, mu, sigma, c):
     """y = A / (sigma*sqrt(2*pi)*(x)) * exp(-(ln(x)-mu)**2/(sigma*sqrt(2)))"""
-    return (A / (sigma*sqrt0(2*pi0)*x)) * exp0(-(log0(x)-mu)**2/(2*sigma**2)) + c
+    return (A / (sigma*sqrt_(2*pi_)*x)) * exp_(-(log_(x)-mu)**2/(2*sigma**2)) + c
 
-def lognormal_k(x, A, mu, sigma, c, k):
+def lognormal_k(x, A, mu, sigma, c, k=0):
     """y = A / (sigma*sqrt(2*pi)*(x)) * exp(-(ln(x)-mu)**2/(sigma*sqrt(2)))"""
-    return (A / (sigma*sqrt0(2*pi0)*(x-k))) * exp0(-(log0(x-k)-mu)**2/(2*sigma**2)) + c
+    return (A / (sigma*sqrt_(2*pi_)*(x-k))) * exp_(-(log_(x-k)-mu)**2/(2*sigma**2)) + c
 
 def rice(x, nu, sigma):
     """Rice distribution using bessel function"""
     from scipy.special import iv
-    return x / (sigma)**2 * exp0(-(x**2 + nu**2)/(2*sigma**2)) * iv(0, x*nu/sigma**2)
+    return x / (sigma)**2 * exp_(-(x**2 + nu**2)/(2*sigma**2)) * iv(0, x*nu/sigma**2)
+
+def weibull(x, lamda, k, A=1):
+    return A * (k/lamda) * (x/lamda)**(k-1) * np.exp(-(x/lamda)**k)
 
 def gamma(x, a, B):
     return B**a * x**(a-1) * np.exp(-B*x) / sp.special.gamma(x)
@@ -328,10 +355,12 @@ def distributions():
 
         return amp * np.exp(exponent)
 
-functions = {'poly': poly, 'linear': linear, 'linear_though_origin': linear_though_origin,
-             'exp': exp, 'exp_a': exp_a, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 
+functions = {'poly': poly, 'linear': linear, 'linear_though_origin': linear_though_origin, 'quadratic_c': quadratic_c,
+             'quadratic0_c': quadratic0_c,
+             'exp': exp, 'exp_a': exp_a, 'exp_c': exp_c, 'exp_a_c': exp_a_c, 'exp0': exp0, 'exp_a0': exp_a0,
              'normal': gaussian, 'gaussian_c': gaussian_c, 'gaussian': gaussian, 'gaussian_upright': gaussian_upright, 
-             'lognormal': lognormal, 'lognormal_k': lognormal_k, 'rice': rice, 'gamma': gamma, 'auto_corr': auto_corr}
+             'lognormal': lognormal, 'lognormal_k': lognormal_k, 'rice': rice, 'gamma': gamma, 'auto_corr': auto_corr,
+             'weibull': weibull}
 
 
 func_obs = {'lognormal': lognormal}
