@@ -135,7 +135,7 @@ class MovieGUI(QtWidgets.QMainWindow):
         # Movie file controls starting values
         widget.le_machine.setText(movie.settings['machine'].value)
         widget.le_camera.setText(movie.settings['camera'].value)
-        widget.le_pulse.setText(movie.settings['pulse'].value)
+        widget.le_pulse.setText(str(movie.settings['pulse'].value))
         widget.sb_start_frame.setValue(movie._frame_range_info_user['frame_range'][0])
         widget.sb_end_frame.setValue(movie._frame_range_info_user['frame_range'][1])
         widget.sb_frame_stride.setValue(movie._frame_range_info_user['stride'])
