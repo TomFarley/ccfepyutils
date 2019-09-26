@@ -220,6 +220,15 @@ class Movie(Stack):
         super().__init__(x, y, z, quantity=quantity, stack_axis='x', name=name)
 
         # kws = self.settings.get_func_args(self.set_movie_source)
+
+
+        # Start tmp ***********************************************
+        # TODO: remove tmp
+        print(settings.view(cols='value'))
+        print(movie_path)
+        # End tmp ***********************************************
+
+
         kws = settings.args_for(self.set_movie_source)
         self.set_movie_source(fn_path=movie_path, **kws)
 
