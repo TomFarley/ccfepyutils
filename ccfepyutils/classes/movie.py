@@ -2,7 +2,7 @@
 
 """Classes for working with fusion camera data"""
 
-import os, re, numbers, logging, inspect, glob, sys, pickle, socket, string
+import os, re, numbers, logging, inspect, glob, sys, pickle, socket, string, shutil
 from collections import defaultdict, OrderedDict
 from pathlib import Path
 from copy import copy, deepcopy
@@ -197,8 +197,18 @@ class Movie(Stack):
         for key in ['start_frame', 'end_frame']:
             if (key in kwargs) and (kwargs[key] is None):
                 kwargs.pop(key)
-        settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
-                            create_new=create_new_settings)
+        try:
+            settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
+                                create_new=create_new_settings)
+        except FileNotFoundError:
+            setpy_movie_dir = Path('~/.setpy/data/movie')
+            template_movie_dir = Path('../template_settings/data/movie/settings-movie-repeat.p')
+            if not setpy_movie_dir.is_dir():
+                setpy_movie_dir.mkdir()
+            shutil.copyfile(template_movie_dir, setpy_movie_dir)
+            settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
+                                create_new=create_new_settings)
+
         self.settings = settings
         # TODO: lookup parameter objects
         x = defaultdict(return_none, name='n')

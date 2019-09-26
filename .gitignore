@@ -23,7 +23,6 @@ ccfepyutils.egg-info/
 *.prof
 *.lprof
 *.tmp
-*.p
 *.csvgit c
 .nfs0*
 
