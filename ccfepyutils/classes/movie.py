@@ -28,6 +28,14 @@ from ccfepyutils.mpl_tools import annotate_axis
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+def copy_movie_settings_templates():
+    from setpy import copy_template_settings_files
+    template_movie_dir = Path('../template_settings/data/')
+    copy_template_settings_files(template_movie_dir, template_subset=['movie', 'enhancer', 'movie_source',
+                                                                      'movie_range', 'movie_data_locations'])
+
+copy_movie_settings_templates()
+
 def get_camera_data_path(machine, camera, pulse):
     """Return path to movie file, looking up settings for camera"""
     from setpy import Settings
@@ -201,13 +209,7 @@ class Movie(Stack):
             settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
                                 create_new=create_new_settings)
         except FileNotFoundError:
-            setpy_movie_dir = Path('~/.setpy/data/movie')
-            template_movie_dir = Path('../template_settings/data/movie/settings-movie-repeat.p')
-            if not setpy_movie_dir.is_dir():
-                setpy_movie_dir.mkdir()
-            shutil.copyfile(template_movie_dir, setpy_movie_dir)
-            settings = Settings(application='movie', settings_name=settings, recursive=True, updated_values=kwargs,
-                                create_new=create_new_settings)
+            copy_movie_settings_templates()
 
         self.settings = settings
         # TODO: lookup parameter objects
@@ -223,9 +225,9 @@ class Movie(Stack):
 
 
         # Start tmp ***********************************************
-        # TODO: remove tmp
-        print(settings.view(cols='value'))
-        print(movie_path)
+        # # TODO: remove tmp
+        # print(settings.view(cols='value'))
+        # print(movie_path)
         # End tmp ***********************************************
 
 
