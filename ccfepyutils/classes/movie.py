@@ -104,6 +104,21 @@ class Frame(Slice):
             return self.stack(raw=True, **{self.dim: self.value})
             # raise ValueError('Frame does not have a raw movie')
 
+    @property
+    def meta(self):
+        meta = self.stack._meta.loc[self.value]
+        return meta
+
+    @property
+    def n(self):
+        n = self.meta['n']
+        return n
+
+    @property
+    def t(self):
+        t = self.meta['t']
+        return t
+
     def hist(self, ax=None, label=None, annotate=True, update_existing=False, show=True, **kwargs):
         if update_existing:
             raise NotImplementedError
