@@ -30,9 +30,11 @@ logger.setLevel(logging.DEBUG)
 
 def copy_movie_settings_templates():
     from setpy import copy_template_settings_files
-    template_movie_dir = Path('../../template_settings/data/')
-    copy_template_settings_files(template_movie_dir, template_subset=['movie', 'enhancer', 'movie_source',
-                                                                      'movie_range', 'movie_data_locations'])
+    current_dir = Path(__file__).parent
+    template_movie_dir = (current_dir / '../template_settings/data/').resolve()
+    copy_template_settings_files(template_movie_dir,
+                        template_subset=['movie', 'enhancer', 'movie_source', 'movie_range', 'movie_data_locations'],
+                        overwrite_existing=False)
 
 copy_movie_settings_templates()
 
