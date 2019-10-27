@@ -21,7 +21,7 @@ import pandas as pd
 from matplotlib import cbook
 from copy import copy
 import sys, os, inspect
-from collections import Mapping, Container
+from collections import Mapping, Container, defaultdict
 from sys import getsizeof
 
 try:
@@ -777,6 +777,13 @@ def equal_string(obj, string):
         return False
 
 # def assert_raises(func)
+
+def reverse_dict(d):
+    """Return dict with keys equal to values in input dict and vales equal to lists corresponding input keys."""
+    reverse = defaultdict(list)
+    for key, value in d.items():
+        reverse[value].append(key)
+    return reverse
 
 def printProgress(iteration, total, prefix='', suffix='', frac=False, t0=None,
                   decimals=2, nth_loop=2, barLength=50, flush=True):
