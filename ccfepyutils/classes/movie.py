@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 def copy_movie_settings_templates():
-    from setpy import copy_template_settings_files
+    from setpy.settings.template_settings_files import copy_template_settings_files
     current_dir = Path(__file__).parent
     template_movie_dir = (current_dir / '../template_settings/data/').resolve()
     copy_template_settings_files(template_movie_dir,
