@@ -49,7 +49,7 @@ class GFileSelector(object):
 
     def __repr__(self):
         class_name = re.search(".*\.(\w+)'\>", str(self.__class__)).groups()[0]
-        return '<{}: {}>'.format(class_name, None)
+        return '<{}: {}>'.format(class_name, self.settings.settings_name)
 
     def get_gfile_fn(self, pulse=None, time=None, allow_scheduler_efit=None, machine='MAST', current_file=None,
                      dt_switch_gfile=None, default_to_last=True, raise_on_inexact_match=True):
