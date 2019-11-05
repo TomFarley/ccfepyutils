@@ -518,8 +518,7 @@ class Worker(QtCore.QRunnable):
         finally:
             self.signals.finished.emit()  # Done
 
-
-if __name__ == '__main__':
+def start_movie_gui():
     movie = Movie('29852', camera='SA1.1', machine='MAST', start_frame=10, end_frame=100, name='Movie_gui')
 
     app = QtWidgets.QApplication(sys.argv)
@@ -528,3 +527,7 @@ if __name__ == '__main__':
     window = MovieGUI(movie)
 
     sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    start_movie_gui()

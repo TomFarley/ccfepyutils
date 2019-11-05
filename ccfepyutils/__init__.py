@@ -66,3 +66,4 @@ from ccfepyutils.classes.plot import Plot
 from ccfepyutils.classes.fitter import Fitter
 from ccfepyutils.classes.gfile_selector import GFileSelector
 from ccfepyutils.classes.movie import Movie
+from ccfepyutils.guis.movie_gui.movie_gui import start_movie_gui
