@@ -28,11 +28,12 @@ set_matplotlib_backend(batch_mode, non_visual_backend='Agg', visual_backend='Qt5
 import matplotlib.pyplot as plt
 colormap_names = sorted(m for m in plt.cm.datad if not m.endswith("_r"))
 
-def get_fig_ax(ax=None, num=None, subplot=111, **fig_kwargs):
+def get_fig_ax(ax=None, num=None, nrows=1, ncols=1, **fig_kwargs):
     """Return new/existing figure and axis instances"""
     if ax is None:
-        fig = plt.figure(num=num, **fig_kwargs)
-        ax = fig.add_subplot(subplot)
+        fig, ax = plt.subplots(nrows=nrows, ncols=ncols, num=num, **fig_kwargs)
+        # fig = plt.figure(num=num, **fig_kwargs)
+        # ax = fig.add_subplot(subplot)
     else:
         fig = ax.figure
     return fig, ax
@@ -142,30 +143,30 @@ def arrowplot(axes, x, y, narrs=30, dspace=0.5, direc='pos', \
     else:
         dspace = abs(dspace)
 
-    arrowData = [] # will hold tuples of x,y,theta for each arrow
-    arrowPos = aspace*(dspace) # current point on walk along data
+    arrow_data = [] # will hold tuples of x,y,theta for each arrow
+    arrow_pos = aspace*(dspace) # current point on walk along data
                                  # could set arrowPos to 0 if you want
                                  # an arrow at the beginning of the curve
 
     ndrawn = 0
     rcount = 1
-    while arrowPos < r.sum() and ndrawn < narrs:
+    while arrow_pos <= r.sum() and ndrawn < narrs:
         x1,x2 = x[rcount-1],x[rcount]
         y1,y2 = y[rcount-1],y[rcount]
-        da = arrowPos-rtot[rcount]
+        da = arrow_pos-rtot[rcount]
         theta = np.arctan2((x2-x1),(y2-y1))
         ax = np.sin(theta)*da+x1
         ay = np.cos(theta)*da+y1
-        arrowData.append((ax,ay,theta))
+        arrow_data.append((ax,ay,theta))
         ndrawn += 1
-        arrowPos+=aspace
-        while arrowPos > rtot[rcount+1]:
+        arrow_pos+=aspace
+        while arrow_pos > rtot[rcount+1]:
             rcount+=1
-            if arrowPos > rtot[-1]:
+            if arrow_pos > rtot[-1]:
                 break
 
     # could be done in above block if you want
-    for ax,ay,theta in arrowData:
+    for ax,ay,theta in arrow_data:
         # use aspace as a guide for size and length of things
         # scaling factors were chosen by experimenting a bit
 
@@ -174,7 +175,7 @@ def arrowplot(axes, x, y, narrs=30, dspace=0.5, direc='pos', \
         dx1 = -1.*np.sin(theta)*hl/2. + ax
         dy1 = -1.*np.cos(theta)*hl/2. + ay
 
-        if direc is 'neg' :
+        if direc is 'pos' :
           ax0 = dx0
           ay0 = dy0
           ax1 = dx1
