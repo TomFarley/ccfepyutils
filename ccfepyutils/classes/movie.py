@@ -55,7 +55,7 @@ def get_camera_data_path(machine, camera, pulse):
     path_options = camera_settings['path_options']
     fn_options = camera_settings['fn_options']
     
-    path_kws = {'machine': machine, 'pulse': pulse}
+    path_kws = {'machine': machine, 'pulse': pulse, 'pulse_prefix': '0{prefix}'.format(prefix=str(pulse[0:2]))}
     fn_kws = {'n': 1, 'pulse': pulse}
     path, fn_format = locate_file(path_options, fn_options, path_kws=path_kws, fn_kws=fn_kws,
                           return_raw_path=False, return_raw_fn=True, _raise=True, verbose=True)
@@ -565,37 +565,37 @@ class Movie(Stack):
         :return:
         """
         movie_meta = {'movie_format': '.ipx'}
-        n = 0
-        step = 100
+        # n = 0
+        # step = 100
 
+        # Read header info for first frame
         vid = ipxReader(filename=fn_path)
         file_header = vid.file_header
-        ret, frame0, frame_header0 = vid.read(transforms=transforms)
-        while ret:
-            n += step
-            vid.set_frame_number(n)
-            ret, frame, frame_header = vid.read(transforms=transforms)
+        ret, frame0, frame_header_first = vid.read(transforms=transforms)
 
-        n_end = vid._current_frame
-        vid = ipxReader(filename=fn_path)
-        n -= step
-        vid.set_frame_number(n)
-        ret = True
-        while ret:
-            n += 1
-            ret, frame, frame_header = vid.read(transforms=transforms)  # auto advances vid frame number
-        # TODO: Fix problem with seeking to final frame   -2 => -1
-        n -= 2  # Go to last frame that returned True
-        vid = ipxReader(filename=fn_path)
-        vid.set_frame_number(n)
-        ret, frame, frame_header = vid.read(transforms=transforms)
+        # Read header info for last frame, working backwards from end until frame is successfully read
+        ret = False
+        n = file_header['numFrames'] if 'numFrames' in file_header else file_header['frames']
+        while (n>=0):
+            n -= 1
+            try:
+                vid.set_frame_number(n)
+                ret, frame, frame_header_last = vid.read(transforms=transforms)
+                if vid._file.closed:
+                    vid = ipxReader(filename=fn_path)
+                if ret:
+                    break
+            except ValueError as e:
+                pass
+        else:
+            raise ValueError('Failed to load last frame of movie (n={n}): {fn_path}'.format(n=n, fn_path=fn_path))
         vid.release()
 
         movie_meta['ipx_header'] = file_header
         movie_meta['frame_range'] = [0, n]
-        movie_meta['t_range'] = [frame_header0['time_stamp'], frame_header['time_stamp']]
+        movie_meta['t_range'] = np.array([float(frame_header_first['time_stamp']), float(frame_header_last['time_stamp'])])
         movie_meta['frame_shape'] = frame0.shape
-        movie_meta['fps'] = (n+1) / (frame_header['time_stamp'] - frame_header0['time_stamp'])
+        movie_meta['fps'] = (n) / np.ptp(movie_meta['t_range'])
         logger.info('Readimg ipx movie file {} with frame range {}'.format(fn_path, movie_meta['frame_range']))
         return movie_meta
 

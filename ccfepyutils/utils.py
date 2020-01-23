@@ -234,7 +234,7 @@ def equivalent_numpy_python_type(value, to_type='python', none_type=type(None),
             break
     else:
         if raise_on_other:
-            raise NotImplementedError(f'Type {value}')
+            raise NotImplementedError('Type {value}'.format(value))
         else:
             # Return type unchanged
             return value_type

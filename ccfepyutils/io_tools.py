@@ -375,7 +375,7 @@ def delete_files_recrusive(pattern, path=None, delete_files=True, delete_directo
                 if not prompt_user:
                     os.remove(path_fn)
     if prompt_user:
-        print(f'Files/directories to be deleted: \n{to_be_removed}')
+        print('Files/directories to be deleted: \n{to_be_removed}'.format(to_be_removed=to_be_removed))
         if ask_input_yes_no('Delete files'):
             for key in ('files', 'dirs'):
                 for file in to_be_removed[key]:
@@ -384,7 +384,7 @@ def delete_files_recrusive(pattern, path=None, delete_files=True, delete_directo
         else:
             print('No files were deleted')
     else:
-        print(f'The following files were deleted: \n{to_be_removed}')
+        print('The following files were deleted: \n{to_be_removed}'.format(to_be_removed=to_be_removed))
 
 # def filter_files_in_dir(path, extension='.p', contain=None, not_contain=None):
 #
@@ -979,7 +979,7 @@ def merge_pdfs(fns_in, fn_out):
     # Write out the merged PDF
     with open(fn_out, 'wb') as out:
         pdf_writer.write(out)
-    logger.info(f'Combined {len(input_fns)} pdf documents into file: {fn_out}')
+    logger.info('Combined {l} pdf documents into file: {fn_out}'.format(l=len(input_fns), fn_out=fn_out))
 
 def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_p{page_min}-{page_max}.pdf', pages='all'):
     """Extract pages from pdf (portable document format) file to a new file.
@@ -992,15 +992,15 @@ def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_p{page_min}-{page_m
     pdf = PdfFileReader(input_fn)
     for page_no in (np.arange(pdf.getNumPages())+1):
         if (page_no in pages) or (pages == ['all']):
-            print(f'extracting page {page_no}')
+            print('extracting page {page_no}'.format(page_no=page_no))
             pdf_out_writer.addPage(pdf.getPage(page_no))
         else:
-            print(f'Skipping page {page_no}')
+            print('Skipping page {page_no}'.format(page_no=page_no))
 
     fn_out = fn_out_pattern.format(input_stem=input_stem, page_min=min(pages), page_max=max(pages))
     with open(fn_out, 'wb') as output_pdf:
         pdf_out_writer.write(output_pdf)
-    logger.info(f'Wrote pages {pages} of pdf {input_fn} to: {fn_out}')
+    logger.info('Wrote pages {pages} of pdf {input_fn} to: {fn_out}'.format(pages=pages, input_fn=input_fn, fn_out=fn_out))
 
 
 if __name__ == '__main__':
