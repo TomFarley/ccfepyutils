@@ -1002,6 +1002,27 @@ def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_p{page_min}-{page_m
         pdf_out_writer.write(output_pdf)
     logger.info('Wrote pages {pages} of pdf {input_fn} to: {fn_out}'.format(pages=pages, input_fn=input_fn, fn_out=fn_out))
 
+def get_calcam_calib(calcam_calib_fn, calcam_calib_path='~/calcam/calibrations/'):
+    """Return calcam Calibration object for given calibration filename and path
+
+    :param calcam_calib_fn: Calibration filename
+    :param calcam_calib_path: Calcam calibrations path
+    :return: Calibration object
+    """
+    try:
+        # Calcam 2.0+
+        from calcam import Calibration
+        calcam_calib_path_fn = Path(calcam_calib_path).expanduser() / calcam_calib_fn
+        if calcam_calib_path_fn.suffix != '.ccc':
+            calcam_calib_path_fn = calcam_calib_path_fn.with_suffix(calcam_calib_path_fn.suffix + '.ccc')
+        calcam_calib = Calibration(calcam_calib_path_fn)
+    except ImportError as e:
+        # Calcam 1
+        from calcam import fitting
+        calcam_calib = fitting.CalibResults(calcam_calib_fn)
+    return calcam_calib
+
+
 
 if __name__ == '__main__':
     # path = '/home/tfarley/elzar2/checkpoints/MAST/SynthCam/single_filament_scan/Corrected_inversion_data/6bb2ed99e9772ce84f1fba74faf65e23a7e5e8f3/'
