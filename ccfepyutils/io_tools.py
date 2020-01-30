@@ -553,7 +553,11 @@ def pickle_dump(obj, path, **kwargs):
     """Wrapper for pickle.dump, accepting multiple path formats (file, string, pathlib.Path).
     - Automatically appends .p if not pressent.
     - Uses cpickle when possible.
-    - Automatically closes file objects."""
+    - Automatically closes file objects.
+
+    Consider passing latest protocol:
+    protocol=-1    OR
+    protocol=pickle.HIGHEST_PROTOCOL"""
     if isinstance(path, Path):
         path = str(path)
 
@@ -569,12 +573,19 @@ def pickle_dump(obj, path, **kwargs):
         raise ValueError('Unexpected path format')
 
 
-def pickle_load(path_fn, base=None, **kwargs):
+def pickle_load(path_fn, path=None, **kwargs):
+    """Wrapper for pickle.load accepting multiple path formats (file, string, pathlib.Path).
+
+    :param path_fn  : Filename or full path of pickle file
+    :param path     : path in which path_fn is located (optional)
+    :param kwargs   : keyword arguments to supply to pickle.load
+    :return: Contents of pickle file
+    """
     if isinstance(path_fn, Path):
         path_fn = str(path_fn)
 
-    if base is not None:
-        path_fn = os.path.join(base, path_fn)
+    if path is not None:
+        path_fn = os.path.join(path, path_fn)
 
     if isinstance(path_fn, basestring):
         if path_fn[-2:] != '.p':
