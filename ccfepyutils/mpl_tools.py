@@ -39,7 +39,7 @@ def get_fig_ax(ax=None, num=None, nrows=1, ncols=1, **fig_kwargs):
     return fig, ax
 
 def seg_line_plot(x, y, z, ax=None, z_out='color', in_range=None, out_range=None, fig=None, color='b', lw = 2, ls='-',
-                  cmap='Spectral_r', label=None, alpha=1):
+                  cmap='Spectral_r', label=None, alpha=1, **kwargs):
     """ Colour line plot. Plot 2D line with z value represented by colour of points on line
     """
     if ax is None:
@@ -61,10 +61,10 @@ def seg_line_plot(x, y, z, ax=None, z_out='color', in_range=None, out_range=None
         z_scaled += out_range[0]
 
     if 'color' in z_out:
-        lc = LineCollection(segments, cmap=plt.get_cmap(cmap))#, norm=plt.Normalize(250, 1500))
+        lc = LineCollection(segments, cmap=plt.get_cmap(cmap), **kwargs)#, norm=plt.Normalize(250, 1500))
         lc.set_array(z_scaled)
     else:
-        lc = LineCollection(segments, cmap=None)#, norm=plt.Normalize(250, 1500))
+        lc = LineCollection(segments, cmap=None, **kwargs)#, norm=plt.Normalize(250, 1500))
         try:
             lc.set_color(color)
         except ValueError as e:
