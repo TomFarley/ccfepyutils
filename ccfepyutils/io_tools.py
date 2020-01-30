@@ -569,28 +569,36 @@ def pickle_dump(obj, path, **kwargs):
         raise ValueError('Unexpected path format')
 
 
-def pickle_load(path, base=None, **kwargs):
-    if isinstance(path, Path):
-        path = str(path)
+def pickle_load(path_fn, base=None, **kwargs):
+    if isinstance(path_fn, Path):
+        path_fn = str(path_fn)
 
     if base is not None:
-        path = os.path.join(base, path)
+        path_fn = os.path.join(base, path_fn)
 
-    if isinstance(path, basestring):
-        if path[-2:] != '.p':
-            path += '.p'
-        with open(path, 'rb') as f:
-            try:
+    if isinstance(path_fn, basestring):
+        if path_fn[-2:] != '.p':
+            path_fn += '.p'
+
+        try:
+            with open(path_fn, 'rb') as f:
                 out = pickle.load(f, **kwargs)
-            except EOFError as e:
-                logger.error('path "{}" is not a pickle file. {}'.format(path, e))
+        except EOFError as e:
+            logger.error('path "{}" is not a pickle file. {}'.format(path_fn, e))
+            raise e
+        except UnicodeDecodeError as e:
+            try:
+                kwargs.update({'encoding': 'latin1'})
+                with open(path_fn, 'rb') as f:
+                    out = pickle.load(f, **kwargs)
+                logger.info('Reading pickle file required encoding="latin": {}'.format(path_fn))
+            except Exception as e:
+                logger.error('Failed to read pickle file "{}". Wrong pickle protocol? {}'.format(path_fn, e))
                 raise e
-            except UnicodeDecodeError as e:
-                logger.error('Failed to read pickle file "{}". Wrong pickle protocol? {}'.format(path, e))
-                raise e
-    elif isinstance(path, file):
-        out = pickle.load(path, **kwargs)
-        path.close()
+
+    elif isinstance(path_fn, file):
+        out = pickle.load(path_fn, **kwargs)
+        path_fn.close()
     else:
         raise ValueError('Unexpected path format')
     return out
