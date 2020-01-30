@@ -1002,7 +1002,7 @@ def extract_pdf_pages(input_fn, fn_out_pattern='{input_stem}_p{page_min}-{page_m
         pdf_out_writer.write(output_pdf)
     logger.info('Wrote pages {pages} of pdf {input_fn} to: {fn_out}'.format(pages=pages, input_fn=input_fn, fn_out=fn_out))
 
-def get_calcam_calib(calcam_calib_fn, calcam_calib_path='~/calcam/calibrations/'):
+def get_calcam_calib(calcam_calib_fn, calcam_calib_path='~/calcam2/calibrations/'):
     """Return calcam Calibration object for given calibration filename and path
 
     :param calcam_calib_fn: Calibration filename
