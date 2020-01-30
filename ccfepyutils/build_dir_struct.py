@@ -3,12 +3,15 @@
 """ 
 Author: T. Farley
 """
+from pathlib import Path
 import logging, os, shutil
 logger = logging.getLogger(__name__)
 
 def check_ccfepyutils_dir_struct(template_settings_dirs=(), settings_dir='~/.ccfetools/settings/'):
     settings_dir = os.path.expanduser(settings_dir)
+    settings_dir_path = Path(settings_dir)
     if not os.path.isdir(settings_dir):
+        settings_dir_path.mkdir(parents=True, exists_ok=True)
         os.mkdir(settings_dir)
         os.mkdir(settings_dir+'values')
         os.mkdir(settings_dir+'log_files')
