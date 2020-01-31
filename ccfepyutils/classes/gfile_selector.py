@@ -63,7 +63,11 @@ class GFileSelector(object):
                                  'fixed_gfile is None')
         s = self.settings
         store = self.store
-        pulse = int(pulse)
+        try:
+            pulse = int(pulse)
+        except ValueError as e:
+            # For synthetic pulse names, use convention that first part of name is pulse number
+            pulse = int(pulse.split('_')[0])
         time = float(time)
         allow_scheduler_efit = none_filter(s['allow_scheduler_efit'].value, allow_scheduler_efit)
         dt_switch_gfile = none_filter(s['dt_switch_gfile'].value, dt_switch_gfile)
