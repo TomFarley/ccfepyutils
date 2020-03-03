@@ -88,14 +88,14 @@ def reduce_image_noise(image, reduce_noise_diameter=5, reduce_noise_sigma_color=
     :param: sigmaSpace: Filter sigma in the coordinate space. A larger value of the parameter means that farther pixels
             will influence each other as long as their colors are close enough (see sigmaColor ). When d>0 , it
             specifies the neighborhood size regardless of sigmaSpace . Otherwise, d is proportional to sigmaSpace ."""
-    image, original_max, original_type = to_nbit(image)
+    image, original_max, original_type = to_nbit(image, nbit=8)
     # try:
     #     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # except:
     #     pass
     reduce_noise_diameter, reduce_noise_sigma_color, reduce_noise_sigma_space = (int(reduce_noise_diameter),
                                                         int(reduce_noise_sigma_color), int(reduce_noise_sigma_space))
-    # image = cv2.guidedFilter(image, image, 3, 9)  # guide, src (in), radius, eps  -- requires OpenCV3
+    # image = cv2.ximgproc.guidedFilter(image, image, 3, 9)  # guide, src (in), radius, eps  -- requires OpenCV3
     # strong but slow noise filter
     image = cv2.bilateralFilter(image, reduce_noise_diameter, reduce_noise_sigma_color, reduce_noise_sigma_space)
     # image = cv2.fastNlMeansDenoising(image,None,7,21)
@@ -195,7 +195,7 @@ def extract_fg(image, frame_stack, method='min'):
 def add_abs_gauss_noise(image, sigma_frac_abs_gauss_noise=0.05, sigma_abs_abs_gauss_noise=None,
                         mean_abs_gauss_noise=0.0, return_noise=False, seed_abs_gauss_noise=None):
     """ Add noise to frame to emulate experimental random noise. A positive definite gaussian distribution is used
-    so as to best model the noise in background subtracted frame data
+    so as to best model the noise in raw / background subtracted frame data
     """
     if sigma_abs_abs_gauss_noise is not None:
         scale = sigma_abs_abs_gauss_noise
@@ -206,8 +206,8 @@ def add_abs_gauss_noise(image, sigma_frac_abs_gauss_noise=0.05, sigma_abs_abs_ga
         np.random.seed(seed=seed_abs_gauss_noise)
     noise = np.abs(np.random.normal(loc=mean_abs_gauss_noise, scale=scale, size=image.shape))
     if not return_noise:
-        image = image + noise
-        return image
+        image_out = image + noise
+        return image_out
     else:
         return noise
 
