@@ -29,8 +29,8 @@ import matplotlib.pyplot as plt
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-def separatrix_raidal_position(pulse=None, time=None, gfile=None, machine='MAST', z=0.0, outboard=True, scheduler=True,
-                               **kwargs):
+def separatrix_raidal_position(pulse=None, time=None, gfile=None, machine='MAST', z=0.0, outboard=True,
+                               scheduler=True, psi_n=1.0, **kwargs):
     """Return radial position of separatrix (default at midplane) for given gfile/pulse"""
     from pyEquilibrium.equilibrium import equilibrium
     if gfile is not None:
@@ -47,7 +47,7 @@ def separatrix_raidal_position(pulse=None, time=None, gfile=None, machine='MAST'
             eq.load_geqdsk(gfile=os.path.join(*gfile), **kwargs)
     else:
         raise ValueError('Insufficient inputs. gfile | pulse + time')
-    fs = eq.get_fluxsurface(1.0)
+    fs = eq.get_fluxsurface(psi_n)
     if 0.0 in fs.Z:
         i = np.where(fs.Z == z)[0]
         r = fs.R[i]
