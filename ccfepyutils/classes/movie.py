@@ -1274,7 +1274,7 @@ class Enhancer(object):
         return args, kws
 
     def __call__(self, enhancements, data, **kwargs):
-        out = copy(data)
+        data = copy(data)
         funcs = self.image_enhancement_functions
         enhancements = make_iterable(enhancements)
         if np.max(data) == 0:
@@ -1286,7 +1286,7 @@ class Enhancer(object):
             func = funcs[enhancement]
             if len(kwargs) == 0:  # if keyword arguments havent been passed, look them up
                 kwargs.update(self.settings.args_for(func, kwargs=kwargs))
-            out = funcs[enhancement](image=out, **kwargs)
+            out = funcs[enhancement](image=data, **kwargs)
         return out
 
     def prepare_arguments(self, enhancement, movie, n):
