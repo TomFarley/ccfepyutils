@@ -50,6 +50,21 @@ __version__ = "1.0.1"
 db = Debug(debug_ON=1, lines_ON = 1, plot_ON=False)
 db.force_all(on=1)
 
+def string_to_dict(string, pattern):
+    """Extract input values from formatted string.
+
+    Taken from https://stackoverflow.com/questions/11844986/convert-or-unformat-a-string-to-variables-like-format-but-in-reverse-in-p
+
+    :param string: Formatted string
+    :param pattern: Uninterpolated format string
+    :return: Dict of interpolated values
+    """
+    regex = re.sub(r'{(.+?)}', r'(?P<_\1>.+)', pattern)
+    values = list(re.search(regex, string).groups())
+    keys = re.findall(r'{(.+?)}', pattern)
+    _dict = dict(zip(keys, values))
+    return _dict
+
 def to_precision(x,p):
     """ Return a string representation of x formatted with a precision of p
 
