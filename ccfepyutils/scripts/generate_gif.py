@@ -75,7 +75,10 @@ def gen_gif(path_in, pattern=r'\S+?(?:jpg|jpeg|png)', fn_out='movie.gif', durati
 if __name__ == '__main__':
     # Path of images to be compiled into a gif (also the output dir)
     # path_in = '/home/tfarley/elzar/images/frames/elm_bgsub/'
-    path_in = '/home/tfarley/elzar2/results/MAST/SA1.1/29852/overview_plot/7e25f017a6eaf2f655e8de7abde0faefc249b272/'
+    path_in = '/home/tfarley/elzar2/results/MAST/SynthCam/29840_storm_solps_neutrals/overview_plot/c1e484722fc7d1100721de2b2bbd00c0'
+    # path_in = '/home/tfarley/elzar2/results/MAST/SynthCam/29840_storm_solps_neutrals/overview_plot/148ed4290c116def531c2099f0e6b82f/'
+    # path_in = '/home/tfarley/elzar2/results/MAST/SynthCam/Nfil_40-Amp_exp-Width_log/overview_plot/3af0dda7d8c6d3570e5ad82aa066266c/'
+    # path_in = '/home/tfarley/elzar2/results/MAST/SA1.1/29852/overview_plot/7e25f017a6eaf2f655e8de7aybde0faefc249b272/'
     # path_in = '/home/tfarley/elzar2/results/MAST/SA1.1/29852/overview_plot/7e25f017a6eaf2f655e8de7abde0faefc249b272/
     # path_in = '/home/tfarley/elzar2/results/MAST/CherabStorm/storm_21712_iaea_1/overview_plot/11b8717068c74a0ddff758d781899c512c7a8a14/'
 
