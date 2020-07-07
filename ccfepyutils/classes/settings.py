@@ -493,6 +493,7 @@ class Settings(object):
         """Rename setting key"""
         assert old_name in self._df.index
         self._df = self._df.rename({old_name: new_name}, axis='index')
+        # TODO: update all meta references to item
 
     def rename_items_with_pattern(self, pattern, replacement_string, force=False):
         """Replace all occurences of regex pattern in indices with 'replacement_string'"""
