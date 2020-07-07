@@ -87,7 +87,10 @@ def delete_file(fn, path=None, ignore_exceptions=(), raise_on_fail=True, verbose
     """Delete file with error handelling
     :param fn: filename
     :param path: optional path to prepend to filename
-    :ignore_exceptions: Tuple of exceptions to pass over (but log) if raised eg (FileNotFoundError,) """
+    :ignore_exceptions: Tuple of exceptions to pass over (but log) if raised eg (FileNotFoundError,)
+    :param raise_on_fail: Raise exception if fail to delete file
+    :param verbose   : Print log messages
+    """
     fn = str(fn)
     if path is not None:
         fn_path = os.path.join(path, fn)
@@ -108,19 +111,31 @@ def delete_file(fn, path=None, ignore_exceptions=(), raise_on_fail=True, verbose
             logger.warning('Failed to delete file: {}'.format(fn_path))
     return success
 
-def rm_files(path, pattern, verbose=True, match=True, ignore_exceptions=()):
-    path = str(path)
-    if verbose:
-        logger.info('Deleting files with pattern "{}" in path: {}'.format(pattern, path))
-    for fn in os.listdir(path):
-        if match:
-            m = re.search(pattern, fn)
-        else:
-            m = re.search(pattern, fn)
-        if m:
-            delete_file(fn, path, ignore_exceptions=ignore_exceptions)
-            if verbose:
-                logger.info('Deleted file: {}'.format(fn))
+def rm_files(paths, pattern, verbose=True, match=True, ignore_exceptions=()):
+    """Delete files in paths matching patterns
+
+    :param paths     : Paths in which to delete files
+    :param pattern   : Regex pattern for files to delete
+    :param verbose   : Print log messages
+    :param match     : Use re.match instead of re.search (ie requries full pattern match)
+    :param ignore_exceptions: Don't raise exceptions
+
+    :return: None
+    """
+    paths = make_iterable(paths)
+    for path in paths:
+        path = str(path)
+        if verbose:
+            logger.info('Deleting files with pattern "{}" in path: {}'.format(pattern, path))
+        for fn in os.listdir(path):
+            if match:
+                m = re.match(pattern, fn)
+            else:
+                m = re.search(pattern, fn)
+            if m:
+                delete_file(fn, path, ignore_exceptions=ignore_exceptions)
+                if verbose:
+                    logger.info('Deleted file: {}'.format(fn))
 
 
 def getUserFile(type=""):
@@ -564,13 +579,15 @@ def pickle_dump(obj, path, **kwargs):
     if isinstance(path, basestring):
         if path[-2:] != '.p':
             path += '.p'
+        path = os.path.expanduser(path)
         with open(path, 'wb') as f:
             pickle.dump(obj, f, **kwargs)
-    elif isinstance(path, file):
-        pickle.dump(obj, path, **kwargs)
-        path.close()
     else:
-        raise ValueError('Unexpected path format')
+        try:
+            pickle.dump(obj, path, **kwargs)
+            path.close()
+        except:
+            raise ValueError('Unexpected path format/type: {}'.format(path))
 
 
 def pickle_load(path_fn, path=None, **kwargs):
@@ -614,6 +631,78 @@ def pickle_load(path_fn, path=None, **kwargs):
         raise ValueError('Unexpected path format')
     return out
 
+def json_dump(obj, path_fn, path=None, indent=4, overwrite=True, raise_on_fail=True):
+    """Convenience wrapper for json.dump.
+
+    Args:
+        obj             : Object to be serialised
+        path_fn         : Filename (and path) for output file
+        path            : (Optional) path to output file
+        indent          : Number of spaces for each json indentation
+        overwrite       : Overwite existing file
+        raise_on_fail   : Whether to raise exceptions or return them
+
+    Returns: Output file path if successful, else captured exception
+
+    """
+    path_fn = Path(path_fn)
+    if path is not None:
+        path_fn = Path(path) / path_fn
+    if (not overwrite) and (path_fn.exists()):
+        raise FileExistsError(f'Requested json file already exists: {path_fn}')
+    try:
+        with open(path_fn, 'w') as f:
+            json.dump(obj, f, indent=indent)
+        out = path_fn
+    except Exception as e:
+        out = e
+        if raise_on_fail:
+            raise e
+    return out
+
+def json_load(path_fn, path=None, key_paths=None, lists_to_arrays=False):
+    """Read json file with optional indexing
+
+    Args:
+        path_fn         : Path to json file
+        path            : Optional path to prepend to filename
+        key_paths       : Optional keys to subsets of contents to return. Each element of keys should be an iterable
+                          specifiying a key path through the json file.
+        lists_to_arrays : Whether to cast lists in output to arrays for easier slicing etc.
+
+    Returns: Contents of json file
+
+    """
+    path_fn = Path(path_fn)
+    if path is not None:
+        path_fn = Path(path) / path_fn
+    if not path_fn.exists():
+        raise FileNotFoundError(f'Requested json file does not exist: {path_fn}')
+    try:
+        with open(str(path_fn), 'r') as f:
+            contents = json.load(f)
+    except Exception as e:
+        raise e
+    # Return indexed subset of file
+    if key_paths is not None:
+        key_paths = make_iterable(key_paths)
+        out = {}
+        for key_path in key_paths:
+            key_path = make_iterable(key_path)
+            subset = contents
+            for key in key_path:
+                try:
+                    subset = subset[key]
+                except KeyError as e:
+                    raise KeyError(f'json file ({path_fn}) does not contain key "{key}" in key path "{key_path}":\n'
+                                   f'{subset}')
+            out[key_path[-1]] = subset
+
+    else:
+        out = contents
+    if lists_to_arrays:
+        out = cast_lists_in_dict_to_arrays(out)
+    return out
 
 def to_csv(x, ys, fn, xheading=None, yheadings=None, description='data'):
     """Quickly and easily save data to csv, with one dependent variable"""
@@ -738,7 +827,7 @@ def locate_file(paths, fns, path_kws=None, fn_kws=None, return_raw_path=False, r
                     logging.info('Located "{}" in {}'.format(fn_out, path_out))
                 return path_out, fn_out
     if _raise:
-        raise IOError('Failed to locate file in paths "{}" with formats: {}'.format(paths, fns))
+        raise IOError('Failed to locate file in paths "{}" with formats: \n{}'.format(list(paths), list(fns)))
     else:
         if verbose:
             logger.warning('Failed to locate file in paths "{}" with formats: {}'.format(paths, fns))
@@ -1031,7 +1120,7 @@ def get_calcam_calib(calcam_calib_fn, calcam_calib_path='~/calcam2/calibrations/
     try:
         # Calcam 2.0+
         from calcam import Calibration
-        calcam_calib_path_fn = Path(calcam_calib_path).expanduser() / calcam_calib_fn
+        calcam_calib_path_fn = Path(calcam_calib_path).expanduser().resolve() / calcam_calib_fn
         if calcam_calib_path_fn.suffix != '.ccc':
             calcam_calib_path_fn = calcam_calib_path_fn.with_suffix(calcam_calib_path_fn.suffix + '.ccc')
         calcam_calib = Calibration(calcam_calib_path_fn)
