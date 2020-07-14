@@ -206,14 +206,14 @@ class Movie(Stack):
     slice_class = Frame
     time_format = '{:0.5f}s'
     def __init__(self, pulse=None, machine=None, camera=None, movie_path=None, settings='repeat', source=None,
-                 moive_range=None, enhancer=None, name=None, frames=None, create_new_settings=False, **kwargs):
+                 movie_range=None, enhancer=None, name=None, frames=None, create_new_settings=False, **kwargs):
         from setpy import Settings
         # TODO: load default machine and camera from config file
         # assert (fn is not None) or all(value is not None for value in (pulse, machine, camera)), 'Insufficient inputs'
         self._reset_stack_attributes()  # Initialise attributes to None
         self._reset_movie_attributes()  # Initialise attributes to None
         keys = ('pulse', 'machine', 'camera', 'movie_source', 'movie_range', 'enhancer')
-        values = (pulse, machine, camera, source, moive_range, enhancer)
+        values = (pulse, machine, camera, source, movie_range, enhancer)
         kwargs.update({key: value for key, value in zip(keys, values)
                        if value is not None})
         # self.settings = Settings.collect('Movie', settings, {'Movie_source': source, 'Movie_range': range,
@@ -283,8 +283,11 @@ class Movie(Stack):
 
     def __repr__(self):
         enhanced = self._enhanced_movie is not None
-        out = '<Movie "{name}" {n}x{res}, enhanced={enh}>'.format(name=self.name, n=self.nframes,
-                                                                res=self.image_resolution, enh=enhanced)
+        try:
+            out = '<Movie "{name}" {n}x{res}, enhanced={enh}>'.format(name=self.name, n=self.nframes,
+                                                                    res=self.image_resolution, enh=enhanced)
+        except TypeError as e:
+            out = '<Movie; initialising id="{id}">'.format(id=id(self))
         return out
 
     def set_movie_source(self, machine, camera, pulse, fn_path=None, transforms=(), **kwargs):
@@ -1173,6 +1176,30 @@ class Movie(Stack):
             #     raise ValueError('Movie class is not compatible with camera "{}". Options: {}'.format(
             #             value, self.compatibities[self.machine].keys()))
             self.source_info['camera'] = value
+
+    @property
+    def name(self):
+        """Name identifying movie instance
+
+        Overloads method in data Stack object"""
+        if self._name is not None:
+            return self._name
+        else:
+            try:
+                name = '{}:{}:{}'.format(self.machine, self.pulse, self.camera)
+                return name
+            except Exception as e:
+                return super().name
+
+    @name.setter
+    def name(self, value):
+        """Name identifying movie instance
+
+        Property setter inheritance, see: https://gitlab.gnome.org/GNOME/gnome-music/snippets/31
+        """
+        super(Movie, self.__class__).name.fset(self, value)
+        # assert isinstance(value, (str, type(None)))
+        # self._name = value
 
     @property
     def frame_range(self):
