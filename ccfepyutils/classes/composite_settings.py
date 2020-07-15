@@ -406,7 +406,7 @@ class CompositeSettings(object):
         if self._hash_id is not None:
             return self._hash_id
         application, name = self._application, self._name
-        mask = ~self._df['runtime']
+        mask = ~self._df['runtime'].astype(bool)
         df_hash = self._df.loc[mask]
         df_runtime = self._df.loc[~mask]
         hash_id = gen_hash_id(df_hash['value'])  # Only use value column for hash_id generation, not fine meta data
@@ -420,6 +420,9 @@ class CompositeSettings(object):
         # if True:
             meta = {'application': self._application, 'name': self._name, 'first_used': t0, 'last_used': t0,
                     'protected': False, 'hash_id': hash_id}
+            for i, col in enumerate(df_hash.columns):
+                if (df_hash[col].dtype == bool) or (type(df_hash.iloc[0, i]) == bool):
+                    df_hash[col] = df_hash[col].astype(int) # int?
             df_hash.to_xarray().to_netcdf(fn_path, mode='w', group='df')
             df_runtime.to_xarray().to_netcdf(fn_path, mode='a', group='runtime')
             with Dataset(fn_path, "a", format="NETCDF4") as root:
